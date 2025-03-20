@@ -7,8 +7,8 @@
     "dev": "vite",
     "server": "node server.js",
     "dev:all": "concurrently \"npm run server\" \"npm run dev\"",
-    "build": "npm run build:client && npm run build:functions",
-    "build:functions": "netlify-lambda build netlify/functions",
+    "build": "vite build",
+    "build:functions": "NODE_ENV=production netlify-lambda build netlify/functions",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -59,6 +59,7 @@
     "express": "^4.21.2",
     "input-otp": "^1.2.4",
     "lucide-react": "^0.462.0",
+    "netlify-lambda": "^2.0.16",
     "next-themes": "^0.3.0",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
