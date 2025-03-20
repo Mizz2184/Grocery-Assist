@@ -12,29 +12,24 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
     const { query, page, pageSize } = req.body;
     console.log('Received search request:', { query, page, pageSize });
 
-    // Get session token first
-    const sessionResponse = await axios.get('https://www.maxipali.co.cr/api/sessions', {
+    // Search products directly without session token
+    const searchResponse = await axios.get(`https://www.maxipali.co.cr/api/catalog_system/pub/products/search/${encodeURIComponent(query)}`, {
+      params: {
+        _from: (page - 1) * pageSize,
+        _to: (page * pageSize) - 1
+      },
       headers: {
         'Accept': 'application/json',
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-      }
-    });
-
-    const sessionToken = sessionResponse.data.sessionToken;
-
-    // Search products with session token
-    const searchResponse = await axios.get(`https://www.maxipali.co.cr/api/catalog_system/pub/products/search/${encodeURIComponent(query)}?_from=${(page - 1) * pageSize}&_to=${page * pageSize - 1}`, {
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'VtexIdclientAutCookie': sessionToken,
-        'Cookie': `VtexIdclientAutCookie=${sessionToken}`,
-      }
+        'Origin': 'https://www.maxipali.co.cr',
+        'Referer': 'https://www.maxipali.co.cr/',
+      },
+      timeout: 30000 // 30 second timeout
     });
 
     // Transform response to match our format
     const transformedData = {
-      products: searchResponse.data.map(p => ({
+      products: (searchResponse.data || []).map(p => ({
         id: p.productId,
         name: p.productName,
         brand: p.brand,
@@ -42,24 +37,26 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
         imageUrl: p.items[0]?.images[0]?.imageUrl || '',
         store: 'MaxiPali'
       })),
-      total: searchResponse.data.length,
+      total: searchResponse.data?.length || 0,
       page,
       pageSize
     };
 
+    console.log(`Found ${transformedData.products.length} products`);
     res.json(transformedData);
   } catch (error) {
-    console.error('Detailed error:', {
+    console.error('Search error:', {
       message: error.message,
       response: error.response?.data,
       status: error.response?.status,
-      headers: error.response?.headers
+      stack: error.stack
     });
     
     res.status(500).json({ 
       error: 'Failed to fetch products',
       details: error.message,
-      response: error.response?.data
+      status: error.response?.status || 500,
+      serverMessage: error.response?.data?.message || 'Unknown error'
     });
   }
 });
@@ -70,40 +67,75 @@ app.get('/api/proxy/maxipali/barcode/:barcode', async (req, res) => {
     console.log('Received barcode lookup request:', barcode);
 
     // Get session token first
-    const sessionResponse = await axios.get('https://www.maxipali.co.cr/api/sessions', {
+    const sessionResponse = await axios.get('https://www.maxipali.co.cr/api/vtexid/pub/authentication/start', {
       headers: {
         'Accept': 'application/json',
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-      }
-    });
-
-    const sessionToken = sessionResponse.data.sessionToken;
-
-    // Search products with session token using the correct URL format
-    const searchResponse = await axios.get(`https://www.maxipali.co.cr/api/catalog_system/pub/products/search?ft=${barcode}`, {
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'VtexIdclientAutCookie': sessionToken,
-        'Cookie': `VtexIdclientAutCookie=${sessionToken}`,
         'Origin': 'https://www.maxipali.co.cr',
-        'Referer': 'https://www.maxipali.co.cr/'
+        'Referer': 'https://www.maxipali.co.cr/',
       }
     });
 
-    if (!searchResponse.data.length) {
+    console.log('Session response:', sessionResponse.data);
+
+    // Try direct product search first
+    try {
+      const directSearchResponse = await axios.get(`https://www.maxipali.co.cr/api/catalog_system/pub/products/search`, {
+        params: {
+          'ft': barcode
+        },
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+          'Origin': 'https://www.maxipali.co.cr',
+          'Referer': 'https://www.maxipali.co.cr/',
+        }
+      });
+
+      if (directSearchResponse.data.length > 0) {
+        const product = directSearchResponse.data[0];
+        return res.json({
+          id: product.productId,
+          name: product.productName,
+          brand: product.brand,
+          price: product.items[0]?.sellers[0]?.commertialOffer?.Price || 0,
+          imageUrl: product.items[0]?.images[0]?.imageUrl || '',
+          store: 'MaxiPali',
+          ean: barcode
+        });
+      }
+    } catch (directSearchError) {
+      console.error('Direct search failed:', directSearchError.message);
+    }
+
+    // If direct search fails, try alternative search
+    const altSearchResponse = await axios.get(`https://www.maxipali.co.cr/api/io/_v/api/intelligent-search/product_search/productSearch`, {
+      params: {
+        term: barcode,
+        count: 1,
+        page: 0
+      },
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Origin': 'https://www.maxipali.co.cr',
+        'Referer': 'https://www.maxipali.co.cr/',
+      }
+    });
+
+    if (!altSearchResponse.data?.products?.length) {
       return res.status(404).json({
         error: 'Product not found',
         details: `No product found with barcode: ${barcode}`
       });
     }
 
-    const product = searchResponse.data[0];
+    const product = altSearchResponse.data.products[0];
     const transformedData = {
       id: product.productId,
       name: product.productName,
       brand: product.brand,
-      price: product.items[0]?.sellers[0]?.commertialOffer?.Price || 0,
+      price: product.price,
       imageUrl: product.items[0]?.images[0]?.imageUrl || '',
       store: 'MaxiPali',
       ean: barcode
@@ -114,12 +146,14 @@ app.get('/api/proxy/maxipali/barcode/:barcode', async (req, res) => {
     console.error('Barcode lookup error:', {
       message: error.message,
       response: error.response?.data,
-      status: error.response?.status
+      status: error.response?.status,
+      stack: error.stack
     });
     
     res.status(500).json({ 
       error: 'Failed to lookup product',
-      details: error.message
+      details: error.message,
+      status: error.response?.status
     });
   }
 });
