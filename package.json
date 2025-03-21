@@ -8,7 +8,7 @@
     "server": "node server.js",
     "dev:all": "concurrently \"npm run server\" \"npm run dev\"",
     "build": "vite build",
-    "vercel-build": "vite build",
+    "vercel-build": "vite build --outDir dist",
     "start": "node server.js",
     "build:functions": "NODE_ENV=production netlify-lambda build netlify/functions",
     "build:dev": "vite build --mode development",

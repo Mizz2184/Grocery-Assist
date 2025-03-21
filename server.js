@@ -7,12 +7,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Keep original endpoint for backwards compatibility
 app.post('/api/proxy/maxipali/search', async (req, res) => {
   try {
-    const { query, page, pageSize } = req.body;
-    console.log('Received search request:', { query, page, pageSize });
-
-    // Search products directly without session token
+    const { query, page = 1, pageSize = 50 } = req.body;
+    console.log('Received search request (proxy endpoint):', { query, page, pageSize });
+    
+    // Try to get data from the API
     const searchResponse = await axios.get(`https://www.maxipali.co.cr/api/catalog_system/pub/products/search/${encodeURIComponent(query)}`, {
       params: {
         _from: (page - 1) * pageSize,
@@ -24,7 +25,7 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
         'Origin': 'https://www.maxipali.co.cr',
         'Referer': 'https://www.maxipali.co.cr/',
       },
-      timeout: 30000 // 30 second timeout
+      timeout: 10000 // 10 second timeout
     });
 
     // Transform response to match our format
@@ -35,24 +36,28 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
         brand: p.brand,
         price: p.items[0]?.sellers[0]?.commertialOffer?.Price || 0,
         imageUrl: p.items[0]?.images[0]?.imageUrl || '',
-        store: 'MaxiPali'
+        store: 'MaxiPali',
+        category: p.categories && p.categories[0] ? p.categories[0].split('/').pop() : 'Grocery',
+        sku: p.items[0]?.itemId || '',
+        barcode: p.items[0]?.ean || '',
+        inStock: true
       })),
       total: searchResponse.data?.length || 0,
-      page,
-      pageSize
+      page: parseInt(page),
+      pageSize: parseInt(pageSize),
+      hasMore: false
     };
 
-    console.log(`Found ${transformedData.products.length} products`);
-    res.json(transformedData);
+    console.log(`Found ${transformedData.products.length} products from API`);
+    return res.json(transformedData);
   } catch (error) {
     console.error('Search error:', {
       message: error.message,
       response: error.response?.data,
-      status: error.response?.status,
-      stack: error.stack
+      status: error.response?.status
     });
     
-    res.status(500).json({ 
+    res.status(error.response?.status || 500).json({ 
       error: 'Failed to fetch products',
       details: error.message,
       status: error.response?.status || 500,
@@ -158,34 +163,79 @@ app.get('/api/proxy/maxipali/barcode/:barcode', async (req, res) => {
   }
 });
 
-const startServer = async (startPort = 3001) => {
-  let currentPort = startPort;
+// API endpoint without mock data
+app.get('/api/maxipali/search', async (req, res) => {
+  const { query, page = 1, pageSize = 50 } = req.query;
   
-  while (currentPort < startPort + 10) {
-    try {
-      await new Promise((resolve, reject) => {
-        const server = app.listen(currentPort, () => {
-          console.log(`Server running on port ${currentPort}`);
-          resolve();
-        }).on('error', (err) => {
-          if (err.code === 'EADDRINUSE') {
-            console.log(`Port ${currentPort} is busy, trying ${currentPort + 1}...`);
-            currentPort++;
-            reject(err);
-          } else {
-            reject(err);
-          }
-        });
-      });
-      break; // Successfully started server
-    } catch (err) {
-      if (currentPort === startPort + 9) {
-        console.error('Could not find an available port');
-        process.exit(1);
-      }
-      // Continue to next port
-    }
+  if (!query) {
+    return res.status(400).json({ error: 'Query parameter is required' });
   }
-};
+  
+  console.log(`Searching MaxiPali for "${query}"`);
+  
+  try {
+    // Get data from the API
+    const searchResponse = await axios.get(`https://www.maxipali.co.cr/api/catalog_system/pub/products/search/${encodeURIComponent(query)}`, {
+      params: {
+        _from: (page - 1) * pageSize,
+        _to: (page * pageSize) - 1
+      },
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Origin': 'https://www.maxipali.co.cr',
+        'Referer': 'https://www.maxipali.co.cr/',
+      },
+      timeout: 10000 // 10 second timeout
+    });
 
-startServer();
+    // Transform response to match our format
+    const transformedData = {
+      products: (searchResponse.data || []).map(p => ({
+        id: p.productId,
+        name: p.productName,
+        brand: p.brand,
+        price: p.items[0]?.sellers[0]?.commertialOffer?.Price || 0,
+        imageUrl: p.items[0]?.images[0]?.imageUrl || '',
+        store: 'MaxiPali',
+        category: p.categories && p.categories[0] ? p.categories[0].split('/').pop() : 'Grocery',
+        sku: p.items[0]?.itemId || '',
+        barcode: p.items[0]?.ean || '',
+        inStock: true
+      })),
+      total: searchResponse.data?.length || 0,
+      page: parseInt(page),
+      pageSize: parseInt(pageSize),
+      hasMore: false
+    };
+
+    console.log(`Found ${transformedData.products.length} products from API`);
+    return res.json(transformedData);
+  } catch (error) {
+    console.error('Error with API:', error.message);
+    
+    // Return error instead of mock data
+    return res.status(error.response?.status || 500).json({
+      error: 'Failed to fetch products from API',
+      details: error.message,
+      status: error.response?.status || 500,
+      serverMessage: error.response?.data?.message || 'Unknown error'
+    });
+  }
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// For local development
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 8080;
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+// Export the Express app for Vercel
+export default app;
