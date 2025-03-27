@@ -1,3 +1,4 @@
+// Updated payment page with improved UI and Stripe integration
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
