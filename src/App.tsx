@@ -15,6 +15,7 @@ import PaymentRequired from "@/components/PaymentRequired";
 import Index from "./pages/Index";
 import Product from "./pages/Product";
 import GroceryList from "./pages/GroceryList";
+import GroceryListTest from "./pages/GroceryListTest";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -116,6 +117,19 @@ export default function App() {
                           <Navbar />
                           <main className="flex-1">
                             <GroceryList />
+                          </main>
+                        </div>
+                      </PaymentRequired>
+                    </ProtectedRoute>
+                  } />
+                  
+                  <Route path="/grocery-list-test" element={
+                    <ProtectedRoute>
+                      <PaymentRequired>
+                        <div className="min-h-screen flex flex-col pt-20">
+                          <Navbar />
+                          <main className="flex-1">
+                            <GroceryListTest />
                           </main>
                         </div>
                       </PaymentRequired>
