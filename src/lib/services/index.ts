@@ -181,7 +181,7 @@ export const compareProductPrices = async (
   maxiPaliProducts: Product[],
   masxMenosProducts: Product[],
   bestPrice: {
-    store: 'MaxiPali' | 'MasxMenos' | 'Unknown',
+    store: 'MaxiPali' | 'MasxMenos' ,
     price: number,
     savings: number,
     savingsPercentage: number
@@ -191,47 +191,112 @@ export const compareProductPrices = async (
     // Normalize the original store for better matching
     const normalizedOriginalStore = originalStore?.toLowerCase() || 'unknown';
     
-    console.log(`Comparing prices for product: ${productName}, barcode: ${barcode || 'N/A'}, original store: ${originalStore || 'unknown'} (normalized: ${normalizedOriginalStore})`);
+    console.log(`Comparing prices for product: ${productName}, original store: ${originalStore || 'unknown'} (normalized: ${normalizedOriginalStore})`);
     
     // Search query - use barcode if available, otherwise use product name
-    const searchQuery = barcode || productName;
+    const searchQuery = productName;
     
-    // Extract product name parts for better matching (take first 2-3 words)
+    // Extract product name parts for better matching
+    // Remove brand names and common words that might differ between stores
     const nameWords = productName.split(' ');
-    let simplifiedName = nameWords.slice(0, Math.min(3, nameWords.length)).join(' ');
+    const cleanedWords = nameWords.filter(word => 
+      word.length > 2 && 
+      !['de', 'la', 'el', 'los', 'las', 'con', 'sin', 'para', 'por'].includes(word.toLowerCase())
+    );
     
-    console.log(`Using simplified name for cross-store search: "${simplifiedName}"`);
+    // Use different search strategies
+    // 1. First 2-3 words from cleaned name (primary identification)
+    const simplifiedName = cleanedWords.slice(0, Math.min(3, cleanedWords.length)).join(' ');
     
-    // Search in both stores concurrently
+    // 2. Keywords from product name (likely to be consistent across stores)
+    // Find words that are likely to be product identifiers (longer words, numbers)
+    const keywordName = cleanedWords
+      .filter(word => word.length > 4 || /\d/.test(word))
+      .join(' ');
+    
+    // 3. Category + key attribute (e.g., "leche entera" or "arroz 1kg")
+    const specificAttributes = productName.match(/(\d+\s*(kg|g|ml|l|oz))/gi);
+    const attributeText = specificAttributes ? specificAttributes[0] : '';
+    const categoryMatch = productName.match(/(leche|arroz|frijol|pasta|cereal|aceite|atun|cafe|azucar|sal)/i);
+    const categoryText = categoryMatch ? categoryMatch[0] : '';
+    const categorySearch = [categoryText, attributeText].filter(Boolean).join(' ');
+    
+    console.log(`Search strategies:
+      - Original query: "${searchQuery}"
+      - Simplified name: "${simplifiedName}"
+      - Keyword name: "${keywordName}"
+      - Category search: "${categorySearch}"`);
+    
+    // If the product is from a specific store, we need to search for it in the other store
+    let maxiPaliProducts: Product[] = [];
+    let masxMenosProducts: Product[] = [];
+    
+    // FIXED: Always search both stores, but remember the original store for display logic
+    // Instead of skipping the original store search, we'll store its products separately
+    const searchMaxiPali = true;
+    const searchMasxMenos = true;
+    
+    console.log(`Search configuration: 
+      - Search MaxiPali: ${searchMaxiPali}
+      - Search MasxMenos: ${searchMasxMenos}
+      - Original store: ${normalizedOriginalStore}`);
+    
+    // Search in both stores concurrently (always)
     const [maxiPaliResponse, masxMenosResponse] = await Promise.all([
       searchMaxiPaliProducts({ query: searchQuery }),
       searchMasxMenosProducts({ query: searchQuery })
     ]);
     
-    // Get the products from both responses and ensure store property is correctly set
-    let maxiPaliProducts = maxiPaliResponse.products.map(p => ({...p, store: 'MaxiPali' as const}));
-    let masxMenosProducts = masxMenosResponse.products.map(p => ({...p, store: 'MasxMenos' as const}));
+    console.log("MaxiPali raw API response:", maxiPaliResponse);
+    console.log("MasxMenos raw API response:", masxMenosResponse);
     
-    // If one store has no results using the primary search, try again with simplified name
-    if (maxiPaliProducts.length === 0 && simplifiedName !== searchQuery) {
-      console.log(`No MaxiPali products found with primary search, trying simplified name: ${simplifiedName}`);
-      const altMaxiPaliResponse = await searchMaxiPaliProducts({ query: simplifiedName });
-      maxiPaliProducts = altMaxiPaliResponse.products.map(p => ({...p, store: 'MaxiPali' as const}));
-    }
+    maxiPaliProducts = maxiPaliResponse.products.map(p => ({...p, store: 'MaxiPali' as const}));
+    masxMenosProducts = masxMenosResponse.products.map(p => ({...p, store: 'MasxMenos' as const}));
     
-    if (masxMenosProducts.length === 0 && simplifiedName !== searchQuery) {
-      console.log(`No MasxMenos products found with primary search, trying simplified name: ${simplifiedName}`);
-      const altMasxMenosResponse = await searchMasxMenosProducts({ query: simplifiedName });
-      masxMenosProducts = altMasxMenosResponse.products.map(p => ({...p, store: 'MasxMenos' as const}));
+    console.log("After mapping - MaxiPali products:", maxiPaliProducts);
+    console.log("After mapping - MasxMenos products:", masxMenosProducts);
+    
+    // If one store has no results, try alternative search strategies
+    const searchStrategies = [simplifiedName, keywordName, categorySearch].filter(s => s && s !== searchQuery);
+    
+    for (const strategy of searchStrategies) {
+      // Only proceed if the strategy has meaningful content
+      if (!strategy || strategy.trim().length < 3) continue;
+      
+      // Try MaxiPali if needed
+      if (maxiPaliProducts.length === 0) {
+        console.log(`Trying alternative strategy for MaxiPali: "${strategy}"`);
+        const altResponse = await searchMaxiPaliProducts({ query: strategy });
+        maxiPaliProducts = altResponse.products.map(p => ({...p, store: 'MaxiPali' as const}));
+        
+        if (maxiPaliProducts.length > 0) {
+          console.log(`Found ${maxiPaliProducts.length} MaxiPali products using strategy: "${strategy}"`);
+          break; // Found results, no need to try more strategies
+        }
+      }
+      
+      // Try MasxMenos if needed
+      if (masxMenosProducts.length === 0) {
+        console.log(`Trying alternative strategy for MasxMenos: "${strategy}"`);
+        const altResponse = await searchMasxMenosProducts({ query: strategy });
+        masxMenosProducts = altResponse.products.map(p => ({...p, store: 'MasxMenos' as const}));
+        
+        if (masxMenosProducts.length > 0) {
+          console.log(`Found ${masxMenosProducts.length} MasxMenos products using strategy: "${strategy}"`);
+          break; // Found results, no need to try more strategies
+        }
+      }
     }
     
     // Log the results
     console.log(`Found ${maxiPaliProducts.length} MaxiPali products and ${masxMenosProducts.length} MasxMenos products`);
     if (maxiPaliProducts.length > 0) {
-      console.log(`First MaxiPali product: ${maxiPaliProducts[0].name}, price: ${maxiPaliProducts[0].price}`);
+      console.log(`First MaxiPali product: ${maxiPaliProducts[0].name}, price: ${maxiPaliProducts[0].price}, store: ${maxiPaliProducts[0].store}`);
+      console.log(`MaxiPali products details:`, maxiPaliProducts);
     }
     if (masxMenosProducts.length > 0) {
-      console.log(`First MasxMenos product: ${masxMenosProducts[0].name}, price: ${masxMenosProducts[0].price}`);
+      console.log(`First MasxMenos product: ${masxMenosProducts[0].name}, price: ${masxMenosProducts[0].price}, store: ${masxMenosProducts[0].store}`);
+      console.log(`MasxMenos products details:`, masxMenosProducts);
     }
     
     // If no products found in either store, return null for best price
@@ -242,6 +307,10 @@ export const compareProductPrices = async (
         bestPrice: null
       };
     }
+    
+    // Ensure each product has the correct store property
+    maxiPaliProducts = maxiPaliProducts.map(p => ({...p, store: 'MaxiPali' as const}));
+    masxMenosProducts = masxMenosProducts.map(p => ({...p, store: 'MasxMenos' as const}));
     
     // Find the lowest price product in each store
     const cheapestMaxiPaliProduct = maxiPaliProducts.length > 0

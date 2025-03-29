@@ -139,11 +139,12 @@ export const searchProducts = (query: string): Product[] => {
 export interface GroceryListItem {
   id: string;
   productId: string;
+  list_id?: string; // Make list_id optional
   quantity: number;
   addedBy: string;
   addedAt: string;
   checked: boolean;
-  productData?: any;
+  productData: Product;
 }
 
 export interface GroceryList {
@@ -153,6 +154,7 @@ export interface GroceryList {
   createdAt: string;
   items: GroceryListItem[];
   collaborators: string[];
+  isShared?: boolean; // Optional property to indicate if the list is shared with the current user
 }
 
 export const mockGroceryLists: GroceryList[] = [
@@ -169,6 +171,7 @@ export const mockGroceryLists: GroceryList[] = [
         addedBy: 'mock-user-id',
         addedAt: new Date().toISOString(),
         checked: false,
+        productData: products[0],
       },
       {
         id: 'item2',
@@ -177,6 +180,7 @@ export const mockGroceryLists: GroceryList[] = [
         addedBy: 'mock-user-id',
         addedAt: new Date().toISOString(),
         checked: true,
+        productData: products[2],
       },
     ],
     collaborators: ['collaborator1@example.com'],

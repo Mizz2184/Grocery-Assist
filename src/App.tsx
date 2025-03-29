@@ -15,7 +15,6 @@ import PaymentRequired from "@/components/PaymentRequired";
 import Index from "./pages/Index";
 import Product from "./pages/Product";
 import GroceryList from "./pages/GroceryList";
-import GroceryListTest from "./pages/GroceryListTest";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -23,6 +22,7 @@ import Login from "./pages/Login";
 import AuthCallback from "./pages/AuthCallback";
 import Payment from "./pages/Payment";
 import PaymentSuccess from "./pages/PaymentSuccess";
+import SharedList from "./pages/SharedList";
 
 // Create a reusable component for translating text
 interface TranslatedTextProps {
@@ -123,19 +123,6 @@ export default function App() {
                     </ProtectedRoute>
                   } />
                   
-                  <Route path="/grocery-list-test" element={
-                    <ProtectedRoute>
-                      <PaymentRequired>
-                        <div className="min-h-screen flex flex-col pt-20">
-                          <Navbar />
-                          <main className="flex-1">
-                            <GroceryListTest />
-                          </main>
-                        </div>
-                      </PaymentRequired>
-                    </ProtectedRoute>
-                  } />
-                  
                   <Route path="/profile" element={
                     <ProtectedRoute>
                       <PaymentRequired>
@@ -156,6 +143,32 @@ export default function App() {
                           <Navbar />
                           <main className="flex-1">
                             <Settings />
+                          </main>
+                        </div>
+                      </PaymentRequired>
+                    </ProtectedRoute>
+                  } />
+                  
+                  <Route path="/shared-list" element={
+                    <ProtectedRoute>
+                      <PaymentRequired>
+                        <div className="min-h-screen flex flex-col pt-20">
+                          <Navbar />
+                          <main className="flex-1">
+                            <SharedList />
+                          </main>
+                        </div>
+                      </PaymentRequired>
+                    </ProtectedRoute>
+                  } />
+                  
+                  <Route path="/shared-list/:listId" element={
+                    <ProtectedRoute>
+                      <PaymentRequired>
+                        <div className="min-h-screen flex flex-col pt-20">
+                          <Navbar />
+                          <main className="flex-1">
+                            <SharedList />
                           </main>
                         </div>
                       </PaymentRequired>

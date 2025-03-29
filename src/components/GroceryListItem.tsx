@@ -9,19 +9,77 @@ import { useToast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { convertCRCtoUSD } from "@/utils/currencyUtils";
+import { deleteGroceryListItem } from "@/lib/services/groceryListService";
+import { Product as StoreProduct } from "@/lib/types/store";
 
 interface GroceryListItemProps {
   item: GroceryItem;
   onUpdateQuantity: (id: string, quantity: number) => void;
   onToggleCheck: (id: string, checked: boolean) => void;
   onRemove: (id: string) => void;
+  readOnly?: boolean;
 }
+
+// Helper function to get image URL from any product structure
+const getProductImage = (product: any): string => {
+  if (!product) return '';
+  
+  // Check different possible image properties
+  if (product.imageUrl) return product.imageUrl;
+  if (product.image) return product.image;
+  
+  // If product has prices (mock product structure)
+  if (product.prices && Array.isArray(product.prices)) {
+    return product.image || '';
+  }
+  
+  return '';
+};
+
+// Helper function to get price from any product structure
+const getProductPrice = (product: any): number => {
+  if (!product) return 0;
+  
+  // Direct price property
+  if (typeof product.price === 'number') return product.price;
+  
+  // If product has prices array (mock product structure)
+  if (product.prices && Array.isArray(product.prices) && product.prices.length > 0) {
+    return product.prices[0].price || 0;
+  }
+  
+  return 0;
+};
+
+// Helper function to get store name from any product structure
+const getProductStore = (product: any): string => {
+  if (!product) return 'Unknown';
+  
+  // Direct store property
+  if (product.store) {
+    // Normalize store names
+    const storeName = String(product.store).trim();
+    if (storeName.includes('MaxiPali') || storeName.toLowerCase() === 'maxipali') return 'MaxiPali';
+    if (storeName.includes('MasxMenos') || storeName.toLowerCase() === 'masxmenos') return 'MasxMenos';
+    return storeName;
+  }
+  
+  // If product has prices array (mock product structure)
+  if (product.prices && Array.isArray(product.prices) && product.prices.length > 0) {
+    const storeId = String(product.prices[0].storeId).toLowerCase();
+    if (storeId === 'maxipali') return 'MaxiPali';
+    if (storeId === 'masxmenos') return 'MasxMenos';
+  }
+  
+  return 'Other';
+};
 
 export const GroceryListItem = ({
   item,
   onUpdateQuantity,
   onToggleCheck,
   onRemove,
+  readOnly,
 }: GroceryListItemProps) => {
   const [isRemoving, setIsRemoving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -53,10 +111,26 @@ export const GroceryListItem = ({
     }).format(amount);
   };
   
-  const itemPrice = product.price || 0;
+  // Use helper functions to get price and store name
+  const itemPrice = getProductPrice(product);
   const totalPrice = itemPrice * item.quantity;
   const totalPriceUSD = convertCRCtoUSD(totalPrice);
-  const storeName = product.store || 'Unknown';
+  const storeName = getProductStore(product);
+  
+  // Ensure the store badge is correctly displayed
+  <Badge 
+    variant="outline" 
+    className={cn(
+      "text-[8px] rounded-sm py-0 h-4 font-normal",
+      storeName === 'MaxiPali' 
+        ? "text-yellow-600" 
+        : storeName === 'MasxMenos' 
+          ? "text-green-600" 
+          : "text-gray-600"
+    )}
+  >
+    {storeName}
+  </Badge>
   
   // Determine store color 
   const getStoreColor = (store: string) => {
@@ -70,15 +144,28 @@ export const GroceryListItem = ({
     }
   };
   
-  const handleRemove = () => {
+  const handleRemove = async () => {
     setIsRemoving(true);
-    setTimeout(() => {
-      onRemove(item.id);
+    try {
+      const success = await deleteGroceryListItem(item.id);
+      if (success) {
+        onRemove(item.id);
+        toast({
+          title: "Item removed",
+          description: `${product.name} has been removed from your list.`,
+        });
+      } else {
+        throw new Error('Failed to delete item');
+      }
+    } catch (error) {
       toast({
-        title: "Item removed",
-        description: `${product.name} has been removed from your list.`,
+        title: "Error",
+        description: "Failed to remove item. Please try again.",
+        variant: "destructive",
       });
-    }, 300);
+    } finally {
+      setIsRemoving(false);
+    }
   };
   
   const handleQuantityChange = (value: number) => {
@@ -89,7 +176,7 @@ export const GroceryListItem = ({
   
   // Calculate and render price in both currencies
   const renderPrice = () => {
-    const price = item.productData?.price || 0;
+    const price = getProductPrice(item.productData) || 0;
     const totalPrice = price * item.quantity;
     const totalPriceUSD = convertCRCtoUSD(totalPrice);
     
@@ -111,18 +198,20 @@ export const GroceryListItem = ({
         isRemoving && "scale-95 opacity-50"
       )}
     >
-      <Checkbox 
-        checked={item.checked}
-        onCheckedChange={(checked) => {
-          onToggleCheck(item.id, checked as boolean);
-        }}
-        className="h-5 w-5 rounded-md data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-      />
+      {!readOnly && (
+        <Checkbox 
+          checked={item.checked}
+          onCheckedChange={(checked) => {
+            onToggleCheck(item.id, checked as boolean);
+          }}
+          className="h-5 w-5 rounded-md data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+        />
+      )}
       
       <div className="w-12 h-12 rounded overflow-hidden bg-secondary flex-shrink-0 relative">
-        {product.imageUrl ? (
+        {getProductImage(product) ? (
           <img 
-            src={product.imageUrl} 
+            src={getProductImage(product)} 
             alt={product.name} 
             className="w-full h-full object-cover"
             loading="lazy"
@@ -174,56 +263,63 @@ export const GroceryListItem = ({
       </div>
       
       <div className="flex items-center gap-2">
-        {isEditing ? (
-          <div className="flex items-center border rounded-full px-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 p-0"
-              onClick={() => handleQuantityChange(quantity - 1)}
-            >
-              <Minus className="h-3 w-3" />
-            </Button>
-            
-            <Input
-              type="number"
-              value={quantity}
-              onChange={(e) => setQuantity(parseInt(e.target.value))}
-              onBlur={() => {
-                onUpdateQuantity(item.id, quantity);
-                setIsEditing(false);
-              }}
-              className="w-10 h-6 border-0 p-0 text-center focus-visible:ring-0"
-            />
-            
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 p-0"
-              onClick={() => handleQuantityChange(quantity + 1)}
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
-          </div>
-        ) : (
-          <div 
-            className="text-sm font-medium cursor-pointer px-2 min-w-[2.5rem] text-center"
-            onClick={() => setIsEditing(true)}
-          >
-            {item.quantity}×
-          </div>
+        {!readOnly && (
+          isEditing ? (
+            <div className="flex items-center border rounded-full px-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 p-0"
+                onClick={() => handleQuantityChange(quantity - 1)}
+              >
+                <Minus className="h-3 w-3" />
+              </Button>
+              
+              <Input
+                type="number"
+                value={quantity}
+                onChange={(e) => setQuantity(parseInt(e.target.value))}
+                onBlur={() => {
+                  onUpdateQuantity(item.id, quantity);
+                  setIsEditing(false);
+                }}
+                className="w-10 h-6 border-0 p-0 text-center focus-visible:ring-0"
+              />
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 p-0"
+                onClick={() => handleQuantityChange(quantity + 1)}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 rounded-full"
+                onClick={() => setIsEditing(true)}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+              
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 rounded-full text-destructive hover:text-destructive"
+                onClick={handleRemove}
+                disabled={isRemoving}
+              >
+                <Trash className="h-3 w-3" />
+              </Button>
+            </div>
+          )
         )}
         
         {renderPrice()}
-        
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 text-destructive rounded-full opacity-50 hover:opacity-100"
-          onClick={handleRemove}
-        >
-          <Trash className="h-3 w-3" />
-        </Button>
       </div>
     </Card>
   );

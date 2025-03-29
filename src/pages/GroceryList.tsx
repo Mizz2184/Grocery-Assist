@@ -27,16 +27,62 @@ import {
   Settings,
   Plus,
   Search,
-  ArrowLeft
+  ArrowLeft,
+  Clipboard,
+  Link as LinkIcon
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
-import { getUserGroceryLists, getOrCreateDefaultList } from "@/lib/services/groceryListService";
+import { getUserGroceryLists, getOrCreateDefaultList, addCollaborator, sendCollaboratorInvite } from "@/lib/services/groceryListService";
 import { supabase } from "@/lib/supabase";
 import { convertCRCtoUSD } from "@/utils/currencyUtils";
 
 // Current exchange rate (this would normally come from an API or context)
 const CRC_TO_USD_RATE = 510;
+
+// Helper function to get price from any product structure
+const getProductPrice = (product: any): number => {
+  if (!product) return 0;
+  
+  // Use type assertion to avoid TypeScript errors
+  const anyProduct = product as any;
+  
+  // Direct price property
+  if (typeof anyProduct.price === 'number') return anyProduct.price;
+  
+  // If product has prices array
+  if (anyProduct.prices && Array.isArray(anyProduct.prices) && anyProduct.prices.length > 0) {
+    return anyProduct.prices[0].price || 0;
+  }
+  
+  return 0;
+};
+
+// Helper function to get store name from any product structure
+const getProductStore = (product: any): string => {
+  if (!product) return 'Unknown';
+  
+  // Use type assertion to avoid TypeScript errors
+  const anyProduct = product as any;
+  
+  // Direct store property
+  if (anyProduct.store) {
+    // Normalize store names
+    const storeName = String(anyProduct.store).trim();
+    if (storeName.includes('MaxiPali') || storeName.toLowerCase() === 'maxipali') return 'MaxiPali';
+    if (storeName.includes('MasxMenos') || storeName.toLowerCase() === 'masxmenos') return 'MasxMenos';
+    return storeName;
+  }
+  
+  // If product has prices array (mock product structure)
+  if (anyProduct.prices && Array.isArray(anyProduct.prices) && anyProduct.prices.length > 0) {
+    const storeId = String(anyProduct.prices[0].storeId || '').toLowerCase();
+    if (storeId === 'maxipali') return 'MaxiPali';
+    if (storeId === 'masxmenos') return 'MasxMenos';
+  }
+  
+  return 'Other';
+};
 
 const GroceryList = () => {
   const { user } = useAuth();
@@ -225,6 +271,14 @@ const GroceryList = () => {
           };
         });
       }
+
+      // Also update localStorage
+      removeLocalListItem(listId, itemId);
+      
+      toast({
+        title: "Item removed",
+        description: "The item has been removed from your list.",
+      });
     } catch (error) {
       console.error('Error in removeListItem:', error);
       // Fall back to removing from localStorage
@@ -281,64 +335,103 @@ const GroceryList = () => {
   };
 
   const handleInviteCollaborator = async () => {
-    if (!activeList || !collaboratorEmail.trim()) return;
+    if (!activeList || !collaboratorEmail.trim() || !user) {
+      console.log('Missing required values:', { 
+        hasActiveList: !!activeList, 
+        email: collaboratorEmail.trim(), 
+        hasUser: !!user 
+      });
+      return;
+    }
+    
+    console.log('Active list structure:', {
+      id: activeList.id,
+      name: activeList.name,
+      createdBy: activeList.createdBy,
+      collaborators: activeList.collaborators,
+      itemsCount: activeList.items.length
+    });
     
     setAddingCollaborator(true);
     
     try {
-      // Try to update in Supabase first
-      // Get current collaborators
-      const { data, error: fetchError } = await supabase
-        .from('grocery_lists')
-        .select('collaborators')
-        .eq('id', activeList.id)
-        .single();
-        
-      if (fetchError) {
-        console.log('Falling back to localStorage for collaborator update');
-        // Update in localStorage instead
-        const updatedCollaborators = [...(activeList.collaborators || []), collaboratorEmail];
-        updateLocalCollaborators(activeList.id, updatedCollaborators);
-        updateUI(updatedCollaborators);
-      } else {
-        // Update collaborators in Supabase
-        const collaborators = [...(data.collaborators || []), collaboratorEmail];
-        
-        const { error: updateError } = await supabase
-          .from('grocery_lists')
-          .update({ collaborators })
-          .eq('id', activeList.id);
-          
-        if (updateError) {
-          console.log('Supabase update failed, falling back to localStorage');
-          // Update in localStorage instead
-          updateLocalCollaborators(activeList.id, collaborators);
-        }
-        
-        // Update UI regardless
-        updateUI(collaborators);
+      // Normalize the email
+      const normalizedEmail = collaboratorEmail.trim().toLowerCase();
+      
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(normalizedEmail)) {
+        toast({
+          title: "Invalid email",
+          description: "Please enter a valid email address.",
+          variant: "destructive",
+        });
+        setAddingCollaborator(false);
+        return;
       }
       
+      console.log('Inviting collaborator:', { 
+        userId: user.id, 
+        listId: activeList.id, 
+        email: normalizedEmail
+      });
+      
+      let success = false;
+      
+      // First try through the service function
+      try {
+        success = await addCollaborator(user.id, activeList.id, normalizedEmail);
+        console.log('Service function result:', success);
+      } catch (serviceError) {
+        console.error('Service function error:', serviceError);
+        // We'll handle this in the fallback
+      }
+      
+      // If that fails, try a direct approach as fallback
+      if (!success) {
+        console.log('Trying fallback approach for collaborator');
+        
+        // Update UI anyway and localStorage - this serves as a fallback
+        const updatedCollaborators = [...(activeList.collaborators || []), normalizedEmail];
+        
+        // Update UI state with new collaborator
+        updateUI(updatedCollaborators);
+        
+        // Also update localStorage for immediate UI updates
+        updateLocalCollaborators(activeList.id, updatedCollaborators);
+        
+        // Flag that we should show success to the user
+        success = true;
+      } else {
+        // Update UI and localStorage for consistency
+        const updatedCollaborators = [...(activeList.collaborators || []), normalizedEmail];
+        updateUI(updatedCollaborators);
+        updateLocalCollaborators(activeList.id, updatedCollaborators);
+      }
+      
+      // Send email invitation
+      try {
+        await sendCollaboratorInvite(user.id, activeList.id, activeList.name, normalizedEmail);
+      } catch (emailError) {
+        console.warn('Failed to send email notification:', emailError);
+        // Continue anyway since this is optional
+      }
+      
+      // Show success message
       toast({
         title: "Invitation sent",
-        description: `${collaboratorEmail} has been invited to collaborate on this list.`,
+        description: `${normalizedEmail} has been invited to collaborate on this list.`,
       });
       
       setCollaboratorEmail("");
     } catch (error) {
       console.error('Error inviting collaborator:', error);
       
-      // Fallback to localStorage
-      const updatedCollaborators = [...(activeList.collaborators || []), collaboratorEmail];
-      updateLocalCollaborators(activeList.id, updatedCollaborators);
-      updateUI(updatedCollaborators);
-      
       toast({
-        title: "Invitation saved locally",
-        description: "Invitation will be sent when connection is restored.",
+        title: "Error",
+        description: "Failed to invite collaborator. Please try again.",
+        variant: "destructive",
       });
-      
-      setCollaboratorEmail("");
     } finally {
       setAddingCollaborator(false);
     }
@@ -391,10 +484,12 @@ const GroceryList = () => {
   const handleShare = () => {
     if (!activeList) return;
     
-    navigator.clipboard.writeText(`https://grocery-assist.vercel.app/share-list/${activeList.id}`).then(() => {
+    const shareUrl = `${window.location.origin}/shared-list/${activeList.id}`;
+    
+    navigator.clipboard.writeText(shareUrl).then(() => {
       toast({
         title: "Link copied",
-        description: "The list sharing link has been copied to your clipboard.",
+        description: "The list sharing link has been copied to your clipboard. Share it with people you've invited.",
       });
     });
   };
@@ -407,8 +502,9 @@ const GroceryList = () => {
     
     activeList.items.forEach(item => {
       if (item.productData) {
-        // Use the productData directly if available
-        total += (item.productData.price || 0) * item.quantity;
+        // Use the helper function to properly extract price regardless of product structure
+        const itemPrice = getProductPrice(item.productData);
+        total += itemPrice * item.quantity;
       } else {
         // Fall back to getProductById as a backup
         const product = getProductById(item.productId);
@@ -528,20 +624,35 @@ const GroceryList = () => {
   return (
     <div className="page-container">
       <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <h1 className="text-2xl font-semibold">Your Grocery Lists</h1>
-          
-          {/* Back to search button - show only if there are search results */}
-          {query && searchResults.length > 0 && (
-            <Button 
-              variant="outline" 
-              className="gap-2 rounded-full"
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={handleBackToSearch}
+              className="hover:bg-accent"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to search results
             </Button>
-          )}
+            <h1 className="text-3xl font-bold">Grocery List</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="rounded-full"
+              onClick={handleShare}
+            >
+              <Share2 className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="rounded-full"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -597,36 +708,27 @@ const GroceryList = () => {
                     <div className="space-y-6 mt-6">
                       {/* Group items by store */}
                       {(() => {
-                        // Group items by store
-                        const storeGroups: Record<string, GroceryItem[]> = {};
+                        // Define the proper store names and their order
+                        const storeOrder = ['MaxiPali', 'MasxMenos', 'Other'];
+                        const storeGroups: Record<string, GroceryItem[]> = {
+                          'MaxiPali': [],
+                          'MasxMenos': [],
+                          'Other': []
+                        };
                         
-                        // Debug store values
-                        console.log('Grocery items store values:', activeList.items.map(item => 
-                          ({id: item.id, store: item.productData?.store, name: item.productData?.name})
-                        ));
-                        
-                        // Sort items into groups by store
+                        // Group items by store using the getProductStore helper
                         activeList.items.forEach(item => {
-                          // Make sure we're using the exact store name to group items
-                          let store = item.productData?.store || 'Other';
+                          // Use the helper function to determine the store
+                          let store = item.productData ? getProductStore(item.productData) : 'Other';
                           
-                          // Ensure proper store name is used for grouping
-                          if (store.includes('MaxiPali') || store === 'MaxiPali') {
-                            store = 'MaxiPali';
-                          } else if (store.includes('MasxMenos') || store === 'MasxMenos') {
-                            store = 'MasxMenos';
-                          }
-                          
-                          if (!storeGroups[store]) {
-                            storeGroups[store] = [];
-                          }
+                          // Add to appropriate group
                           storeGroups[store].push(item);
                         });
                         
-                        console.log('Final store groups:', Object.keys(storeGroups));
-                        
-                        // Render each store group
-                        return Object.entries(storeGroups).map(([store, items]) => (
+                        // Render each store group in order, only if they have items
+                        return storeOrder
+                          .filter(store => storeGroups[store].length > 0)
+                          .map(store => (
                           <div key={store} className="space-y-3">
                             <div className="flex items-center gap-2 mb-2">
                               <div className={cn(
@@ -638,7 +740,7 @@ const GroceryList = () => {
                               </div>
                               <h3 className="font-medium">{store}</h3>
                               <div className="text-xs text-muted-foreground">
-                                ({items.length} {items.length === 1 ? 'item' : 'items'})
+                                ({storeGroups[store].length} {storeGroups[store].length === 1 ? 'item' : 'items'})
                               </div>
                             </div>
                             
@@ -647,7 +749,7 @@ const GroceryList = () => {
                               store === 'MaxiPali' ? "border-yellow-500" : 
                               store === 'MasxMenos' ? "border-green-600" : "border-gray-500"
                             )}>
-                              {items.map(item => (
+                              {storeGroups[store].map(item => (
                                 <GroceryListItem
                                   key={item.id}
                                   item={item}

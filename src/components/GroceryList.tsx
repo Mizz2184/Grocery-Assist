@@ -153,6 +153,19 @@ export const GroceryList = () => {
   const exampleList = lists[0];
   const exampleTotal = calculateTotal(exampleList);
   
+  // Add this function to group items by store
+  const groupItemsByStore = (items: any[]) => {
+    return items.reduce((groups: any, item: any) => {
+      const store = item.productData?.store || 'Unknown';
+      if (!groups[store]) {
+        groups[store] = [];
+      }
+      groups[store].push(item);
+      return groups;
+    }, {});
+  };
+
+  // Modify the list rendering section
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-6">
       <div className="flex justify-between items-center">
@@ -173,9 +186,17 @@ export const GroceryList = () => {
           </h2>
         </div>
         
-        <div className="divide-y">
-          {exampleList?.items?.map((item: any) => renderListItem(item))}
-        </div>
+        {/* Group items by store */}
+        {Object.entries(groupItemsByStore(exampleList?.items || [])).map(([store, items]: [string, any[]]) => (
+          <div key={store} className="border-b last:border-b-0">
+            <div className="bg-muted/20 p-2 font-medium">
+              {store}
+            </div>
+            <div className="divide-y">
+              {items.map((item: any) => renderListItem(item))}
+            </div>
+          </div>
+        ))}
         
         <div className="border-t p-4 bg-muted/30 flex justify-between items-center">
           <span className="font-medium">
@@ -222,3 +243,80 @@ export const GroceryList = () => {
     </div>
   );
 };
+
+
+// Add this helper function at the top of your component
+const getStoreKey = (store: string) => {
+  // Ensure exact store name matching
+  if (store?.includes('MasxMenos')) return 'MasxMenos';
+  if (store?.includes('MaxiPali')) return 'MaxiPali';
+  return store || 'Unknown';
+};
+
+// Update the groupItemsByStore function
+const groupItemsByStore = (items: any[]) => {
+  return items.reduce((groups: any, item: any) => {
+    const store = getStoreKey(item.productData?.store);
+    if (!groups[store]) {
+      groups[store] = [];
+    }
+    groups[store].push(item);
+    return groups;
+  }, {});
+};
+
+// Update the addProductToList function
+const addProductToList = async (listId: string, productId: string) => {
+  try {
+    const productResponse = await fetch(`/api/products/${productId}`);
+    const productData = await productResponse.json();
+    
+    // Keep the original store name without modification
+    const response = await fetch(`/api/lists/${listId}/items`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        productId,
+        quantity: 1,
+        store: productData.store, // Use original store name
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to add product to list');
+    }
+    
+    // Update lists with original store name
+    setLists(prevLists => {
+      return prevLists.map(list => {
+        if (list.id === listId) {
+          const newItem = {
+            id: Date.now().toString(),
+            productId,
+            quantity: 1,
+            checked: false,
+            productData: {
+              ...productData,
+              store: productData.store // Keep original store name
+            }
+          };
+          return {
+            ...list,
+            items: [...list.items, newItem]
+          };
+        }
+        return list;
+      });
+    });
+    
+  } catch (error) {
+    console.error('Error adding product to list:', error);
+    throw error;
+  }
+};
+
+function setLists(arg0: (prevLists: any) => any) {
+  throw new Error("Function not implemented.");
+}

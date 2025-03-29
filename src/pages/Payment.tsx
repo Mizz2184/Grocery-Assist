@@ -62,7 +62,7 @@ const Payment = () => {
     
     toast({
       title: "Payment successful",
-      description: "Thank you for subscribing to Grocery-Assist!",
+      description: "Thank you for subscribing to Fam-Assist!",
     });
   };
 
@@ -91,7 +91,7 @@ const Payment = () => {
           <div className="mx-auto p-2 h-20 w-20 bg-primary rounded-full mb-4 flex items-center justify-center">
             <ShoppingCart className="h-10 w-10 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl font-bold">Subscribe to Grocery-Assist</CardTitle>
+          <CardTitle className="text-2xl font-bold">Subscribe to Fam-Assist</CardTitle>
           <CardDescription>
             Get full access to price comparisons and save money on your groceries
           </CardDescription>

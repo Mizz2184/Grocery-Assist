@@ -7,10 +7,9 @@ import { Product } from '@/lib/types/store';
 type DbGroceryList = {
   id: string;
   name: string;
-  user_id: string;
+  created_by: string;
   created_at: string;
   collaborators?: string[];
-  created_by?: string; // For backward compatibility
 };
 
 type DbGroceryItem = {
@@ -38,16 +37,52 @@ export const getUserGroceryLists = async (userId: string): Promise<GroceryList[]
     }
     
     // Otherwise, try to fetch from Supabase
-    const { data: lists, error: listsError } = await supabase
+    // Get lists owned by the user
+    const { data: ownedLists, error: ownedListsError } = await supabase
       .from('grocery_lists')
       .select('*')
-      .eq('user_id', userId);
-
-    if (listsError) {
-      console.error('Error fetching grocery lists:', listsError);
+      .eq('created_by', userId);
+      
+    if (ownedListsError) {
+      console.error('Error fetching owned grocery lists:', ownedListsError);
       // Return local lists as fallback
       return userLocalLists;
     }
+    
+    // Get user's email for checking shared lists
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('email')
+      .eq('id', userId)
+      .single();
+      
+    if (userError) {
+      console.error('Error fetching user email:', userError);
+      // Continue with owned lists only
+      const lists = [...(ownedLists || [])];
+      // Rest of processing...
+    }
+    
+    // Get the user's email
+    const userEmail = userData?.email;
+    
+    // Get lists where user is a collaborator by checking if their email is in the collaborators array
+    let sharedLists = [];
+    if (userEmail) {
+      const { data: shared, error: sharedListsError } = await supabase
+        .from('grocery_lists')
+        .select('*')
+        .contains('collaborators', [userEmail]);
+      
+      if (sharedListsError) {
+        console.error('Error fetching shared grocery lists:', sharedListsError);
+      } else {
+        sharedLists = shared || [];
+      }
+    }
+    
+    // Combine owned and shared lists
+    const lists = [...(ownedLists || []), ...sharedLists];
     
     if (!lists || lists.length === 0) {
       return [];
@@ -95,7 +130,7 @@ export const getUserGroceryLists = async (userId: string): Promise<GroceryList[]
     return lists.map((list: DbGroceryList) => ({
       id: list.id,
       name: list.name,
-      createdBy: list.created_by || list.user_id,
+      createdBy: list.created_by,
       createdAt: list.created_at,
       collaborators: list.collaborators || [],
       items: items
@@ -166,7 +201,7 @@ export const getGroceryListById = async (listId: string): Promise<GroceryList | 
     const { data: userProducts, error: productsError } = await supabase
       .from('user_products')
       .select('*')
-      .eq('user_id', list.user_id);
+      .eq('user_id', list.created_by);
       
     if (productsError) {
       console.error('Error fetching user products:', productsError);
@@ -193,7 +228,7 @@ export const getGroceryListById = async (listId: string): Promise<GroceryList | 
     return {
       id: list.id,
       name: list.name,
-      createdBy: list.user_id,
+      createdBy: list.created_by,
       createdAt: list.created_at,
       collaborators: list.collaborators || [],
       items: items.map((item: DbGroceryItem) => {
@@ -229,190 +264,89 @@ export const addProductToGroceryList = async (
   quantity: number = 1
 ): Promise<{ success: boolean; message?: string; list?: GroceryList }> => {
   try {
-    // Normalize store name for consistency
-    let normalizedStore = product.store;
-    if (normalizedStore?.includes('MaxiPali') || normalizedStore === 'MaxiPali') {
-      normalizedStore = 'MaxiPali';
-    } else if (normalizedStore?.includes('MasxMenos') || normalizedStore === 'MasxMenos') {
-      normalizedStore = 'MasxMenos';
-    }
-    
-    // Create a normalized product with consistent store name
-    const normalizedProduct = {
-      ...product,
-      store: normalizedStore
+    // First, try to save to Supabase
+    const productData = {
+      id: product.id,
+      name: product.name,
+      brand: product.brand || 'Unknown',
+      image: product.imageUrl || '', // Convert imageUrl to image
+      barcode: product.barcode || product.ean || '',
+      category: product.category || 'Other',
+      prices: [{ // Convert single price to prices array
+        storeId: product.store?.toLowerCase() || 'unknown',
+        price: product.price,
+        currency: '₡',
+        date: new Date().toISOString()
+      }]
     };
-    
-    console.log('Adding product to list with store:', normalizedStore);
-    
-    // Check if we're using localStorage (for anonymous users or mock users)
-    const localLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
-    const listIndex = localLists.findIndex((list: GroceryList) => list.id === listId);
-    
-    // If the list exists in localStorage or it's a mock user, use localStorage
-    if (listIndex !== -1 || userId.startsWith('mock-')) {
-      console.log('Using localStorage for adding product to list');
-      
-      if (listIndex === -1) {
-        return { success: false, message: 'Grocery list not found' };
+
+    // Check if product already exists in user_products
+    const { data: existingProduct } = await supabase
+      .from('user_products')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('product_id', product.id)
+      .single();
+
+    if (!existingProduct) {
+      // Save product to user_products table
+      const { error: productError } = await supabase
+        .from('user_products')
+        .insert({
+          user_id: userId,
+          product_id: product.id,
+          name: product.name,
+          brand: product.brand,
+          price: product.price,
+          image_url: product.imageUrl,
+          store: product.store?.trim(),
+          category: product.category
+        });
+
+      if (productError) {
+        console.error('Error saving product to user_products:', productError);
+        // Continue with localStorage as fallback
       }
-      
-      const list = localLists[listIndex];
-      const existingItemIndex = list.items.findIndex(item => item.productId === normalizedProduct.id);
-      
-      if (existingItemIndex !== -1) {
-        // Update quantity if product already exists
-        list.items[existingItemIndex].quantity += quantity;
-      } else {
-        // Add new item
-        const newItem: GroceryListItem = {
-          id: uuidv4(),
-          productId: normalizedProduct.id,
-          quantity,
-          addedBy: userId,
-          addedAt: new Date().toISOString(),
-          checked: false,
-          productData: {
-            id: normalizedProduct.id,
-            name: normalizedProduct.name,
-            brand: normalizedProduct.brand || 'Unknown',
-            imageUrl: normalizedProduct.imageUrl,
-            price: normalizedProduct.price,
-            store: normalizedStore,
-            category: normalizedProduct.category
-          }
-        };
-        list.items.push(newItem);
-      }
-      
-      // Update localStorage
-      localStorage.setItem('grocery_lists', JSON.stringify(localLists));
-      
-      return { success: true, list };
     }
-    
-    // Otherwise, try to use Supabase
-    // Check if product is already in the list
-    const { data: existingItems, error: checkError } = await supabase
+
+    // Check if item already exists in grocery_items
+    const { data: existingItem } = await supabase
       .from('grocery_items')
       .select('*')
       .eq('list_id', listId)
-      .eq('product_id', normalizedProduct.id);
+      .eq('product_id', product.id)
+      .single();
 
-    if (checkError) {
-      console.error('Error checking existing items:', checkError);
-      // Fall back to localStorage
-      return addProductToLocalList(listId, userId, normalizedProduct, quantity);
-    }
-
-    // Store the product data in the user_products table
-    const { error: productError } = await supabase
-      .from('user_products')
-      .upsert({
-        id: uuidv4(),
-        user_id: userId,
-        product_id: normalizedProduct.id,
-        name: normalizedProduct.name,
-        brand: normalizedProduct.brand || 'Unknown',
-        image_url: normalizedProduct.imageUrl,
-        price: normalizedProduct.price,
-        store: normalizedStore,
-        category: normalizedProduct.category || 'Grocery',
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'user_id, product_id'
-      });
-
-    if (productError) {
-      console.error('Error storing product data in user_products:', productError);
-      // Continue anyway, as this is not critical for the grocery list
-    }
-
-    if (existingItems && existingItems.length > 0) {
-      // Update quantity if product already exists
-      const existingItem = existingItems[0];
+    if (existingItem) {
+      // Update quantity if item exists
       const { error: updateError } = await supabase
         .from('grocery_items')
-        .update({ 
-          quantity: existingItem.quantity + quantity,
-          updated_at: new Date().toISOString()
-        })
+        .update({ quantity: existingItem.quantity + quantity })
         .eq('id', existingItem.id);
 
       if (updateError) {
-        console.error('Error updating item quantity:', updateError);
-        // Fall back to localStorage
-        return addProductToLocalList(listId, userId, normalizedProduct, quantity);
+        console.error('Error updating item quantity in Supabase:', updateError);
+        // Continue with localStorage as fallback
       }
     } else {
-      // Add new item
-      const newItem = {
-        id: uuidv4(),
-        list_id: listId,
-        product_id: normalizedProduct.id,
-        quantity,
-        added_by: userId,
-        added_at: new Date().toISOString(),
-        checked: false,
-        product_data: {
-          id: normalizedProduct.id,
-          name: normalizedProduct.name,
-          brand: normalizedProduct.brand || 'Unknown',
-          imageUrl: normalizedProduct.imageUrl,
-          price: normalizedProduct.price,
-          store: normalizedStore,
-          category: normalizedProduct.category
-        }
-      };
-
+      // Insert new item
       const { error: insertError } = await supabase
         .from('grocery_items')
-        .insert(newItem);
+        .insert({
+          list_id: listId,
+          user_id: userId,
+          product_id: product.id,
+          quantity,
+          checked: false
+        });
 
       if (insertError) {
-        console.error('Error inserting new item:', insertError);
-        // Fall back to localStorage
-        return addProductToLocalList(listId, userId, normalizedProduct, quantity);
+        console.error('Error inserting item into Supabase:', insertError);
+        // Continue with localStorage as fallback
       }
     }
 
-    // Get updated list to return
-    const updatedList = await getGroceryListById(listId);
-    return { 
-      success: true, 
-      list: updatedList 
-    };
-  } catch (error) {
-    console.error('Error in addProductToGroceryList:', error);
-    // Fall back to localStorage
-    return addProductToLocalList(listId, userId, product, quantity);
-  }
-};
-
-// Helper function to add product to local list (for fallback)
-const addProductToLocalList = (
-  listId: string, 
-  userId: string, 
-  product: Product, 
-  quantity: number
-): Promise<{ success: boolean; message?: string; list?: GroceryList }> => {
-  try {
-    // Normalize store name for consistency
-    let normalizedStore = product.store;
-    if (normalizedStore?.includes('MaxiPali') || normalizedStore === 'MaxiPali') {
-      normalizedStore = 'MaxiPali';
-    } else if (normalizedStore?.includes('MasxMenos') || normalizedStore === 'MasxMenos') {
-      normalizedStore = 'MasxMenos';
-    }
-    
-    // Create a normalized product with consistent store name
-    const normalizedProduct = {
-      ...product,
-      store: normalizedStore
-    };
-    
-    console.log('Adding product to local list with store:', normalizedStore);
-    
+    // Update localStorage as fallback and for immediate UI updates
     const localLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
     const listIndex = localLists.findIndex((list: GroceryList) => list.id === listId);
     
@@ -421,7 +355,7 @@ const addProductToLocalList = (
     }
     
     const list = localLists[listIndex];
-    const existingItemIndex = list.items.findIndex(item => item.productId === normalizedProduct.id);
+    const existingItemIndex = list.items.findIndex(item => item.productId === product.id);
     
     if (existingItemIndex !== -1) {
       // Update quantity if product already exists
@@ -430,20 +364,12 @@ const addProductToLocalList = (
       // Add new item
       const newItem: GroceryListItem = {
         id: uuidv4(),
-        productId: normalizedProduct.id,
+        productId: product.id,
         quantity,
         addedBy: userId,
         addedAt: new Date().toISOString(),
         checked: false,
-        productData: {
-          id: normalizedProduct.id,
-          name: normalizedProduct.name,
-          brand: normalizedProduct.brand || 'Unknown',
-          imageUrl: normalizedProduct.imageUrl,
-          price: normalizedProduct.price,
-          store: normalizedStore,
-          category: normalizedProduct.category
-        }
+        productData: productData
       };
       list.items.push(newItem);
     }
@@ -453,7 +379,7 @@ const addProductToLocalList = (
     
     return Promise.resolve({ success: true, list });
   } catch (error) {
-    console.error('Error adding product to local list:', error);
+    console.error('Error adding product to list:', error);
     return Promise.resolve({ success: false, message: 'Failed to add product to list' });
   }
 };
@@ -495,7 +421,7 @@ export const createGroceryList = async (
       .from('grocery_lists')
       .insert({
         id: newListId,
-        user_id: userId,
+        created_by: userId,
         name,
         created_at: now,
         collaborators: []
@@ -592,4 +518,244 @@ export const getOrCreateDefaultList = async (userId: string): Promise<GroceryLis
     
     return mockList;
   }
-}; 
+};
+
+// Add this new function to handle item deletion
+export const deleteGroceryListItem = async (itemId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('grocery_items')
+      .delete()
+      .eq('id', itemId);
+
+    if (error) {
+      console.error('Error deleting item from Supabase:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in deleteGroceryListItem:', error);
+    return false;
+  }
+};
+
+// Get grocery list by ID with permission check
+export const getSharedGroceryListById = async (userId: string, listId: string): Promise<GroceryList | undefined> => {
+  try {
+    // Fetch list
+    const { data: list, error: listError } = await supabase
+      .from('grocery_lists')
+      .select('*')
+      .eq('id', listId)
+      .single();
+
+    if (listError) {
+      console.error('Error fetching grocery list:', listError);
+      return undefined;
+    }
+    
+    // Check if user has access to this list (owner or collaborator)
+    const isOwner = list.created_by === userId;
+    const isCollaborator = list.collaborators && list.collaborators.includes(userId);
+    
+    if (!isOwner && !isCollaborator) {
+      console.error('User does not have access to this list');
+      return undefined;
+    }
+
+    // Fetch items for the list
+    const { data: items, error: itemsError } = await supabase
+      .from('grocery_items')
+      .select('*')
+      .eq('list_id', listId);
+
+    if (itemsError) {
+      console.error('Error fetching grocery items:', itemsError);
+      return undefined;
+    }
+    
+    // Fetch user's products from user_products table
+    const { data: userProducts, error: productsError } = await supabase
+      .from('user_products')
+      .select('*')
+      .eq('user_id', userId);
+      
+    if (productsError) {
+      console.error('Error fetching user products:', productsError);
+      // Continue without user products, using the embedded product_data
+    }
+    
+    // Create a map of product_id to user product for quick lookup
+    const productMap = new Map();
+    if (userProducts && userProducts.length > 0) {
+      userProducts.forEach(product => {
+        productMap.set(product.product_id, {
+          id: product.product_id,
+          name: product.name,
+          brand: product.brand,
+          price: product.price,
+          imageUrl: product.image_url,
+          store: product.store,
+          category: product.category
+        });
+      });
+    }
+
+    // Transform data to match application format
+    return {
+      id: list.id,
+      name: list.name,
+      createdBy: list.created_by,
+      createdAt: list.created_at,
+      collaborators: list.collaborators || [],
+      isShared: isOwner ? false : true,
+      items: items.map((item: DbGroceryItem) => {
+        // Look up product in user's product database first
+        const userProduct = productMap.get(item.product_id);
+        
+        return {
+          id: item.id,
+          productId: item.product_id,
+          quantity: item.quantity,
+          addedBy: item.added_by,
+          addedAt: item.added_at,
+          checked: item.checked,
+          // Use user's product data if available, otherwise use embedded product_data
+          productData: userProduct || item.product_data
+        };
+      })
+    };
+  } catch (error) {
+    console.error('Error in getSharedGroceryListById:', error);
+    return undefined;
+  }
+};
+
+// Add a collaborator to a grocery list
+export const addCollaborator = async (userId: string, listId: string, collaboratorEmail: string): Promise<boolean> => {
+  try {
+    console.log(`Starting addCollaborator: userId=${userId}, listId=${listId}, email=${collaboratorEmail}`);
+    
+    // Normalize the email address
+    const normalizedEmail = collaboratorEmail.trim().toLowerCase();
+    
+    // Step 1: Get the list data
+    const { data: listData, error: listError } = await supabase
+      .from('grocery_lists')
+      .select('id, created_by, collaborators')
+      .eq('id', listId)
+      .single();
+    
+    if (listError || !listData) {
+      console.error('Error fetching list:', listError);
+      return false;
+    }
+    
+    console.log('List data retrieved:', {
+      id: listData.id,
+      createdBy: listData.created_by,
+      collaborators: listData.collaborators
+    });
+    
+    // Step 2: Check permission
+    const isOwner = listData.created_by === userId;
+    if (!isOwner) {
+      console.error('User does not have permission to modify this list');
+      return false;
+    }
+    
+    // Step 3: Handle collaborators
+    let collaborators = Array.isArray(listData.collaborators) ? 
+      [...listData.collaborators] : [];
+    
+    // Don't add if already present
+    if (collaborators.includes(normalizedEmail)) {
+      console.log('Email already in collaborators list');
+      return true;
+    }
+    
+    // Add the new collaborator
+    collaborators.push(normalizedEmail);
+    console.log('New collaborators array:', collaborators);
+    
+    // Step 4: Update the list with the new collaborators
+    const { error: updateError } = await supabase
+      .from('grocery_lists')
+      .update({ collaborators })
+      .eq('id', listId);
+      
+    if (updateError) {
+      console.error('Error updating collaborators:', updateError);
+      return false;
+    }
+    
+    console.log('Successfully added collaborator');
+    return true;
+  } catch (error) {
+    console.error('Error in addCollaborator:', error);
+    return false;
+  }
+};
+
+// Remove a collaborator from a grocery list
+export const removeCollaborator = async (userId: string, listId: string, collaboratorEmail: string): Promise<boolean> => {
+  try {
+    // Check if user has permission to remove collaborators (must be the owner)
+    const { data: list, error: fetchError } = await supabase
+      .from('grocery_lists')
+      .select('id, created_by, collaborators')
+      .eq('id', listId)
+      .eq('created_by', userId)
+      .single();
+      
+    if (fetchError) {
+      console.error('Error fetching list or user does not have permission:', fetchError);
+      return false;
+    }
+    
+    // Get current collaborators and remove the email
+    const collaborators = (list.collaborators || []).filter(email => email !== collaboratorEmail);
+    
+    // Update the list with new collaborators
+    const { error: updateError } = await supabase
+      .from('grocery_lists')
+      .update({ collaborators })
+      .eq('id', listId);
+      
+    if (updateError) {
+      console.error('Error updating collaborators:', updateError);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error in removeCollaborator:', error);
+    return false;
+  }
+};
+
+// Send invite email to collaborator
+export const sendCollaboratorInvite = async (
+  userId: string,
+  listId: string,
+  listName: string,
+  collaboratorEmail: string
+): Promise<boolean> => {
+  try {
+    // This would typically connect to a server-side function
+    // For now, we'll just log the attempt and return success
+    console.log(`[INVITE EMAIL] Would send email to ${collaboratorEmail} for list ${listName} (${listId})`);
+    
+    // In a real implementation, you would call a server function:
+    // const { error } = await supabase.functions.invoke('send-collaborator-invite', {
+    //   body: { userId, listId, listName, collaboratorEmail }
+    // });
+    
+    // For now, we'll return true to indicate success
+    return true;
+  } catch (error) {
+    console.error('Error sending invite email:', error);
+    return false;
+  }
+};

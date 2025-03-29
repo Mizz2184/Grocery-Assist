@@ -34,6 +34,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         if (session) {
           const currentUser = await getCurrentUser();
           setUser(currentUser);
+          
+          // We don't clear search here because this runs on initial load
+          // and would clear search for already logged in users
         }
       } catch (error) {
         console.error("Error checking auth session:", error);
@@ -48,6 +51,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const { data: authListener } = subscribeToAuthChanges((event, session) => {
       if (event === 'SIGNED_IN') {
         setUser(session?.user || null);
+        
+        // Clear search data on sign in
+        // Using session storage directly since we can't use the context hook here
+        sessionStorage.removeItem('search_query');
+        sessionStorage.removeItem('search_results');
+        sessionStorage.removeItem('search_scroll_position');
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
       }

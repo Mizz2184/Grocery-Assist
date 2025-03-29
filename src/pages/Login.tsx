@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Navigate, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
+import { useSearch } from "@/context/SearchContext";
 import { signInWithGoogle, signInWithEmail, signUpWithEmail } from "@/lib/supabase";
 import { ShoppingCart, AlertCircle, Mail, Lock, User } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -12,8 +13,32 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 
 const Login = () => {
-  const { user, loading } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth();
+  const { clearSearch } = useSearch();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Extract redirect URL from query parameters
+  const queryParams = new URLSearchParams(location.search);
+  const redirectUrl = queryParams.get('redirect') || '/';
+  
+  // Redirect to specified URL after successful login
+  useEffect(() => {
+    if (user) {
+      // Clear search when user logs in
+      clearSearch();
+      navigate(redirectUrl);
+    }
+  }, [user, navigate, redirectUrl, clearSearch]);
+  
+  // If user is already logged in, redirect to home
+  if (user) {
+    // This will trigger the clearSearch in the effect above
+    return <Navigate to={redirectUrl} />;
+  }
+
   const [error, setError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isSigningUp, setIsSigningUp] = useState(false);
@@ -27,6 +52,8 @@ const Login = () => {
     try {
       setIsLoggingIn(true);
       setError(null);
+      // Clear search state before login attempt
+      clearSearch();
       const { error } = await signInWithGoogle();
       if (error) {
         setError(error.message);
@@ -49,6 +76,8 @@ const Login = () => {
     try {
       setIsLoggingIn(true);
       setError(null);
+      // Clear search state before login attempt
+      clearSearch();
       const { error } = await signInWithEmail(email, password);
       if (error) {
         setError(error.message);
@@ -71,6 +100,8 @@ const Login = () => {
     try {
       setIsSigningUp(true);
       setError(null);
+      // Clear search state before signup attempt
+      clearSearch();
       const { data, error } = await signUpWithEmail(email, password, { full_name: fullName });
       
       if (error) {
@@ -103,11 +134,6 @@ const Login = () => {
       setIsSigningUp(false);
     }
   };
-
-  // If already logged in, redirect to home
-  if (user && !loading) {
-    return <Navigate to="/" replace />;
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">

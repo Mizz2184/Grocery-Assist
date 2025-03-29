@@ -178,8 +178,10 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
     };
 
     // Filter out products with zero price
-    transformedData.products = transformedData.products.filter(p => p.price > 0);
-    transformedData.total = transformedData.products.length;
+    const filteredProducts = transformedData.products.filter(p => p.price > 0);
+    console.log(`Filtered from ${transformedData.products.length} to ${filteredProducts.length} products with price > 0`);
+    transformedData.products = filteredProducts;
+    transformedData.total = filteredProducts.length;
 
     console.log(`Found ${transformedData.products.length} products from API`);
     return res.json(transformedData);

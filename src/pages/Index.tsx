@@ -70,7 +70,16 @@ const Index = () => {
         
         lists.forEach(list => {
           list.items.forEach(item => {
-            productIds.add(item.productId);
+            // Create composite key for each product
+            if (item.productData) {
+              // Check if productData has a store property (different Product interfaces in the codebase)
+              const store = 'store' in item.productData ? item.productData.store : 'unknown';
+              const uniqueKey = `${store}|${item.productId}`;
+              productIds.add(uniqueKey);
+            } else {
+              // Fallback to just productId if product data not available
+              productIds.add(item.productId);
+            }
           });
         });
         
@@ -84,8 +93,10 @@ const Index = () => {
   }, [user]);
 
   // Check if product is in any grocery list
-  const isProductInList = (productId: string) => {
-    return productsInList.has(productId);
+  const isProductInList = (productId: string, store: string) => {
+    // Create a composite key using store and productId
+    const uniqueKey = `${store}|${productId}`;
+    return productsInList.has(uniqueKey);
   };
 
   // Helper function to sort products by relevance to search query
@@ -266,11 +277,41 @@ const Index = () => {
     }
     
     try {
-      // Find the product in our search results
-      const product = searchResults.find(p => p.id === productId);
+      // Find the EXACT product in our search results - by ID and event target
+      const clickedElement = document.activeElement;
+      let cardElement = clickedElement;
+      
+      // Find the closest product card element (might be the button or a parent)
+      while (cardElement && !cardElement.getAttribute('data-product-key')) {
+        cardElement = cardElement.parentElement;
+      }
+      
+      // Get the unique key that identifies this specific product card
+      const productKey = cardElement?.getAttribute('data-product-key');
+      console.log('Product key from clicked element:', productKey);
+      
+      // Find the exact product using the unique key if available
+      let product;
+      if (productKey) {
+        const [id, indexStr] = productKey.split('-');
+        const index = parseInt(indexStr, 10);
+        // Get the exact product at that index if valid
+        if (!isNaN(index) && index >= 0 && index < searchResults.length) {
+          product = searchResults[index];
+        }
+      }
+      
+      // Fallback: find by ID only if we couldn't find the specific product
+      if (!product) {
+        console.log('Falling back to product ID search');
+        product = searchResults.find(p => p.id === productId);
+      }
+      
       if (!product) {
         throw new Error('Product not found in search results');
       }
+      
+      console.log('Adding product to list:', product);
       
       // Get the default list or create one if it doesn't exist
       const defaultList = await getOrCreateDefaultList(user.id);
@@ -287,8 +328,9 @@ const Index = () => {
         return Promise.reject(new Error(result.message));
       }
       
-      // Update the list of products in user's lists
-      setProductsInList(prev => new Set([...prev, productId]));
+      // Update the list of products in user's lists - use a composite key of store+id
+      const uniqueKey = `${product.store}|${productId}`;
+      setProductsInList(prev => new Set([...prev, uniqueKey]));
       
       toast({
         title: "Added to list",
@@ -334,8 +376,11 @@ const Index = () => {
         return Promise.reject(new Error(result.message));
       }
       
-      // Update the list of products in user's lists
-      setProductsInList(prev => new Set([...prev, product.id]));
+      // Update the list of products in user's lists with a composite key
+      // Check if product has a store property
+      const store = 'store' in product ? product.store : 'unknown';
+      const uniqueKey = `${store}|${product.id}`;
+      setProductsInList(prev => new Set([...prev, uniqueKey]));
       
       return Promise.resolve();
     } catch (error) {
@@ -440,8 +485,9 @@ const Index = () => {
                 <ProductCard 
                   key={`${product.id}-${index}`} 
                   product={product} 
-                  isInList={isProductInList(product.id)}
+                  isInList={isProductInList(product.id, product.store || '')}
                   onAddToList={handleAddToList}
+                  index={index}
                 />
               ))}
             </div>
