@@ -90,9 +90,15 @@ export const Navbar = () => {
   return (
     <header 
       className={cn(
-        "fixed top-0 left-0 right-0 z-50 py-4 px-4 transition-all duration-300",
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 fixed-top",
         scrolled ? "glass shadow-sm" : "bg-transparent"
       )}
+      style={{
+        paddingTop: 'max(1rem, env(safe-area-inset-top))',
+        paddingLeft: 'env(safe-area-inset-left, 1rem)',
+        paddingRight: 'env(safe-area-inset-right, 1rem)',
+        paddingBottom: '1rem'
+      }}
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <Link 
@@ -200,7 +206,15 @@ export const Navbar = () => {
 
       {/* Mobile Navigation Overlay */}
       {isMenuOpen && (
-        <div className="fixed inset-0 z-40 md:hidden glass-card animate-fade-in transition-all">
+        <div 
+          className="fixed inset-0 z-40 md:hidden glass-card animate-fade-in transition-all" 
+          style={{
+            paddingTop: 'env(safe-area-inset-top, 0)',
+            paddingBottom: 'env(safe-area-inset-bottom, 0)',
+            paddingLeft: 'env(safe-area-inset-left, 0)',
+            paddingRight: 'env(safe-area-inset-right, 0)'
+          }}
+        >
           <div className="flex flex-col items-center justify-center h-full gap-8 p-8">
             {/* User info for mobile */}
             {user && (
@@ -257,6 +271,9 @@ export const Navbar = () => {
                 variant="destructive"
                 className="mt-6 rounded-full w-full animate-fade-up"
                 onClick={handleSignOut}
+                style={{
+                  marginBottom: 'env(safe-area-inset-bottom, 0)'
+                }}
               >
                 <LogOut className="w-5 h-5 mr-2" />
                 {isTranslated ? "Sign Out" : translateText("Cerrar Sesión")}
