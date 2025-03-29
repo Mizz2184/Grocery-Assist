@@ -118,18 +118,10 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
 // Helper functions for authentication
 export const signInWithGoogle = async () => {
-  // Get the current domain - this will work for both development and production
-  const currentDomain = window.location.origin;
-  
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${currentDomain}/auth/callback`,
-      // Add some querystring parameters that help with debugging
-      queryParams: {
-        // This helps ensure the redirect works correctly
-        prompt: 'select_account'
-      }
+      redirectTo: `${window.location.origin}/auth/callback`
     }
   });
   

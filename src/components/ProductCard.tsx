@@ -1,4 +1,4 @@
-import { useState, memo } from "react";
+import { useState, useEffect } from "react";
 import { Product } from "@/lib/types/store";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,16 +16,21 @@ interface ProductCardProps {
   index?: number;
 }
 
-// Using React.memo to prevent unnecessary re-renders
-const ProductCard = memo(({
+export const ProductCard = ({
   product,
   isInList = false,
   onAddToList,
   index = 0
 }: ProductCardProps) => {
   const [isAdding, setIsAdding] = useState(false);
+  const [isInListLocal, setIsInListLocal] = useState(isInList);
   const { toast } = useToast();
   const { translateText, isTranslated } = useTranslation();
+
+  // Update local state when props change
+  useEffect(() => {
+    setIsInListLocal(isInList);
+  }, [isInList]);
 
   // Debug log to check product data
   console.log('Product in ProductCard:', product);
@@ -37,11 +42,10 @@ const ProductCard = memo(({
     setIsAdding(true);
     try {
       await onAddToList(product.id);
-      toast({
-        title: isTranslated ? "Added to list" : translateText("Añadido a la lista"),
-        description: `${isTranslated ? translateText(product.name) : product.name} ${isTranslated ? "has been added to your grocery list" : "ha sido añadido a tu lista de compras"}.`,
-      });
+      // Update local state to show check mark immediately
+      setIsInListLocal(true);
     } catch (error) {
+      console.error('Error adding product to list:', error);
       toast({
         title: isTranslated ? "Error" : translateText("Error"),
         description: isTranslated ? "Failed to add product to list. Please try again." : "No se pudo añadir el producto a la lista. Por favor, inténtalo de nuevo.",
@@ -80,7 +84,7 @@ const ProductCard = memo(({
   };
 
   return (
-    <div className="block h-full" data-product-key={`${product.id}-${index}`}>
+    <div className="block h-full" data-product-id={product.id} data-index={index}>
       <Card className="overflow-hidden h-full flex flex-col group hover:shadow-md transition-shadow">
         <div className="relative aspect-square overflow-hidden bg-muted/30">
           {product.imageUrl ? (
@@ -88,7 +92,6 @@ const ProductCard = memo(({
               src={product.imageUrl} 
               alt={isTranslated ? translateText(product.name) : product.name} 
               className="w-full h-full object-cover"
-              loading="lazy" // Add lazy loading for images
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-muted-foreground">
@@ -137,17 +140,17 @@ const ProductCard = memo(({
             {onAddToList && (
               <Button
                 size="icon"
-                variant={isInList ? "secondary" : "default"}
+                variant={isInListLocal ? "secondary" : "default"}
                 className={cn(
                   "rounded-full flex-shrink-0",
-                  isInList && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                  isInListLocal && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                 )}
                 onClick={handleAddToList}
-                disabled={isAdding || isInList}
-                aria-label={isTranslated ? (isInList ? "Added to list" : "Add to list") : translateText(isInList ? "Añadido a la lista" : "Añadir a la lista")}
-                data-product-key={`${product.id}-${index}`}
+                disabled={isAdding || isInListLocal}
+                aria-label={isTranslated ? (isInListLocal ? "Added to list" : "Add to list") : translateText(isInListLocal ? "Añadido a la lista" : "Añadir a la lista")}
+                data-product-id={product.id}
               >
-                {isInList ? (
+                {isInListLocal ? (
                   <Check className="h-4 w-4" />
                 ) : isAdding ? (
                   <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
@@ -177,8 +180,4 @@ const ProductCard = memo(({
       </Card>
     </div>
   );
-});
-
-ProductCard.displayName = "ProductCard";
-
-export { ProductCard };
+};

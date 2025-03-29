@@ -36,26 +36,11 @@ export const Navbar = () => {
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 10);
-      // Don't close the menu on scroll
     };
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  // Handle touch events for better mobile support
-  useEffect(() => {
-    if (isMenuOpen) {
-      // Prevent body scrolling when menu is open
-      document.body.style.overflow = 'hidden';
-    } else {
-      // Allow scrolling when menu is closed
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isMenuOpen]);
 
   // Close mobile menu when route changes
   useEffect(() => {
@@ -191,7 +176,7 @@ export const Navbar = () => {
         </nav>
 
         {/* Mobile Menu Button */}
-        <div className="flex md:hidden items-center gap-2 relative z-[52]">
+        <div className="flex md:hidden items-center gap-2">
           <TranslationToggle />
           <ThemeToggle />
           <Button
@@ -215,8 +200,8 @@ export const Navbar = () => {
 
       {/* Mobile Navigation Overlay */}
       {isMenuOpen && (
-        <div className="fixed inset-0 z-[51] md:hidden glass-card animate-fade-in transition-all">
-          <div className="flex flex-col items-center justify-center h-full gap-8 p-8 overflow-y-auto">
+        <div className="fixed inset-0 z-40 md:hidden glass-card animate-fade-in transition-all">
+          <div className="flex flex-col items-center justify-center h-full gap-8 p-8">
             {/* User info for mobile */}
             {user && (
               <div className="flex flex-col items-center gap-2 mb-6">
