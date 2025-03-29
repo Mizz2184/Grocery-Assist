@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { Product } from "@/lib/types/store";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,8 @@ interface ProductCardProps {
   index?: number;
 }
 
-export const ProductCard = ({
+// Using React.memo to prevent unnecessary re-renders
+const ProductCard = memo(({
   product,
   isInList = false,
   onAddToList,
@@ -87,6 +88,7 @@ export const ProductCard = ({
               src={product.imageUrl} 
               alt={isTranslated ? translateText(product.name) : product.name} 
               className="w-full h-full object-cover"
+              loading="lazy" // Add lazy loading for images
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-muted-foreground">
@@ -175,4 +177,8 @@ export const ProductCard = ({
       </Card>
     </div>
   );
-};
+});
+
+ProductCard.displayName = "ProductCard";
+
+export { ProductCard };

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { SearchBar } from "@/components/SearchBar";
 import { ProductCard } from "@/components/ProductCard";
 import { mockGroceryLists } from "@/utils/productData";
@@ -6,7 +6,7 @@ import { stores } from "@/utils/storeData";
 import { useAuth } from "@/hooks/useAuth";
 import { useSearch } from "@/context/SearchContext";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Search as SearchIcon, Scan, Filter } from "lucide-react";
+import { ShoppingCart, Search as SearchIcon, Scan, Filter, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import { searchMaxiPaliProducts, searchMasxMenosProducts } from "@/lib/services";
@@ -15,6 +15,9 @@ import { Product } from "@/lib/types/store";
 import { Button } from "@/components/ui/button";
 import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+// Number of items to show initially and each time "Load More" is clicked
+const PAGE_SIZE = 16;
 
 const Index = () => {
   const { 
@@ -27,10 +30,35 @@ const Index = () => {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [storeFilter, setStoreFilter] = useState<'all' | 'MaxiPali' | 'MasxMenos'>('all');
   const [showBanner, setShowBanner] = useState(true);
+  const [visibleItems, setVisibleItems] = useState(PAGE_SIZE);
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const searchResultsRef = useRef<HTMLDivElement>(null);
+
+  // Filter products by selected store if needed
+  const filteredResults = useMemo(() => {
+    if (storeFilter === 'all') {
+      return searchResults;
+    }
+    
+    return searchResults.filter(product => {
+      // Normalize store name for consistent filtering
+      let normalizedStore = product.store;
+      if (normalizedStore?.includes('MaxiPali') || normalizedStore === 'MaxiPali') {
+        normalizedStore = 'MaxiPali';
+      } else if (normalizedStore?.includes('MasxMenos') || normalizedStore === 'MasxMenos') {
+        normalizedStore = 'MasxMenos';
+      }
+      
+      return normalizedStore === storeFilter;
+    });
+  }, [searchResults, storeFilter]);
+
+  // Get only the visible subset of results
+  const visibleResults = useMemo(() => {
+    return filteredResults.slice(0, visibleItems);
+  }, [filteredResults, visibleItems]);
 
   // Restore scroll position when returning to the page
   useEffect(() => {
@@ -44,17 +72,47 @@ const Index = () => {
 
   // Save scroll position when scrolling
   useEffect(() => {
+    let scrollTimeout: number | null = null;
+    
     const handleScroll = () => {
-      if (query && searchResults.length > 0) {
-        setScrollPosition(window.scrollY);
+      // Cancel any pending scroll events
+      if (scrollTimeout) {
+        window.clearTimeout(scrollTimeout);
       }
+      
+      // Debounce the scroll event to avoid excessive updates
+      scrollTimeout = window.setTimeout(() => {
+        if (query && searchResults.length > 0) {
+          setScrollPosition(window.scrollY);
+          
+          // Auto-load more results when scrolling near the bottom
+          const scrollPosition = window.scrollY;
+          const windowHeight = window.innerHeight;
+          const documentHeight = document.documentElement.scrollHeight;
+          
+          // If we're near the bottom (200px from bottom) and have more items to show
+          if (documentHeight - (scrollPosition + windowHeight) < 200 && 
+              visibleItems < filteredResults.length) {
+            // Load more items but don't exceed the total
+            setVisibleItems(prev => Math.min(prev + PAGE_SIZE, filteredResults.length));
+          }
+        }
+      }, 100); // 100ms debounce
     };
 
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
       window.removeEventListener('scroll', handleScroll);
+      if (scrollTimeout) {
+        window.clearTimeout(scrollTimeout);
+      }
     };
-  }, [query, searchResults, setScrollPosition]);
+  }, [query, searchResults, setScrollPosition, filteredResults, visibleItems]);
+
+  // Reset visible items when search results or filter changes
+  useEffect(() => {
+    setVisibleItems(PAGE_SIZE);
+  }, [searchResults, storeFilter]);
 
   // Fetch user's products in lists when user changes
   useEffect(() => {
@@ -93,11 +151,16 @@ const Index = () => {
   }, [user]);
 
   // Check if product is in any grocery list
-  const isProductInList = (productId: string, store: string) => {
+  const isProductInList = useCallback((productId: string, store: string) => {
     // Create a composite key using store and productId
     const uniqueKey = `${store}|${productId}`;
     return productsInList.has(uniqueKey);
-  };
+  }, [productsInList]);
+
+  // Load more results handler
+  const handleLoadMore = useCallback(() => {
+    setVisibleItems(prev => Math.min(prev + PAGE_SIZE, filteredResults.length));
+  }, [filteredResults.length]);
 
   // Helper function to sort products by relevance to search query
   const sortProductsByRelevance = (products: Product[], searchQuery: string): Product[] => {
@@ -389,25 +452,64 @@ const Index = () => {
     }
   };
 
-  // Filter products by selected store if needed
-  const filteredResults = useMemo(() => {
-    if (storeFilter === 'all') {
-      return searchResults;
+  // Render product grid with optimized rendering
+  const renderProductGrid = useCallback(() => {
+    if (isSearching) {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div 
+              key={i} 
+              className="aspect-square bg-muted animate-pulse rounded-lg"
+            />
+          ))}
+        </div>
+      );
     }
     
-    return searchResults.filter(product => {
-      // Normalize store name for consistent filtering
-      let normalizedStore = product.store;
-      if (normalizedStore?.includes('MaxiPali') || normalizedStore === 'MaxiPali') {
-        normalizedStore = 'MaxiPali';
-      } else if (normalizedStore?.includes('MasxMenos') || normalizedStore === 'MasxMenos') {
-        normalizedStore = 'MasxMenos';
-      }
-      
-      return normalizedStore === storeFilter;
-    });
-  }, [searchResults, storeFilter]);
-
+    if (filteredResults.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <div className="inline-flex justify-center items-center w-16 h-16 rounded-full bg-muted mb-4">
+            <SearchIcon className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-medium mb-1">No results found</h3>
+          <p className="text-muted-foreground">
+            Try adjusting your search term or try a different keyword
+          </p>
+        </div>
+      );
+    }
+    
+    return (
+      <>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {visibleResults.map((product, index) => (
+            <ProductCard 
+              key={`${product.id}-${index}`} 
+              product={product} 
+              isInList={isProductInList(product.id, product.store || '')}
+              onAddToList={handleAddToList}
+              index={index}
+            />
+          ))}
+        </div>
+        
+        {visibleItems < filteredResults.length && (
+          <div className="flex justify-center mt-8">
+            <Button 
+              variant="outline" 
+              onClick={handleLoadMore}
+              className="px-8 flex items-center gap-2"
+            >
+              Load more <ChevronDown className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </>
+    );
+  }, [isSearching, filteredResults, visibleResults, visibleItems, isProductInList, handleAddToList, handleLoadMore]);
+  
   return (
     <div className="page-container">
       <div className="max-w-2xl mx-auto text-center mb-8 animate-fade-up">
@@ -470,38 +572,9 @@ const Index = () => {
             )}
           </div>
 
-          {isSearching ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div 
-                  key={i} 
-                  className="aspect-square bg-muted animate-pulse rounded-lg"
-                />
-              ))}
-            </div>
-          ) : searchResults.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredResults.map((product, index) => (
-                <ProductCard 
-                  key={`${product.id}-${index}`} 
-                  product={product} 
-                  isInList={isProductInList(product.id, product.store || '')}
-                  onAddToList={handleAddToList}
-                  index={index}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <div className="inline-flex justify-center items-center w-16 h-16 rounded-full bg-muted mb-4">
-                <SearchIcon className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-medium mb-1">No results found</h3>
-              <p className="text-muted-foreground">
-                Try adjusting your search term or try a different keyword
-              </p>
-            </div>
-          )}
+          {/* Optimized product grid rendering */}
+          {renderProductGrid()}
+          
         </div>
       ) : (
         <div className="space-y-12 animate-fade-up animate-delay-200">
