@@ -36,11 +36,26 @@ export const Navbar = () => {
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 10);
+      // Don't close the menu on scroll
     };
 
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Handle touch events for better mobile support
+  useEffect(() => {
+    if (isMenuOpen) {
+      // Prevent body scrolling when menu is open
+      document.body.style.overflow = 'hidden';
+    } else {
+      // Allow scrolling when menu is closed
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMenuOpen]);
 
   // Close mobile menu when route changes
   useEffect(() => {
@@ -90,15 +105,9 @@ export const Navbar = () => {
   return (
     <header 
       className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 fixed-top",
+        "fixed top-0 left-0 right-0 z-50 py-4 px-4 transition-all duration-300",
         scrolled ? "glass shadow-sm" : "bg-transparent"
       )}
-      style={{
-        paddingTop: 'max(1rem, env(safe-area-inset-top))',
-        paddingLeft: 'env(safe-area-inset-left, 1rem)',
-        paddingRight: 'env(safe-area-inset-right, 1rem)',
-        paddingBottom: '1rem'
-      }}
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <Link 
@@ -182,7 +191,7 @@ export const Navbar = () => {
         </nav>
 
         {/* Mobile Menu Button */}
-        <div className="flex md:hidden items-center gap-2">
+        <div className="flex md:hidden items-center gap-2 relative z-[52]">
           <TranslationToggle />
           <ThemeToggle />
           <Button
@@ -206,16 +215,8 @@ export const Navbar = () => {
 
       {/* Mobile Navigation Overlay */}
       {isMenuOpen && (
-        <div 
-          className="fixed inset-0 z-40 md:hidden glass-card animate-fade-in transition-all" 
-          style={{
-            paddingTop: 'env(safe-area-inset-top, 0)',
-            paddingBottom: 'env(safe-area-inset-bottom, 0)',
-            paddingLeft: 'env(safe-area-inset-left, 0)',
-            paddingRight: 'env(safe-area-inset-right, 0)'
-          }}
-        >
-          <div className="flex flex-col items-center justify-center h-full gap-8 p-8">
+        <div className="fixed inset-0 z-[51] md:hidden glass-card animate-fade-in transition-all">
+          <div className="flex flex-col items-center justify-center h-full gap-8 p-8 overflow-y-auto">
             {/* User info for mobile */}
             {user && (
               <div className="flex flex-col items-center gap-2 mb-6">
@@ -271,9 +272,6 @@ export const Navbar = () => {
                 variant="destructive"
                 className="mt-6 rounded-full w-full animate-fade-up"
                 onClick={handleSignOut}
-                style={{
-                  marginBottom: 'env(safe-area-inset-bottom, 0)'
-                }}
               >
                 <LogOut className="w-5 h-5 mr-2" />
                 {isTranslated ? "Sign Out" : translateText("Cerrar Sesión")}
