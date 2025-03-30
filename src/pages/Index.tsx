@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { ShoppingCart, Search as SearchIcon, Scan, Filter } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
-import { searchMaxiPaliProducts, searchMasxMenosProducts } from "@/lib/services";
+import { searchMaxiPaliProducts, searchMasxMenosProducts, searchWalmartProducts } from "@/lib/services";
 import { addProductToGroceryList, getOrCreateDefaultList, getUserGroceryLists } from "@/lib/services/groceryListService";
 import { Product } from "@/lib/types/store";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ const Index = () => {
   } = useSearch();
   const [productsInList, setProductsInList] = useState<Set<string>>(new Set());
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [storeFilter, setStoreFilter] = useState<'all' | 'MaxiPali' | 'MasxMenos'>('all');
+  const [storeFilter, setStoreFilter] = useState<'all' | 'MaxiPali' | 'MasxMenos' | 'Walmart'>('all');
   const [showBanner, setShowBanner] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -145,115 +145,65 @@ const Index = () => {
   };
 
   const handleSearch = async (searchQuery: string) => {
-    if (!searchQuery || searchQuery.trim() === '') {
-      toast({
-        title: "Please enter a search term",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!searchQuery) return;
     
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-    setQuery(searchQuery);
+    console.log('Performing product search for:', searchQuery);
     setIsSearching(true);
-    setSearchResults([]);
-    setScrollPosition(0); // Reset scroll position for new search
-    
+
     try {
-      console.log('Starting search for:', searchQuery);
-      
-      // Search in both MaxiPali and MasxMenos
-      const [maxiPaliResults, masxMenosResults] = await Promise.allSettled([
+      // Perform searches in parallel
+      const [maxiPaliResults, masxMenosResults, walmartResults] = await Promise.all([
         searchMaxiPaliProducts({ query: searchQuery }),
-        searchMasxMenosProducts({ query: searchQuery })
+        searchMasxMenosProducts({ query: searchQuery }),
+        searchWalmartProducts({ query: searchQuery })
       ]);
-      
-      // Initialize an array to hold combined results
+
       let combinedResults: Product[] = [];
       let totalProductCount = 0;
       
-      // Handle MaxiPali results
-      if (maxiPaliResults.status === 'fulfilled' && maxiPaliResults.value.products) {
-        // Additional filtering to ensure relevance
-        const filteredMaxiPaliResults = maxiPaliResults.value.products.filter(product => {
-          const searchTerms = normalizedQuery.split(/\s+/);
-          const productName = product.name.toLowerCase();
-          const brand = (product.brand || '').toLowerCase();
-          const category = (product.category || '').toLowerCase();
-          
-          // Check if any search term matches the product
-          return searchTerms.some(term => {
-            // Skip empty terms
-            if (!term) return false;
-            
-            // Check for exact matches first
-            if (productName.includes(term) || 
-                brand.includes(term) || 
-                category.includes(term) ||
-                (product.ean && product.ean === searchQuery)) {
-              return true;
-            }
-            
-            // For terms longer than 2 characters, also check for partial matches
-            if (term.length > 2) {
-              return productName.includes(term) || 
-                     brand.includes(term) || 
-                     category.includes(term);
-            }
-            
-            return false;
-          });
-        });
-        
-        combinedResults = [...filteredMaxiPaliResults];
-        totalProductCount += filteredMaxiPaliResults.length;
-        console.log(`Found ${maxiPaliResults.value.products.length} MaxiPali products, filtered to ${filteredMaxiPaliResults.length}`);
-      } else if (maxiPaliResults.status === 'rejected') {
-        console.error('MaxiPali search error:', maxiPaliResults.reason);
+      // Add MaxiPali results
+      if (maxiPaliResults.products && maxiPaliResults.products.length > 0) {
+        combinedResults = [...combinedResults, ...maxiPaliResults.products];
+        totalProductCount += maxiPaliResults.products.length;
+        console.log(`Found ${maxiPaliResults.products.length} MaxiPali products`);
       }
       
-      // Handle MasxMenos results
-      if (masxMenosResults.status === 'fulfilled' && masxMenosResults.value.products) {
+      // Add MasxMenos results
+      if (masxMenosResults.products && masxMenosResults.products.length > 0) {
         // Add MasxMenos results directly without additional filtering
-        combinedResults = [...combinedResults, ...masxMenosResults.value.products];
-        totalProductCount += masxMenosResults.value.products.length;
-        console.log(`Found ${masxMenosResults.value.products.length} MasxMenos products`);
-      } else if (masxMenosResults.status === 'rejected') {
-        console.error('MasxMenos search error:', masxMenosResults.reason);
+        combinedResults = [...combinedResults, ...masxMenosResults.products];
+        totalProductCount += masxMenosResults.products.length;
+        console.log(`Found ${masxMenosResults.products.length} MasxMenos products`);
+      }
+      
+      // Add Walmart results
+      if (walmartResults.products && walmartResults.products.length > 0) {
+        // Add Walmart results directly without additional filtering
+        combinedResults = [...combinedResults, ...walmartResults.products];
+        totalProductCount += walmartResults.products.length;
+        console.log(`Found ${walmartResults.products.length} Walmart products`);
       }
       
       // If both searches failed or returned no results
       if (combinedResults.length === 0) {
-        if (maxiPaliResults.status === 'rejected' && masxMenosResults.status === 'rejected') {
-          toast({
-            title: "Search Error",
-            description: "Failed to connect to search services. Please try again later.",
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title: "No products found",
-            description: "Try a different search term or check your connection",
-          });
-        }
-      } else {
-        // Sort by relevance if search query is provided
-        const sortedResults = sortProductsByRelevance(combinedResults, normalizedQuery);
-        setSearchResults(sortedResults);
-        setShowBanner(false);
-        
         toast({
-          title: `Found ${totalProductCount} products`,
-          description: storeFilter === 'all' 
-            ? "Showing results from all stores" 
-            : `Showing results from ${storeFilter}`
+          title: "No Results Found",
+          description: `We couldn't find any products matching "${searchQuery}"`,
+          variant: "destructive"
         });
+      } else {
+        console.log(`Found ${combinedResults.length} total products`);
+        toast({
+          title: `Found ${totalProductCount} Products`,
+          description: `Showing results for "${searchQuery}"`
+        });
+        setSearchResults(combinedResults);
       }
     } catch (error) {
-      console.error('Search error:', error);
+      console.error('Error during search:', error);
       toast({
-        title: "Search failed",
-        description: "Please try again later",
+        title: "Search Error",
+        description: "An error occurred during the search. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -428,6 +378,8 @@ const Index = () => {
         normalizedStore = 'MaxiPali';
       } else if (normalizedStore?.includes('MasxMenos') || normalizedStore === 'MasxMenos') {
         normalizedStore = 'MasxMenos';
+      } else if (normalizedStore?.includes('Walmart') || normalizedStore === 'Walmart') {
+        normalizedStore = 'Walmart';
       }
       
       return normalizedStore === storeFilter;
@@ -441,7 +393,7 @@ const Index = () => {
           Compare Prices, Save Money
         </h1>
         <p className="text-muted-foreground text-lg">
-          Find the best grocery deals at MaxiPali and MasxMenos
+          Find the best grocery deals at MaxiPali, MasxMenos, and Walmart
         </p>
       </div>
 
@@ -484,13 +436,14 @@ const Index = () => {
             {searchResults.length > 0 && !isSearching && (
               <Tabs 
                 value={storeFilter} 
-                onValueChange={(value) => setStoreFilter(value as 'all' | 'MaxiPali' | 'MasxMenos')}
+                onValueChange={(value) => setStoreFilter(value as 'all' | 'MaxiPali' | 'MasxMenos' | 'Walmart')}
                 className="w-full md:w-auto"
               >
-                <TabsList className="grid grid-cols-3 w-full md:w-auto">
+                <TabsList className="grid grid-cols-4 w-full md:w-auto">
                   <TabsTrigger value="all">All Stores</TabsTrigger>
                   <TabsTrigger value="MaxiPali">MaxiPali</TabsTrigger>
                   <TabsTrigger value="MasxMenos">MasxMenos</TabsTrigger>
+                  <TabsTrigger value="Walmart">Walmart</TabsTrigger>
                 </TabsList>
               </Tabs>
             )}

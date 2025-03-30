@@ -173,6 +173,86 @@ export const searchMasxMenosProducts = async ({
   }
 };
 
+export const searchWalmartProducts = async ({ 
+  query, 
+  page = 1,
+  pageSize = 49
+}: ProductSearchParams): Promise<ProductSearchResponse> => {
+  try {
+    console.log('Searching Walmart for:', query);
+    
+    // If no query is provided, return empty results
+    if (!query || query.trim() === '') {
+      return {
+        products: [],
+        total: 0,
+        page,
+        pageSize,
+        hasMore: false
+      };
+    }
+    
+    // Get all possible translations for the search query
+    const searchTerms = getSearchTranslations(query);
+    console.log('Search terms with translations:', searchTerms);
+    
+    // Note: This is a mock implementation until a real Walmart API can be integrated
+    // Generate mock products based on the search query
+    const mockProducts: Product[] = [
+      {
+        id: `walmart-${query.replace(/\s/g, '-')}-1`,
+        name: `${query} Product 1`,
+        price: Math.floor(Math.random() * 10000) / 100,
+        description: `A great ${query} product from Walmart`,
+        imageUrl: "https://placehold.co/400x400?text=Walmart",
+        brand: "Great Value",
+        category: "Grocery",
+        store: 'Walmart',
+        inStock: true
+      },
+      {
+        id: `walmart-${query.replace(/\s/g, '-')}-2`,
+        name: `${query} Product 2`,
+        price: Math.floor(Math.random() * 10000) / 100,
+        description: `Another ${query} product from Walmart`,
+        imageUrl: "https://placehold.co/400x400?text=Walmart",
+        brand: "Equate",
+        category: "Grocery",
+        store: 'Walmart',
+        inStock: true
+      },
+      {
+        id: `walmart-${query.replace(/\s/g, '-')}-3`,
+        name: `Premium ${query}`,
+        price: Math.floor(Math.random() * 15000) / 100,
+        description: `Premium ${query} product from Walmart`,
+        imageUrl: "https://placehold.co/400x400?text=Walmart",
+        brand: "Sam's Choice",
+        category: "Grocery",
+        store: 'Walmart',
+        inStock: true
+      }
+    ];
+    
+    return {
+      products: mockProducts,
+      total: mockProducts.length,
+      page,
+      pageSize,
+      hasMore: false
+    };
+  } catch (error) {
+    console.error('Error fetching Walmart products:', error);
+    return {
+      products: [],
+      total: 0,
+      page,
+      pageSize,
+      hasMore: false
+    };
+  }
+};
+
 export const compareProductPrices = async (
   productName: string,
   barcode?: string,
@@ -180,8 +260,9 @@ export const compareProductPrices = async (
 ): Promise<{
   maxiPaliProducts: Product[],
   masxMenosProducts: Product[],
+  walmartProducts: Product[],
   bestPrice: {
-    store: 'MaxiPali' | 'MasxMenos' ,
+    store: 'MaxiPali' | 'MasxMenos' | 'Walmart',
     price: number,
     savings: number,
     savingsPercentage: number
@@ -230,31 +311,38 @@ export const compareProductPrices = async (
     // If the product is from a specific store, we need to search for it in the other store
     let maxiPaliProducts: Product[] = [];
     let masxMenosProducts: Product[] = [];
+    let walmartProducts: Product[] = [];
     
     // FIXED: Always search both stores, but remember the original store for display logic
     // Instead of skipping the original store search, we'll store its products separately
     const searchMaxiPali = true;
     const searchMasxMenos = true;
+    const searchWalmart = true;
     
     console.log(`Search configuration: 
       - Search MaxiPali: ${searchMaxiPali}
       - Search MasxMenos: ${searchMasxMenos}
+      - Search Walmart: ${searchWalmart}
       - Original store: ${normalizedOriginalStore}`);
     
-    // Search in both stores concurrently (always)
-    const [maxiPaliResponse, masxMenosResponse] = await Promise.all([
+    // Search in all stores concurrently
+    const [maxiPaliResponse, masxMenosResponse, walmartResponse] = await Promise.all([
       searchMaxiPaliProducts({ query: searchQuery }),
-      searchMasxMenosProducts({ query: searchQuery })
+      searchMasxMenosProducts({ query: searchQuery }),
+      searchWalmartProducts({ query: searchQuery })
     ]);
     
     console.log("MaxiPali raw API response:", maxiPaliResponse);
     console.log("MasxMenos raw API response:", masxMenosResponse);
+    console.log("Walmart raw API response:", walmartResponse);
     
     maxiPaliProducts = maxiPaliResponse.products.map(p => ({...p, store: 'MaxiPali' as const}));
     masxMenosProducts = masxMenosResponse.products.map(p => ({...p, store: 'MasxMenos' as const}));
+    walmartProducts = walmartResponse.products.map(p => ({...p, store: 'Walmart' as const}));
     
     console.log("After mapping - MaxiPali products:", maxiPaliProducts);
     console.log("After mapping - MasxMenos products:", masxMenosProducts);
+    console.log("After mapping - Walmart products:", walmartProducts);
     
     // If one store has no results, try alternative search strategies
     const searchStrategies = [simplifiedName, keywordName, categorySearch].filter(s => s && s !== searchQuery);
@@ -286,10 +374,22 @@ export const compareProductPrices = async (
           break; // Found results, no need to try more strategies
         }
       }
+      
+      // Try Walmart if needed
+      if (walmartProducts.length === 0) {
+        console.log(`Trying alternative strategy for Walmart: "${strategy}"`);
+        const altResponse = await searchWalmartProducts({ query: strategy });
+        walmartProducts = altResponse.products.map(p => ({...p, store: 'Walmart' as const}));
+        
+        if (walmartProducts.length > 0) {
+          console.log(`Found ${walmartProducts.length} Walmart products using strategy: "${strategy}"`);
+          break; // Found results, no need to try more strategies
+        }
+      }
     }
     
     // Log the results
-    console.log(`Found ${maxiPaliProducts.length} MaxiPali products and ${masxMenosProducts.length} MasxMenos products`);
+    console.log(`Found ${maxiPaliProducts.length} MaxiPali products, ${masxMenosProducts.length} MasxMenos products, and ${walmartProducts.length} Walmart products`);
     if (maxiPaliProducts.length > 0) {
       console.log(`First MaxiPali product: ${maxiPaliProducts[0].name}, price: ${maxiPaliProducts[0].price}, store: ${maxiPaliProducts[0].store}`);
       console.log(`MaxiPali products details:`, maxiPaliProducts);
@@ -298,12 +398,17 @@ export const compareProductPrices = async (
       console.log(`First MasxMenos product: ${masxMenosProducts[0].name}, price: ${masxMenosProducts[0].price}, store: ${masxMenosProducts[0].store}`);
       console.log(`MasxMenos products details:`, masxMenosProducts);
     }
+    if (walmartProducts.length > 0) {
+      console.log(`First Walmart product: ${walmartProducts[0].name}, price: ${walmartProducts[0].price}, store: ${walmartProducts[0].store}`);
+      console.log(`Walmart products details:`, walmartProducts);
+    }
     
-    // If no products found in either store, return null for best price
-    if (maxiPaliProducts.length === 0 && masxMenosProducts.length === 0) {
+    // If no products found in any store, return null for best price
+    if (maxiPaliProducts.length === 0 && masxMenosProducts.length === 0 && walmartProducts.length === 0) {
       return {
         maxiPaliProducts,
         masxMenosProducts,
+        walmartProducts,
         bestPrice: null
       };
     }
@@ -311,6 +416,7 @@ export const compareProductPrices = async (
     // Ensure each product has the correct store property
     maxiPaliProducts = maxiPaliProducts.map(p => ({...p, store: 'MaxiPali' as const}));
     masxMenosProducts = masxMenosProducts.map(p => ({...p, store: 'MasxMenos' as const}));
+    walmartProducts = walmartProducts.map(p => ({...p, store: 'Walmart' as const}));
     
     // Find the lowest price product in each store
     const cheapestMaxiPaliProduct = maxiPaliProducts.length > 0
@@ -322,64 +428,74 @@ export const compareProductPrices = async (
       ? masxMenosProducts.reduce((cheapest, current) => 
           current.price < cheapest.price ? current : cheapest, masxMenosProducts[0])
       : null;
+      
+    const cheapestWalmartProduct = walmartProducts.length > 0
+      ? walmartProducts.reduce((cheapest, current) => 
+          current.price < cheapest.price ? current : cheapest, walmartProducts[0])
+      : null;
     
-    // Determine best price
+    // Determine best price among all stores
     let bestPrice = null;
+    let cheapestProduct = null;
+    let cheapestStore = null;
     
-    if (cheapestMaxiPaliProduct && cheapestMasxMenosProduct) {
-      // Both stores have the product - compare prices
-      if (cheapestMaxiPaliProduct.price < cheapestMasxMenosProduct.price) {
-        // MaxiPali is cheaper
-        const savings = cheapestMasxMenosProduct.price - cheapestMaxiPaliProduct.price;
-        const savingsPercentage = Math.round((savings / cheapestMasxMenosProduct.price) * 100);
-        
+    // Find the cheapest product overall
+    if (cheapestMaxiPaliProduct && (!cheapestProduct || cheapestMaxiPaliProduct.price < cheapestProduct.price)) {
+      cheapestProduct = cheapestMaxiPaliProduct;
+      cheapestStore = 'MaxiPali';
+    }
+    
+    if (cheapestMasxMenosProduct && (!cheapestProduct || cheapestMasxMenosProduct.price < cheapestProduct.price)) {
+      cheapestProduct = cheapestMasxMenosProduct;
+      cheapestStore = 'MasxMenos';
+    }
+    
+    if (cheapestWalmartProduct && (!cheapestProduct || cheapestWalmartProduct.price < cheapestProduct.price)) {
+      cheapestProduct = cheapestWalmartProduct;
+      cheapestStore = 'Walmart';
+    }
+    
+    if (cheapestProduct && cheapestStore) {
+      // Calculate savings compared to the next cheapest option
+      let nextCheapestPrice = Infinity;
+      
+      if (cheapestStore !== 'MaxiPali' && cheapestMaxiPaliProduct) {
+        nextCheapestPrice = Math.min(nextCheapestPrice, cheapestMaxiPaliProduct.price);
+      }
+      
+      if (cheapestStore !== 'MasxMenos' && cheapestMasxMenosProduct) {
+        nextCheapestPrice = Math.min(nextCheapestPrice, cheapestMasxMenosProduct.price);
+      }
+      
+      if (cheapestStore !== 'Walmart' && cheapestWalmartProduct) {
+        nextCheapestPrice = Math.min(nextCheapestPrice, cheapestWalmartProduct.price);
+      }
+      
+      // If we don't have a second option for comparison, there's no savings
+      if (nextCheapestPrice === Infinity) {
         bestPrice = {
-          store: 'MaxiPali',
-          price: cheapestMaxiPaliProduct.price,
-          savings,
-          savingsPercentage
-        };
-      } else if (cheapestMasxMenosProduct.price < cheapestMaxiPaliProduct.price) {
-        // MasxMenos is cheaper
-        const savings = cheapestMaxiPaliProduct.price - cheapestMasxMenosProduct.price;
-        const savingsPercentage = Math.round((savings / cheapestMaxiPaliProduct.price) * 100);
-        
-        bestPrice = {
-          store: 'MasxMenos',
-          price: cheapestMasxMenosProduct.price,
-          savings,
-          savingsPercentage
-        };
-      } else {
-        // Same price
-        bestPrice = {
-          store: 'MaxiPali', // Default to MaxiPali if same price
-          price: cheapestMaxiPaliProduct.price,
+          store: cheapestStore as 'MaxiPali' | 'MasxMenos' | 'Walmart',
+          price: cheapestProduct.price,
           savings: 0,
           savingsPercentage: 0
         };
+      } else {
+        const savings = nextCheapestPrice - cheapestProduct.price;
+        const savingsPercentage = Math.round((savings / nextCheapestPrice) * 100);
+        
+        bestPrice = {
+          store: cheapestStore as 'MaxiPali' | 'MasxMenos' | 'Walmart',
+          price: cheapestProduct.price,
+          savings,
+          savingsPercentage
+        };
       }
-    } else if (cheapestMaxiPaliProduct) {
-      // Only MaxiPali has the product
-      bestPrice = {
-        store: 'MaxiPali',
-        price: cheapestMaxiPaliProduct.price,
-        savings: 0,
-        savingsPercentage: 0
-      };
-    } else if (cheapestMasxMenosProduct) {
-      // Only MasxMenos has the product
-      bestPrice = {
-        store: 'MasxMenos',
-        price: cheapestMasxMenosProduct.price,
-        savings: 0,
-        savingsPercentage: 0
-      };
     }
     
     return {
       maxiPaliProducts,
       masxMenosProducts,
+      walmartProducts,
       bestPrice
     };
   } catch (error) {
@@ -387,6 +503,7 @@ export const compareProductPrices = async (
     return {
       maxiPaliProducts: [],
       masxMenosProducts: [],
+      walmartProducts: [],
       bestPrice: null
     };
   }

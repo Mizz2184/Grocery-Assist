@@ -12,7 +12,8 @@ import {
   Store,
   ShoppingBag,
   ArrowDown,
-  Scale
+  Scale,
+  Loader
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,20 @@ import { compareProductPrices } from "@/lib/services";
 import { Product as ProductType } from "@/lib/types/store";
 import { getOrCreateDefaultList, addProductToGroceryList } from "@/lib/services/groceryListService";
 import { formatCurrency } from "@/utils/currencyUtils";
+import { 
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import { 
+  Tabs, 
+  TabsContent, 
+  TabsList, 
+  TabsTrigger 
+} from "@/components/ui/tabs";
 
 // Price type for the PriceComparison component
 interface Price {
@@ -28,6 +43,13 @@ interface Price {
   price: number;
   currency: string;
   date: string;
+}
+
+// Added Walmart to the possible matches
+interface MatchedProducts {
+  maxiPali: ProductType | null; 
+  masxMenos: ProductType | null;
+  walmart: ProductType | null;
 }
 
 // Create separate store product display components to better handle the rendering
@@ -135,16 +157,70 @@ const MasxMenosProductDisplay = ({ product, isLowestPrice }: { product: ProductT
   );
 };
 
+// Walmart Product Display Component
+const WalmartProductDisplay = ({ product, isLowestPrice }: { product: ProductType | null, isLowestPrice: boolean }) => {
+  return (
+    <div className={cn(
+      "p-4 rounded-lg border",
+      product 
+        ? (isLowestPrice 
+          ? "border-blue-400 bg-blue-50 dark:bg-blue-900/20" 
+          : "")
+        : "border-dashed border-muted"
+    )}>
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
+          <Store className="w-4 h-4 text-white" />
+        </div>
+        <h4 className="font-medium text-lg">Walmart</h4>
+        {product && isLowestPrice && (
+          <Badge variant="outline" className="ml-auto bg-green-50 text-green-700 border-green-100">
+            Best Price
+          </Badge>
+        )}
+      </div>
+      
+      {product ? (
+        <div className="space-y-3">
+          <div className="flex gap-3">
+            <div className="w-16 h-16 rounded bg-muted overflow-hidden flex-shrink-0">
+              <img 
+                src={product.imageUrl || 'https://placehold.co/400?text=No+Image'} 
+                alt={product.name} 
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div>
+              <p className="font-medium line-clamp-2">{product.name}</p>
+              <p className="text-sm text-muted-foreground">{product.brand || 'Unknown brand'}</p>
+            </div>
+          </div>
+          <div className="font-bold text-lg">
+            ₡{product.price.toLocaleString('es-CR')}
+          </div>
+        </div>
+      ) : (
+        <div className="py-8 text-center">
+          <p className="text-muted-foreground">
+            Product not available at Walmart
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Product = () => {
   const { id } = useParams<{ id: string }>();
   const [maxiPaliProduct, setMaxiPaliProduct] = useState<ProductType | null>(null);
   const [masxMenosProduct, setMasxMenosProduct] = useState<ProductType | null>(null);
+  const [walmartProduct, setWalmartProduct] = useState<ProductType | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [isInList, setIsInList] = useState(false);
   const [compareResult, setCompareResult] = useState<{
     bestPrice: {
-      store: 'MaxiPali' | 'MasxMenos' | 'Unknown';
+      store: 'MaxiPali' | 'MasxMenos' | 'Walmart' | 'Unknown';
       price: number;
       savings: number;
       savingsPercentage: number;
@@ -153,7 +229,8 @@ const Product = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [matchedProducts, setMatchedProducts] = useState<{ maxiPali: ProductType | null, masxMenos: ProductType | null }[]>([]);
+  const [matchedProducts, setMatchedProducts] = useState<MatchedProducts[]>([]);
+  const [selectedTab, setSelectedTab] = useState<string>("compare");
 
   useEffect(() => {
     const fetchProductComparison = async () => {
@@ -176,6 +253,7 @@ const Product = () => {
 
         setMaxiPaliProduct(null);
         setMasxMenosProduct(null);
+        setWalmartProduct(null);
         
         // Search by the ID, which could be a name or barcode
         console.log(`Fetching comparison for product: ${productId} from original store: ${originalStore || 'unknown'}`);
@@ -186,252 +264,281 @@ const Product = () => {
         // Filter out products with zero price
         const validMaxiPaliProducts = result.maxiPaliProducts.filter(p => p.price > 0);
         const validMasxMenosProducts = result.masxMenosProducts.filter(p => p.price > 0);
+        const validWalmartProducts = result.walmartProducts.filter(p => p.price > 0);
         
         console.log(`Valid MaxiPali products: ${validMaxiPaliProducts.length}`);
         console.log(`Valid MasxMenos products: ${validMasxMenosProducts.length}`);
+        console.log(`Valid Walmart products: ${validWalmartProducts.length}`);
 
         // Find best matching products by name similarity
-        let bestMatches: { maxiPali: ProductType | null, masxMenos: ProductType | null }[] = [];
+        let bestMatches: MatchedProducts[] = [];
         
-        // If we have products from both stores, try to match them
-        if (validMaxiPaliProducts.length > 0 && validMasxMenosProducts.length > 0) {
-          // Helper functions to clean and normalize product names for better matching
-          const normalizeText = (text: string) => {
-            return text.toLowerCase()
-              .replace(/\s+/g, ' ')
-              .trim()
-              .replace(/[^\w\s]/g, '')  // Remove punctuation
-              .replace(/\d+\s*(kg|g|ml|l|oz)/gi, ''); // Remove weight/volume
-          };
+        // Helper functions to clean and normalize product names for better matching
+        const normalizeText = (text: string) => {
+          return text.toLowerCase()
+            .replace(/\s+/g, ' ')
+            .trim()
+            .replace(/[^\w\s]/g, '')  // Remove punctuation
+            .replace(/\d+\s*(kg|g|ml|l|oz)/gi, ''); // Remove weight/volume
+        };
+        
+        // Calculate similarity score between two product names (0-100)
+        const getNameSimilarity = (name1: string, name2: string): number => {
+          const norm1 = normalizeText(name1);
+          const norm2 = normalizeText(name2);
           
-          // Calculate similarity score between two product names (0-100)
-          const getNameSimilarity = (name1: string, name2: string): number => {
-            const norm1 = normalizeText(name1);
-            const norm2 = normalizeText(name2);
-            
-            // Direct inclusion check
-            if (norm1.includes(norm2) || norm2.includes(norm1)) {
-              return 90;
+          // Direct inclusion check
+          if (norm1.includes(norm2) || norm2.includes(norm1)) {
+            return 90;
+          }
+          
+          // Word matching - count how many words match
+          const words1 = norm1.split(' ');
+          const words2 = norm2.split(' ');
+          
+          let matchCount = 0;
+          for (const word1 of words1) {
+            if (word1.length < 3) continue; // Skip short words
+            if (words2.some(word2 => word2.includes(word1) || word1.includes(word2))) {
+              matchCount++;
             }
-            
-            // Word matching - count how many words match
-            const words1 = norm1.split(' ');
-            const words2 = norm2.split(' ');
-            
-            let matchCount = 0;
-            for (const word1 of words1) {
-              if (word1.length < 3) continue; // Skip short words
-              if (words2.some(word2 => word2.includes(word1) || word1.includes(word2))) {
-                matchCount++;
-              }
-            }
-            
-            const matchRatio = matchCount / Math.max(words1.length, words2.length);
-            return matchRatio * 100;
-          };
+          }
           
-          // Calculate overall similarity considering name, brand, and category
-          const getProductSimilarity = (p1: ProductType, p2: ProductType): number => {
-            const nameSimilarity = getNameSimilarity(p1.name, p2.name);
-            
-            // Brand similarity (adds 10 points if brands match)
-            const brandSimilarity = p1.brand && p2.brand && 
-              normalizeText(p1.brand) === normalizeText(p2.brand) ? 10 : 0;
-            
-            // Category similarity (adds 5 points if categories match)
-            const categorySimilarity = p1.category && p2.category && 
-              normalizeText(p1.category) === normalizeText(p2.category) ? 5 : 0;
-            
-            return nameSimilarity + brandSimilarity + categorySimilarity;
-          };
+          const matchRatio = matchCount / Math.max(words1.length, words2.length);
+          return matchRatio * 100;
+        };
+        
+        // Calculate overall similarity considering name, brand, and category
+        const getProductSimilarity = (p1: ProductType, p2: ProductType): number => {
+          const nameSimilarity = getNameSimilarity(p1.name, p2.name);
           
-          // Organize by similarity to show similar products side by side
-          let usedMaxiPali = new Set<string>();
-          let usedMasxMenos = new Set<string>();
+          // Brand similarity (adds 10 points if brands match)
+          const brandSimilarity = p1.brand && p2.brand && 
+            normalizeText(p1.brand) === normalizeText(p2.brand) ? 10 : 0;
           
-          // First find closest matches between the two stores
-          const potentialMatches: Array<{
-            maxiPali: ProductType, 
-            masxMenos: ProductType, 
-            similarity: number
+          // Category similarity (adds 5 points if categories match)
+          const categorySimilarity = p1.category && p2.category && 
+            normalizeText(p1.category) === normalizeText(p2.category) ? 5 : 0;
+          
+          return nameSimilarity + brandSimilarity + categorySimilarity;
+        };
+        
+        // Function to match products across all three stores
+        const findBestMatches = () => {
+          // Initialize sets to track which products have been matched
+          const usedMaxiPali = new Set<string>();
+          const usedMasxMenos = new Set<string>();
+          const usedWalmart = new Set<string>();
+          
+          // Create all possible product pairs with similarity scores
+          const allPairs: Array<{
+            products: [ProductType, ProductType];
+            stores: [string, string];
+            similarity: number;
           }> = [];
           
-          // Build all possible matches with similarity scores
+          // Compare MaxiPali and MasxMenos
           validMaxiPaliProducts.forEach(maxiProd => {
             validMasxMenosProducts.forEach(masxProd => {
               const similarity = getProductSimilarity(maxiProd, masxProd);
-              
-              // Only consider matches with reasonable similarity
               if (similarity >= 50) {
-                potentialMatches.push({
-                  maxiPali: maxiProd,
-                  masxMenos: masxProd,
+                allPairs.push({
+                  products: [maxiProd, masxProd],
+                  stores: ['maxiPali', 'masxMenos'],
                   similarity
                 });
               }
             });
           });
           
-          // Sort by similarity (highest first)
-          potentialMatches.sort((a, b) => b.similarity - a.similarity);
+          // Compare MaxiPali and Walmart
+          validMaxiPaliProducts.forEach(maxiProd => {
+            validWalmartProducts.forEach(walmartProd => {
+              const similarity = getProductSimilarity(maxiProd, walmartProd);
+              if (similarity >= 50) {
+                allPairs.push({
+                  products: [maxiProd, walmartProd],
+                  stores: ['maxiPali', 'walmart'],
+                  similarity
+                });
+              }
+            });
+          });
           
-          // Take matches in order of similarity, ensuring no product is used twice
-          potentialMatches.forEach(match => {
-            if (!usedMaxiPali.has(match.maxiPali.id) && 
-                !usedMasxMenos.has(match.masxMenos.id)) {
-              bestMatches.push({
-                maxiPali: match.maxiPali,
-                masxMenos: match.masxMenos
-              });
+          // Compare MasxMenos and Walmart
+          validMasxMenosProducts.forEach(masxProd => {
+            validWalmartProducts.forEach(walmartProd => {
+              const similarity = getProductSimilarity(masxProd, walmartProd);
+              if (similarity >= 50) {
+                allPairs.push({
+                  products: [masxProd, walmartProd],
+                  stores: ['masxMenos', 'walmart'],
+                  similarity
+                });
+              }
+            });
+          });
+          
+          // Sort pairs by similarity
+          allPairs.sort((a, b) => b.similarity - a.similarity);
+          
+          // Create a map to track matches by product ID
+          const matchMap = new Map<string, MatchedProducts>();
+          
+          // Process pairs in order of similarity
+          allPairs.forEach(pair => {
+            const [prod1, prod2] = pair.products;
+            const [store1, store2] = pair.stores;
+            
+            // Skip if either product is already used
+            if ((store1 === 'maxiPali' && usedMaxiPali.has(prod1.id)) ||
+                (store1 === 'masxMenos' && usedMasxMenos.has(prod1.id)) ||
+                (store1 === 'walmart' && usedWalmart.has(prod1.id)) ||
+                (store2 === 'maxiPali' && usedMaxiPali.has(prod2.id)) ||
+                (store2 === 'masxMenos' && usedMasxMenos.has(prod2.id)) ||
+                (store2 === 'walmart' && usedWalmart.has(prod2.id))) {
+              return;
+            }
+            
+            // Mark these products as used
+            if (store1 === 'maxiPali') usedMaxiPali.add(prod1.id);
+            if (store1 === 'masxMenos') usedMasxMenos.add(prod1.id);
+            if (store1 === 'walmart') usedWalmart.add(prod1.id);
+            
+            if (store2 === 'maxiPali') usedMaxiPali.add(prod2.id);
+            if (store2 === 'masxMenos') usedMasxMenos.add(prod2.id);
+            if (store2 === 'walmart') usedWalmart.add(prod2.id);
+            
+            // Check if either product is already in a match
+            const matchId1 = `${store1}-${prod1.id}`;
+            const matchId2 = `${store2}-${prod2.id}`;
+            
+            let match: MatchedProducts | undefined;
+            
+            if (matchMap.has(matchId1)) {
+              match = matchMap.get(matchId1);
+            } else if (matchMap.has(matchId2)) {
+              match = matchMap.get(matchId2);
+            } else {
+              // Create a new match
+              match = {
+                maxiPali: null,
+                masxMenos: null,
+                walmart: null
+              };
+            }
+            
+            if (match) {
+              // Add the products to the match
+              if (store1 === 'maxiPali') match.maxiPali = prod1;
+              if (store1 === 'masxMenos') match.masxMenos = prod1;
+              if (store1 === 'walmart') match.walmart = prod1;
               
-              usedMaxiPali.add(match.maxiPali.id);
-              usedMasxMenos.add(match.masxMenos.id);
+              if (store2 === 'maxiPali') match.maxiPali = prod2;
+              if (store2 === 'masxMenos') match.masxMenos = prod2;
+              if (store2 === 'walmart') match.walmart = prod2;
+              
+              // Update the match map
+              matchMap.set(matchId1, match);
+              matchMap.set(matchId2, match);
             }
           });
           
-          // Then add unpaired products
+          // Convert the map to an array of matches
+          const matchesArray = Array.from(new Set(matchMap.values()));
+          
+          // Add unmatched products
           validMaxiPaliProducts.forEach(prod => {
             if (!usedMaxiPali.has(prod.id)) {
-              bestMatches.push({ maxiPali: prod, masxMenos: null });
-              usedMaxiPali.add(prod.id);
+              matchesArray.push({
+                maxiPali: prod,
+                masxMenos: null,
+                walmart: null
+              });
             }
           });
           
           validMasxMenosProducts.forEach(prod => {
             if (!usedMasxMenos.has(prod.id)) {
-              bestMatches.push({ maxiPali: null, masxMenos: prod });
-              usedMasxMenos.add(prod.id);
+              matchesArray.push({
+                maxiPali: null,
+                masxMenos: prod,
+                walmart: null
+              });
             }
           });
-        } else if (validMaxiPaliProducts.length > 0) {
-          // Only MaxiPali products
-          validMaxiPaliProducts.forEach(prod => {
-            bestMatches.push({ maxiPali: prod, masxMenos: null });
+          
+          validWalmartProducts.forEach(prod => {
+            if (!usedWalmart.has(prod.id)) {
+              matchesArray.push({
+                maxiPali: null,
+                masxMenos: null,
+                walmart: prod
+              });
+            }
           });
-        } else if (validMasxMenosProducts.length > 0) {
-          // Only MasxMenos products
-          validMasxMenosProducts.forEach(prod => {
-            bestMatches.push({ maxiPali: null, masxMenos: prod });
-          });
-        }
+          
+          return matchesArray;
+        };
+        
+        // Find the best matches
+        bestMatches = findBestMatches();
         
         // Get the best matching products from each store with prefixed IDs to help React distinguish them
         let bestMaxiPaliMatch = validMaxiPaliProducts.length > 0 ? 
           { ...validMaxiPaliProducts[0], id: `maxipali-${validMaxiPaliProducts[0].id}` } : null;
         let bestMasxMenosMatch = validMasxMenosProducts.length > 0 ? 
           { ...validMasxMenosProducts[0], id: `masxmenos-${validMasxMenosProducts[0].id}` } : null;
+        let bestWalmartMatch = validWalmartProducts.length > 0 ? 
+          { ...validWalmartProducts[0], id: `walmart-${validWalmartProducts[0].id}` } : null;
         
         console.log("Setting MaxiPali product:", bestMaxiPaliMatch);
         console.log("Setting MasxMenos product:", bestMasxMenosMatch);
+        console.log("Setting Walmart product:", bestWalmartMatch);
         console.log("Best matches:", bestMatches);
         
         // Force the component to recognize these as new objects by using a small delay to break React batching
         setTimeout(() => {
-          if (bestMaxiPaliMatch) {
-            setMaxiPaliProduct(bestMaxiPaliMatch);
-          } else {
-            setMaxiPaliProduct(null);
-          }
-          
-          if (bestMasxMenosMatch) {
-            setMasxMenosProduct(bestMasxMenosMatch);
-          } else {
-            setMasxMenosProduct(null);
-          }
-
-          // Set all matched products
+          setMaxiPaliProduct(bestMaxiPaliMatch);
+          setMasxMenosProduct(bestMasxMenosMatch);
+          setWalmartProduct(bestWalmartMatch);
           setMatchedProducts(bestMatches);
         }, 50);
         
-        // Calculate best price
-        let bestPrice = null;
+        // Store the best price from the API
+        setCompareResult({
+          bestPrice: result.bestPrice
+        });
         
-        // Check if we found at least one product
-        if (!bestMaxiPaliMatch && !bestMasxMenosMatch) {
+        // Show toast notification based on search results
+        if (!bestMaxiPaliMatch && !bestMasxMenosMatch && !bestWalmartMatch) {
           toast({
             title: "No products found",
             description: "Could not find this product in any store.",
             variant: "destructive"
           });
-        } else if (!bestMaxiPaliMatch) {
-          toast({
-            description: "Product found only in MasxMenos.",
-          });
-        } else if (!bestMasxMenosMatch) {
-          toast({
-            description: "Product found only in MaxiPali.",
-          });
         } else {
-          toast({
-            description: "Product found in both stores. Compare prices below!",
-          });
-        }
-        
-        // Recalculate best price if needed
-        if ((bestMaxiPaliMatch || bestMasxMenosMatch) && 
-            (!bestPrice || bestPrice.price === 0)) {
-          if (bestMaxiPaliMatch && bestMasxMenosMatch) {
-            // Both stores have valid products - compare prices
-            if (bestMaxiPaliMatch.price < bestMasxMenosMatch.price) {
-              const savings = bestMasxMenosMatch.price - bestMaxiPaliMatch.price;
-              const savingsPercentage = Math.round((savings / bestMasxMenosMatch.price) * 100);
-              
-              bestPrice = {
-                store: 'MaxiPali',
-                price: bestMaxiPaliMatch.price,
-                savings,
-                savingsPercentage
-              };
-            } else if (bestMasxMenosMatch.price < bestMaxiPaliMatch.price) {
-              const savings = bestMaxiPaliMatch.price - bestMasxMenosMatch.price;
-              const savingsPercentage = Math.round((savings / bestMaxiPaliMatch.price) * 100);
-              
-              bestPrice = {
-                store: 'MasxMenos',
-                price: bestMasxMenosMatch.price,
-                savings,
-                savingsPercentage
-              };
-            } else {
-              // Same price
-              bestPrice = {
-                store: 'MaxiPali', // Default to MaxiPali if same price
-                price: bestMaxiPaliMatch.price,
-                savings: 0,
-                savingsPercentage: 0
-              };
-            }
-          } else if (bestMaxiPaliMatch) {
-            // Only MaxiPali has a valid product
-            bestPrice = {
-              store: 'MaxiPali',
-              price: bestMaxiPaliMatch.price,
-              savings: 0,
-              savingsPercentage: 0
-            };
-          } else if (bestMasxMenosMatch) {
-            // Only MasxMenos has a valid product
-            bestPrice = {
-              store: 'MasxMenos',
-              price: bestMasxMenosMatch.price,
-              savings: 0,
-              savingsPercentage: 0
-            };
+          const foundStores = [
+            bestMaxiPaliMatch ? 'MaxiPali' : null,
+            bestMasxMenosMatch ? 'MasxMenos' : null,
+            bestWalmartMatch ? 'Walmart' : null
+          ].filter(Boolean);
+          
+          if (foundStores.length === 1) {
+            toast({
+              description: `Product found only in ${foundStores[0]}.`
+            });
+          } else if (foundStores.length > 1) {
+            toast({
+              description: `Product found in ${foundStores.length} stores. Compare prices below!`
+            });
           }
         }
-        
-        setCompareResult({
-          bestPrice
-        });
-        
-        // Check if any of these products are in the user's list - this is a placeholder
-        // In a real implementation, you would check against user's grocery list
-        setIsInList(false);
       } catch (error) {
-        console.error('Error fetching product comparison:', error);
+        console.error("Error fetching product comparison:", error);
         toast({
           title: "Error",
-          description: "Failed to load product comparison. Please try again.",
+          description: "Failed to load product comparison.",
           variant: "destructive"
         });
       } finally {
@@ -450,6 +557,10 @@ const Product = () => {
   useEffect(() => {
     console.log("masxMenosProduct state updated:", masxMenosProduct);
   }, [masxMenosProduct]);
+  
+  useEffect(() => {
+    console.log("walmartProduct state updated:", walmartProduct);
+  }, [walmartProduct]);
 
   const handleAddToList = async () => {
     if (!user) {
@@ -462,7 +573,7 @@ const Product = () => {
       return;
     }
 
-    if (!maxiPaliProduct && !masxMenosProduct) {
+    if (!maxiPaliProduct && !masxMenosProduct && !walmartProduct) {
       toast({
         title: "Error",
         description: "No product available to add to your list.",
@@ -484,10 +595,12 @@ const Product = () => {
         productToAdd = maxiPaliProduct;
       } else if (compareResult?.bestPrice?.store === 'MasxMenos' && masxMenosProduct) {
         productToAdd = masxMenosProduct;
+      } else if (compareResult?.bestPrice?.store === 'Walmart' && walmartProduct) {
+        productToAdd = walmartProduct;
       } else {
         // If no best price or the preferred store doesn't have the product,
         // use whatever product is available
-        productToAdd = maxiPaliProduct || masxMenosProduct;
+        productToAdd = maxiPaliProduct || masxMenosProduct || walmartProduct;
       }
       
       if (!productToAdd) {
@@ -565,7 +678,7 @@ const Product = () => {
   };
 
   const handleShare = () => {
-    const productName = maxiPaliProduct?.name || masxMenosProduct?.name || 'Product';
+    const productName = maxiPaliProduct?.name || masxMenosProduct?.name || walmartProduct?.name || 'Product';
     
     if (navigator.share) {
       navigator.share({
@@ -591,6 +704,7 @@ const Product = () => {
     console.log("Creating price comparison data:");
     console.log("MaxiPali product:", maxiPaliProduct);
     console.log("MasxMenos product:", masxMenosProduct);
+    console.log("Walmart product:", walmartProduct);
     
     const prices: Price[] = [];
     
@@ -614,41 +728,70 @@ const Product = () => {
     console.log("Adding MasxMenos price:", masxMenosPrice);
     prices.push(masxMenosPrice);
     
+    // Always add Walmart data with consistent ID
+    const walmartPrice: Price = {
+      storeId: 'walmart', // Ensure lowercase consistent with stores.find lookup
+      price: walmartProduct?.price || 0,
+      currency: '₡',
+      date: new Date().toISOString()
+    };
+    console.log("Adding Walmart price:", walmartPrice);
+    prices.push(walmartPrice);
+    
     console.log("Final price comparison data:", prices);
     return prices;
   };
 
   const calculateSavings = () => {
-    if (!maxiPaliProduct || !masxMenosProduct) return null;
+    if (!maxiPaliProduct || !masxMenosProduct || !walmartProduct) return null;
     
     const maxiPaliPrice = maxiPaliProduct.price || 0;
     const masxMenosPrice = masxMenosProduct.price || 0;
+    const walmartPrice = walmartProduct.price || 0;
     
-    if (maxiPaliPrice === 0 || masxMenosPrice === 0) return null;
+    if (maxiPaliPrice === 0 || masxMenosPrice === 0 || walmartPrice === 0) return null;
     
-    if (maxiPaliPrice < masxMenosPrice) {
-      const savingsAmount = masxMenosPrice - maxiPaliPrice;
-      const savingsPercentage = Math.round((savingsAmount / masxMenosPrice) * 100);
-      return {
-        betterStore: "MaxiPali",
-        amount: savingsAmount,
-        percentage: savingsPercentage
+    let bestPrice = null;
+    
+    // Compare prices and calculate savings
+    if (maxiPaliPrice < masxMenosPrice && maxiPaliPrice < walmartPrice) {
+      const savingsAmount = maxiPaliPrice;
+      const savingsPercentage = 0;
+      bestPrice = {
+        store: 'MaxiPali',
+        price: savingsAmount,
+        savings: savingsAmount,
+        savingsPercentage
       };
-    } else if (masxMenosPrice < maxiPaliPrice) {
-      const savingsAmount = maxiPaliPrice - masxMenosPrice;
-      const savingsPercentage = Math.round((savingsAmount / maxiPaliPrice) * 100);
-      return {
-        betterStore: "MasxMenos",
-        amount: savingsAmount,
-        percentage: savingsPercentage
+    } else if (masxMenosPrice < maxiPaliPrice && masxMenosPrice < walmartPrice) {
+      const savingsAmount = masxMenosPrice;
+      const savingsPercentage = 0;
+      bestPrice = {
+        store: 'MasxMenos',
+        price: savingsAmount,
+        savings: savingsAmount,
+        savingsPercentage
+      };
+    } else if (walmartPrice < maxiPaliPrice && walmartPrice < masxMenosPrice) {
+      const savingsAmount = walmartPrice;
+      const savingsPercentage = 0;
+      bestPrice = {
+        store: 'Walmart',
+        price: savingsAmount,
+        savings: savingsAmount,
+        savingsPercentage
+      };
+    } else {
+      // If prices are equal, choose MaxiPali
+      bestPrice = {
+        store: 'MaxiPali',
+        price: maxiPaliPrice,
+        savings: 0,
+        savingsPercentage: 0
       };
     }
     
-    return {
-      betterStore: "Equal",
-      amount: 0,
-      percentage: 0
-    };
+    return bestPrice;
   };
 
   if (loading) {
@@ -681,7 +824,7 @@ const Product = () => {
     );
   }
 
-  if (!maxiPaliProduct && !masxMenosProduct) {
+  if (!maxiPaliProduct && !masxMenosProduct && !walmartProduct) {
     return (
       <div className="page-container">
         <div className="max-w-5xl mx-auto text-center py-12">
@@ -700,9 +843,9 @@ const Product = () => {
   // Choose which product to display main info for (prefer the one with best price)
   const mainProduct = compareResult?.bestPrice?.store === 'MasxMenos' && masxMenosProduct 
     ? masxMenosProduct 
-    : (maxiPaliProduct || masxMenosProduct);
+    : (maxiPaliProduct || masxMenosProduct || walmartProduct);
 
-  const savings = calculateSavings();
+  const bestPrice = calculateSavings();
 
   if (!mainProduct) return null;
 
@@ -801,36 +944,41 @@ const Product = () => {
               </div>
               
               <div className="p-4">
-                {/* Show savings summary if both stores have the product */}
-                {savings && savings.betterStore !== "Equal" && maxiPaliProduct && masxMenosProduct && (
+                {/* Show savings summary if at least two stores have the product */}
+                {bestPrice && bestPrice.store && (maxiPaliProduct || masxMenosProduct || walmartProduct) && (
                   <div className="mb-4 p-3 bg-green-50 border border-green-100 rounded-lg dark:bg-green-900/20 dark:border-green-900/30">
                     <h4 className="text-green-700 dark:text-green-400 font-medium flex items-center gap-1">
                       <ArrowDown className="w-4 h-4" /> 
-                      Save {formatCurrency(savings.amount, "CRC")} ({savings.percentage}%)
+                      Best Price at {bestPrice.store}
                     </h4>
                     <p className="text-sm text-green-700 dark:text-green-400">
-                      {savings.betterStore} offers a better price compared to {savings.betterStore === "MaxiPali" ? "MasxMenos" : "MaxiPali"}.
+                      {bestPrice.store} offers the best price at {formatCurrency(bestPrice.price, "CRC")}.
+                      {bestPrice.savingsPercentage > 0 && ` Save up to ${bestPrice.savingsPercentage}% compared to other stores.`}
                     </p>
                   </div>
                 )}
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Debug info */}
                   {process.env.NODE_ENV !== 'production' && (
-                    <div className="col-span-2 mb-4 p-3 bg-gray-100 border border-gray-200 rounded text-xs font-mono overflow-auto max-h-32">
+                    <div className="col-span-3 mb-4 p-3 bg-gray-100 border border-gray-200 rounded text-xs font-mono overflow-auto max-h-32">
                       <div>MaxiPali: {maxiPaliProduct ? '✅' : '❌'}</div>
                       <div>MasxMenos: {masxMenosProduct ? '✅' : '❌'}</div>
+                      <div>Walmart: {walmartProduct ? '✅' : '❌'}</div>
                       <div>MaxiPali Name: {maxiPaliProduct?.name || 'N/A'}</div>
                       <div>MaxiPali ID: {maxiPaliProduct?.id || 'N/A'}</div>
                       <div>MaxiPali Price: {maxiPaliProduct?.price || 'N/A'}</div>
                     </div>
                   )}
                 
-                  {/* MaxiPali product - ALWAYS SHOW THIS SECTION */}
+                  {/* MaxiPali product */}
                   <MaxiPaliProductDisplay product={maxiPaliProduct} isLowestPrice={compareResult?.bestPrice?.store === "MaxiPali"} />
                   
-                  {/* MasxMenos product - ALWAYS SHOW THIS SECTION */}
+                  {/* MasxMenos product */}
                   <MasxMenosProductDisplay product={masxMenosProduct} isLowestPrice={compareResult?.bestPrice?.store === "MasxMenos"} />
+                  
+                  {/* Walmart product */}
+                  <WalmartProductDisplay product={walmartProduct} isLowestPrice={compareResult?.bestPrice?.store === "Walmart"} />
                 </div>
               </div>
             </div>
@@ -857,7 +1005,7 @@ const Product = () => {
                   
                   {matchedProducts.map((match, index) => (
                     <div key={index} className="border rounded-lg p-4 mb-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* MaxiPali product */}
                         <div className={cn(
                           "p-4 rounded-lg border",
@@ -957,14 +1105,65 @@ const Product = () => {
                             </div>
                           )}
                         </div>
+                        
+                        {/* Walmart product */}
+                        <div className={cn(
+                          "p-4 rounded-lg border",
+                          match.walmart ? "border-blue-200" : "border-dashed border-muted"
+                        )}>
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
+                              <Store className="w-3 h-3 text-white" />
+                            </div>
+                            <h4 className="font-medium">Walmart</h4>
+                          </div>
+                          
+                          {match.walmart ? (
+                            <div className="space-y-2">
+                              <div className="flex gap-3">
+                                <div className="w-16 h-16 rounded bg-muted overflow-hidden flex-shrink-0">
+                                  <img 
+                                    src={match.walmart.imageUrl || 'https://placehold.co/400?text=No+Image'} 
+                                    alt={match.walmart.name} 
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                                <div>
+                                  <p className="font-medium line-clamp-2">{match.walmart.name}</p>
+                                  <p className="text-sm text-muted-foreground">{match.walmart.brand || 'Unknown brand'}</p>
+                                  <div className="font-semibold">
+                                    ₡{match.walmart.price.toLocaleString('es-CR')}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="mt-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="w-full text-xs"
+                                  onClick={() => handleAddMatchedProduct(match.walmart)}
+                                >
+                                  <Plus className="h-3 w-3 mr-1" /> Add to List
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="py-4 text-center">
+                              <p className="text-muted-foreground">
+                                Product not available at Walmart
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       
                       {/* Price comparison and savings */}
-                      {match.maxiPali && match.masxMenos && (
+                      {(match.maxiPali && match.masxMenos) || (match.maxiPali && match.walmart) || (match.masxMenos && match.walmart) ? (
                         <div className="mt-3 pt-3 border-t">
-                          {match.maxiPali.price !== match.masxMenos.price && (
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground">Price difference:</span>
+                          {/* MaxiPali vs MasxMenos */}
+                          {match.maxiPali && match.masxMenos && match.maxiPali.price !== match.masxMenos.price && (
+                            <div className="flex items-center justify-between text-sm mb-2">
+                              <span className="text-muted-foreground">MaxiPali vs MasxMenos:</span>
                               <Badge 
                                 variant={match.maxiPali.price < match.masxMenos.price ? "secondary" : "default"}
                                 className={cn(
@@ -980,8 +1179,48 @@ const Product = () => {
                               </Badge>
                             </div>
                           )}
+                          
+                          {/* MaxiPali vs Walmart */}
+                          {match.maxiPali && match.walmart && match.maxiPali.price !== match.walmart.price && (
+                            <div className="flex items-center justify-between text-sm mb-2">
+                              <span className="text-muted-foreground">MaxiPali vs Walmart:</span>
+                              <Badge 
+                                variant={match.maxiPali.price < match.walmart.price ? "secondary" : "default"}
+                                className={cn(
+                                  "font-normal",
+                                  match.maxiPali.price < match.walmart.price 
+                                    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" 
+                                    : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                                )}
+                              >
+                                {match.maxiPali.price < match.walmart.price ? 'MaxiPali cheaper by' : 'Walmart cheaper by'} 
+                                {' '}₡{Math.abs(match.maxiPali.price - match.walmart.price).toLocaleString('es-CR')}
+                                {' '}({Math.round((Math.abs(match.maxiPali.price - match.walmart.price) / Math.max(match.maxiPali.price, match.walmart.price)) * 100)}%)
+                              </Badge>
+                            </div>
+                          )}
+                          
+                          {/* MasxMenos vs Walmart */}
+                          {match.masxMenos && match.walmart && match.masxMenos.price !== match.walmart.price && (
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">MasxMenos vs Walmart:</span>
+                              <Badge 
+                                variant={match.masxMenos.price < match.walmart.price ? "secondary" : "default"}
+                                className={cn(
+                                  "font-normal",
+                                  match.masxMenos.price < match.walmart.price 
+                                    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" 
+                                    : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                                )}
+                              >
+                                {match.masxMenos.price < match.walmart.price ? 'MasxMenos cheaper by' : 'Walmart cheaper by'} 
+                                {' '}₡{Math.abs(match.masxMenos.price - match.walmart.price).toLocaleString('es-CR')}
+                                {' '}({Math.round((Math.abs(match.masxMenos.price - match.walmart.price) / Math.max(match.masxMenos.price, match.walmart.price)) * 100)}%)
+                              </Badge>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   ))}
                 </div>

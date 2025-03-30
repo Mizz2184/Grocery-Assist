@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
   GroceryList as GroceryListType, 
   GroceryListItem as GroceryItem,
@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
-import { getUserGroceryLists, getOrCreateDefaultList, addCollaborator, sendCollaboratorInvite } from "@/lib/services/groceryListService";
+import { getUserGroceryLists, getOrCreateDefaultList, addCollaborator, removeCollaborator, sendCollaboratorInvite } from "@/lib/services/groceryListService";
 import { supabase } from "@/lib/supabase";
 import { convertCRCtoUSD } from "@/utils/currencyUtils";
 
@@ -65,22 +65,42 @@ const getProductStore = (product: any): string => {
   // Use type assertion to avoid TypeScript errors
   const anyProduct = product as any;
   
+  console.log('Getting store for product:', anyProduct.id, anyProduct);
+  
   // Direct store property
   if (anyProduct.store) {
     // Normalize store names
     const storeName = String(anyProduct.store).trim();
-    if (storeName.includes('MaxiPali') || storeName.toLowerCase() === 'maxipali') return 'MaxiPali';
-    if (storeName.includes('MasxMenos') || storeName.toLowerCase() === 'masxmenos') return 'MasxMenos';
+    console.log('Store from product.store:', storeName);
+    
+    // Handle exact matches first to avoid confusion
+    if (storeName === 'MaxiPali') return 'MaxiPali';
+    if (storeName === 'MasxMenos') return 'MasxMenos';
+    
+    // Then handle partial matches
+    if (storeName.includes('MaxiPali') || storeName.toLowerCase().includes('maxipali')) return 'MaxiPali';
+    if (storeName.includes('MasxMenos') || storeName.toLowerCase().includes('masxmenos')) return 'MasxMenos';
+    
     return storeName;
   }
   
   // If product has prices array (mock product structure)
   if (anyProduct.prices && Array.isArray(anyProduct.prices) && anyProduct.prices.length > 0) {
     const storeId = String(anyProduct.prices[0].storeId || '').toLowerCase();
+    console.log('Store from prices array storeId:', storeId);
+    
     if (storeId === 'maxipali') return 'MaxiPali';
     if (storeId === 'masxmenos') return 'MasxMenos';
   }
   
+  // Fallback to checking product ID patterns if applicable
+  if (anyProduct.id) {
+    const productId = String(anyProduct.id);
+    if (productId.startsWith('mp-') || productId.includes('-maxipali-')) return 'MaxiPali';
+    if (productId.startsWith('mm-') || productId.includes('-masxmenos-')) return 'MasxMenos';
+  }
+  
+  console.log('Defaulting to Other for store');
   return 'Other';
 };
 
@@ -94,6 +114,7 @@ const GroceryList = () => {
   const [loading, setLoading] = useState(true);
   const [collaboratorEmail, setCollaboratorEmail] = useState("");
   const [addingCollaborator, setAddingCollaborator] = useState(false);
+  const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const fetchLists = async () => {
@@ -581,6 +602,85 @@ const GroceryList = () => {
     navigate('/');
   };
 
+  // Add this new function to handle removing a collaborator
+  const handleRemoveCollaborator = async (email: string) => {
+    if (!activeList || !user) {
+      console.log('Cannot remove collaborator: missing activeList or user');
+      toast({
+        title: "Error",
+        description: "Cannot remove collaborator at this time.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      // Show immediate feedback
+      toast({
+        title: "Removing collaborator...",
+        description: `Removing ${email} from this list.`,
+      });
+      
+      console.log(`Removing collaborator: ${email} from list ${activeList.id}`);
+      console.log('User ID:', user.id);
+      console.log('Active list:', activeList);
+      
+      // First update the UI optimistically
+      const updatedCollaborators = activeList.collaborators.filter(e => e !== email);
+      
+      // Update UI state immediately for responsive feel
+      updateUI(updatedCollaborators);
+      
+      // Also update localStorage
+      updateLocalCollaborators(activeList.id, updatedCollaborators);
+      
+      // Then try the service function
+      const success = await removeCollaborator(user.id, activeList.id, email);
+      console.log('Service function result:', success);
+      
+      if (success) {
+        toast({
+          title: "Collaborator removed",
+          description: `${email} has been removed from this list.`,
+        });
+      } else {
+        console.error('Error from removeCollaborator service');
+        toast({
+          title: "Warning",
+          description: "Collaborator removed locally, but server sync may have failed.",
+        });
+      }
+    } catch (error) {
+      console.error('Error removing collaborator:', error);
+      
+      toast({
+        title: "Error",
+        description: "Failed to remove collaborator. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Add a toggle function for the dropdown
+  const toggleDropdown = (email: string) => {
+    setOpenDropdowns(prev => ({
+      ...prev,
+      [email]: !prev[email]
+    }));
+  };
+  
+  // Close all dropdowns when clicking outside
+  const closeAllDropdowns = useCallback(() => {
+    setOpenDropdowns({});
+  }, []);
+  
+  useEffect(() => {
+    document.addEventListener('click', closeAllDropdowns);
+    return () => {
+      document.removeEventListener('click', closeAllDropdowns);
+    };
+  }, [closeAllDropdowns]);
+
   if (loading) {
     return (
       <div className="page-container">
@@ -752,13 +852,35 @@ const GroceryList = () => {
                           'Other': []
                         };
                         
+                        console.log('Starting to group items by store, total items:', activeList.items.length);
+                        
                         // Group items by store using the getProductStore helper
                         activeList.items.forEach(item => {
                           // Use the helper function to determine the store
-                          let store = item.productData ? getProductStore(item.productData) : 'Other';
+                          let store = 'Other';
+                          
+                          if (item.productData) {
+                            store = getProductStore(item.productData);
+                            console.log(`Item ${item.id} (${item.productData.name}) - Assigned to group: ${store}`);
+                          } else {
+                            console.log(`Item ${item.id} has no productData, assigned to Other`);
+                          }
+                          
+                          // Ensure we're using one of our defined groups
+                          if (!storeGroups[store]) {
+                            console.log(`Store ${store} is not in our defined groups, using Other instead`);
+                            store = 'Other';
+                          }
                           
                           // Add to appropriate group
                           storeGroups[store].push(item);
+                        });
+                        
+                        // Log the final group counts
+                        console.log('Final group counts:', {
+                          MaxiPali: storeGroups['MaxiPali'].length,
+                          MasxMenos: storeGroups['MasxMenos'].length,
+                          Other: storeGroups['Other'].length
                         });
                         
                         // Render each store group in order, only if they have items
@@ -864,8 +986,27 @@ const GroceryList = () => {
                         className="flex items-center justify-between p-2 bg-muted rounded-lg"
                       >
                         <span className="text-sm">{email}</span>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                          <MoreHorizontal className="h-4 w-4" />
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 rounded-full text-destructive hover:bg-destructive/10"
+                          onClick={() => handleRemoveCollaborator(email)}
+                          title="Remove collaborator"
+                        >
+                          <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            width="16" 
+                            height="16" 
+                            viewBox="0 0 24 24" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            strokeWidth="2" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round"
+                          >
+                            <path d="M18 6 6 18" />
+                            <path d="m6 6 12 12" />
+                          </svg>
                         </Button>
                       </div>
                     ))}

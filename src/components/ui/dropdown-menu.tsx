@@ -57,19 +57,97 @@ DropdownMenuSubContent.displayName =
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className, sideOffset = 4, ...props }, ref) => (
-  <DropdownMenuPrimitive.Portal>
-    <DropdownMenuPrimitive.Content
-      ref={ref}
-      sideOffset={sideOffset}
-      className={cn(
-        "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-        className
-      )}
-      {...props}
-    />
-  </DropdownMenuPrimitive.Portal>
-))
+>(({ className, sideOffset = 4, ...props }, ref) => {
+  const [isOpen, setIsOpen] = React.useState(true);
+  const touchStartY = React.useRef<number | null>(null);
+  const contentRef = React.useRef<HTMLDivElement>(null);
+  
+  // Use a merged ref to combine the forwarded ref and our local ref
+  const mergedRef = (node: HTMLDivElement) => {
+    contentRef.current = node;
+    if (typeof ref === 'function') {
+      ref(node);
+    } else if (ref) {
+      ref.current = node;
+    }
+  };
+  
+  // Handle touch start event
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+  
+  // Handle touch move event
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (touchStartY.current === null) return;
+    
+    const currentY = e.touches[0].clientY;
+    const diff = touchStartY.current - currentY;
+    
+    // Respond to both swipe up (positive diff) and down (negative diff) gestures for closing
+    const absDiff = Math.abs(diff);
+    if (absDiff > 20) { // Add a small threshold to avoid accidental swipes
+      // Calculate a transform value based on the swipe distance
+      // but cap it to a reasonable amount
+      const translateY = diff < 0 ? Math.min(-diff * 0.5, 100) : Math.min(diff * 0.5, 100);
+      const moveDirection = diff < 0 ? 1 : -1; // 1 for down, -1 for up
+      const opacity = Math.max(1 - (translateY / 150), 0.5);
+      
+      if (contentRef.current) {
+        contentRef.current.style.transform = `translateY(${translateY * moveDirection}px)`;
+        contentRef.current.style.opacity = String(opacity);
+      }
+      
+      // If swiping more than threshold, close the dropdown
+      if (translateY > 75) {
+        setIsOpen(false);
+        
+        // Find the closest dropdown root and close it
+        const event = new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true
+        });
+        document.dispatchEvent(event);
+      }
+    }
+  };
+  
+  // Handle touch end event
+  const handleTouchEnd = () => {
+    touchStartY.current = null;
+    
+    // Reset transform and opacity
+    if (contentRef.current) {
+      contentRef.current.style.transform = '';
+      contentRef.current.style.opacity = '1';
+    }
+  };
+  
+  return (
+    <DropdownMenuPrimitive.Portal>
+      <DropdownMenuPrimitive.Content
+        ref={mergedRef}
+        sideOffset={sideOffset}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className={cn(
+          "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out",
+          "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+          "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+          "data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2",
+          "data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+          "fixed-dropdown swipeable-dropdown",
+          className
+        )}
+        collisionPadding={16}
+        avoidCollisions={true}
+        {...props}
+      />
+    </DropdownMenuPrimitive.Portal>
+  );
+})
 DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName
 
 const DropdownMenuItem = React.forwardRef<

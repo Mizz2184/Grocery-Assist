@@ -6,7 +6,7 @@ export interface Product {
   imageUrl?: string;
   brand?: string;
   category?: string;
-  store: 'MaxiPali' | 'Automercado' | 'MasxMenos' | 'PriceSmart' | 'Unknown';
+  store: 'MaxiPali' | 'Automercado' | 'MasxMenos' | 'PriceSmart' | 'Walmart' | 'Unknown';
   url?: string;
   sku?: string;
   inStock?: boolean;

@@ -42,10 +42,31 @@ export const Navbar = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Toggle the menu
+  const toggleMenu = () => {
+    const newMenuState = !isMenuOpen;
+    setIsMenuOpen(newMenuState);
+    
+    // Toggle body class to prevent scrolling when menu is open
+    if (newMenuState) {
+      document.body.classList.add('menu-open');
+    } else {
+      document.body.classList.remove('menu-open');
+    }
+  };
+  
   // Close mobile menu when route changes
   useEffect(() => {
     setIsMenuOpen(false);
+    document.body.classList.remove('menu-open');
   }, [location.pathname]);
+  
+  // Cleanup body class on unmount
+  useEffect(() => {
+    return () => {
+      document.body.classList.remove('menu-open');
+    };
+  }, []);
 
   const getUserInitials = () => {
     if (!user || !user.user_metadata) return "U";
@@ -91,7 +112,7 @@ export const Navbar = () => {
     <header 
       className={cn(
         "fixed top-0 left-0 right-0 z-50 py-4 px-4 transition-all duration-300",
-        scrolled ? "glass shadow-sm" : "bg-transparent"
+        isMenuOpen ? "nav-transparent" : scrolled ? "glass-nav shadow-sm" : "bg-transparent"
       )}
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -139,7 +160,7 @@ export const Navbar = () => {
                   </span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" sideOffset={8} className="z-[60] w-56 dropdown-menu-container" avoidCollisions={true} collisionPadding={20}>
                 <DropdownMenuLabel>
                   {isTranslated ? "My Account" : translateText("Mi Cuenta")}
                 </DropdownMenuLabel>
@@ -182,7 +203,7 @@ export const Navbar = () => {
           <Button
             variant="ghost" 
             size="icon" 
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            onClick={toggleMenu}
             className="rounded-full"
             aria-label={isMenuOpen 
               ? (isTranslated ? "Close menu" : translateText("Cerrar menú")) 
@@ -200,8 +221,21 @@ export const Navbar = () => {
 
       {/* Mobile Navigation Overlay */}
       {isMenuOpen && (
-        <div className="fixed inset-0 z-40 md:hidden glass-card animate-fade-in transition-all">
-          <div className="flex flex-col items-center justify-center h-full gap-8 p-8">
+        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[200] md:hidden mobile-menu-overlay animate-fade-in">
+          <div className="absolute top-4 right-4 z-[210]">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleMenu}
+              className="rounded-full bg-background/80 backdrop-blur-sm"
+              aria-label={isTranslated ? "Close menu" : translateText("Cerrar menú")}
+            >
+              <X className="h-6 w-6" />
+            </Button>
+          </div>
+          <div className="flex flex-col items-center justify-start h-full min-h-screen pt-20 pb-16 gap-6 p-6 overflow-y-auto"
+            onClick={(e) => e.stopPropagation()} // Prevent clicks from closing the menu
+          >
             {/* User info for mobile */}
             {user && (
               <div className="flex flex-col items-center gap-2 mb-6">
