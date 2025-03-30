@@ -32,6 +32,11 @@ export const ProductCard = ({
     setIsInListLocal(isInList);
   }, [isInList]);
 
+  // Debug log to check product data and list status
+  useEffect(() => {
+    console.log(`ProductCard [${product.id}]: isInList=${isInList}, isInListLocal=${isInListLocal}`);
+  }, [product.id, isInList, isInListLocal]);
+
   // Debug log to check product data
   console.log('Product in ProductCard:', product);
   console.log('Image URL:', product.imageUrl);
@@ -39,13 +44,15 @@ export const ProductCard = ({
   const handleAddToList = async () => {
     if (!onAddToList) return;
     
+    console.log(`Attempting to add product ${product.id} to list`);
     setIsAdding(true);
     try {
       await onAddToList(product.id);
       // Update local state to show check mark immediately
       setIsInListLocal(true);
+      console.log(`Successfully added product ${product.id} to list`);
     } catch (error) {
-      console.error('Error adding product to list:', error);
+      console.error(`Error adding product ${product.id} to list:`, error);
       toast({
         title: isTranslated ? "Error" : translateText("Error"),
         description: isTranslated ? "Failed to add product to list. Please try again." : "No se pudo añadir el producto a la lista. Por favor, inténtalo de nuevo.",

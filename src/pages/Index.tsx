@@ -62,10 +62,12 @@ const Index = () => {
     const fetchUserLists = async () => {
       if (!user) {
         setProductsInList(new Set());
+        console.log('No user logged in, clearing productsInList');
         return;
       }
 
       try {
+        console.log('Fetching user lists to build productsInList for user:', user.id);
         const lists = await getUserGroceryLists(user.id);
         const productIds = new Set<string>();
         
@@ -76,6 +78,7 @@ const Index = () => {
           });
         });
         
+        console.log('Updated productsInList, now contains', productIds.size, 'products');
         setProductsInList(productIds);
       } catch (error) {
         console.error('Error fetching user lists:', error);
@@ -87,8 +90,9 @@ const Index = () => {
 
   // Check if product is in any grocery list
   const isProductInList = (productId: string, store: string) => {
-    // Just check by product ID directly
-    return productsInList.has(productId);
+    const isInList = productsInList.has(productId);
+    console.log(`Checking if product ${productId} is in list: ${isInList}`);
+    return isInList;
   };
 
   // Helper function to sort products by relevance to search query
@@ -377,11 +381,15 @@ const Index = () => {
     }
     
     try {
+      console.log('Adding scanned product to list:', product);
+      
       // Get the default list or create one if it doesn't exist
       const defaultList = await getOrCreateDefaultList(user.id);
+      console.log('Default list for scanned product:', defaultList);
       
       // Add the product to the list
       const result = await addProductToGroceryList(defaultList.id, user.id, product);
+      console.log('Result of adding scanned product:', result);
       
       if (!result.success) {
         toast({
@@ -392,11 +400,13 @@ const Index = () => {
         return Promise.reject(new Error(result.message));
       }
       
-      // Update the list of products in user's lists with a composite key
-      // Check if product has a store property
-      const store = 'store' in product ? product.store : 'unknown';
-      const uniqueKey = `${store}|${product.id}`;
-      setProductsInList(prev => new Set([...prev, uniqueKey]));
+      // Update the list of products in user's lists with the product ID directly
+      setProductsInList(prev => new Set([...prev, product.id]));
+      
+      toast({
+        title: "Added to list",
+        description: `${product.name || 'Product'} added to ${defaultList.name}`,
+      });
       
       return Promise.resolve();
     } catch (error) {

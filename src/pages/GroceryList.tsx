@@ -101,25 +101,54 @@ const GroceryList = () => {
       
       if (user) {
         try {
+          console.log('Fetching grocery lists for user:', user.id);
           const userLists = await getUserGroceryLists(user.id);
+          console.log('Lists fetched:', userLists.length);
           
           setLists(userLists);
           
           if (userLists.length > 0 && !activeList) {
+            console.log('Setting active list to first list:', userLists[0].id);
             setActiveList(userLists[0]);
           } else if (userLists.length === 0) {
             // Create a default list if user has none
-            const defaultList = await getOrCreateDefaultList(user.id);
-            setLists([defaultList]);
-            setActiveList(defaultList);
+            console.log('No lists found, creating default list');
+            try {
+              const defaultList = await getOrCreateDefaultList(user.id);
+              console.log('Default list created:', defaultList.id);
+              setLists([defaultList]);
+              setActiveList(defaultList);
+            } catch (defaultListError) {
+              console.error('Error creating default list:', defaultListError);
+              toast({
+                title: "Error",
+                description: "Failed to create a default grocery list.",
+                variant: "destructive",
+              });
+            }
           }
         } catch (error) {
           console.error('Error fetching grocery lists:', error);
-          toast({
-            title: "Error",
-            description: "Failed to load your grocery lists.",
-            variant: "destructive",
-          });
+          
+          // Try to create a default list as a fallback
+          try {
+            console.log('Attempting to create a fallback default list');
+            const defaultList = await getOrCreateDefaultList(user.id);
+            setLists([defaultList]);
+            setActiveList(defaultList);
+            
+            toast({
+              title: "Using local storage",
+              description: "Database connection issues detected. Your lists will be saved locally.",
+            });
+          } catch (fallbackError) {
+            console.error('Fallback error:', fallbackError);
+            toast({
+              title: "Error",
+              description: "Failed to load your grocery lists.",
+              variant: "destructive",
+            });
+          }
         } finally {
           setLoading(false);
         }

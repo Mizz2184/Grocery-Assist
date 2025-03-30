@@ -26,17 +26,21 @@ type DbGroceryItem = {
 // Get user's grocery lists
 export const getUserGroceryLists = async (userId: string): Promise<GroceryList[]> => {
   try {
+    console.log('Fetching grocery lists for user:', userId);
+    
     // Check if we have lists in localStorage (for anonymous users or fallback)
     const localLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
     const userLocalLists = localLists.filter((list: GroceryList) => list.createdBy === userId);
     
     // If we have local lists or we're using a mock user, return those
     if (userLocalLists.length > 0 || userId.startsWith('mock-')) {
-      console.log('Using local lists for user', userId);
+      console.log('Using local lists for user', userId, userLocalLists.length, 'lists found');
       return userLocalLists;
     }
     
     // Otherwise, try to fetch from Supabase
+    console.log('Fetching lists from Supabase for user:', userId);
+    
     // Get lists owned by the user
     const { data: ownedLists, error: ownedListsError } = await supabase
       .from('grocery_lists')
@@ -49,17 +53,21 @@ export const getUserGroceryLists = async (userId: string): Promise<GroceryList[]
       return userLocalLists;
     }
     
-    // Get lists where user is a collaborator (bypassing the users table)
-    // Since we don't have a users table, use the auth ID directly for now
+    console.log('Owned lists fetched:', ownedLists?.length || 0);
+    
+    // Get lists where user is a collaborator 
     let sharedLists = [];
     try {
       const { data: shared, error: sharedListsError } = await supabase
         .from('grocery_lists')
         .select('*')
-        .contains('collaborators', [userId]); // Try using the userId directly as a fallback
+        .contains('collaborators', [userId]);
       
       if (!sharedListsError && shared) {
         sharedLists = shared;
+        console.log('Shared lists fetched:', shared?.length || 0);
+      } else if (sharedListsError) {
+        console.error('Error fetching shared lists:', sharedListsError);
       }
     } catch (sharedError) {
       console.error('Error fetching shared lists:', sharedError);
@@ -67,12 +75,15 @@ export const getUserGroceryLists = async (userId: string): Promise<GroceryList[]
     
     // Combine owned and shared lists
     const lists = [...(ownedLists || []), ...sharedLists];
+    console.log('Total lists fetched:', lists?.length || 0);
     
     if (!lists || lists.length === 0) {
+      console.log('No lists found in database, returning empty array');
       return [];
     }
 
     // Fetch items for all lists
+    console.log('Fetching items for lists:', lists.map(l => l.id));
     const { data: items, error: itemsError } = await supabase
       .from('grocery_items')
       .select('*')
@@ -83,12 +94,12 @@ export const getUserGroceryLists = async (userId: string): Promise<GroceryList[]
       return [];
     }
     
-    // We'll skip the user_products table query since that table doesn't exist
+    console.log('Items fetched:', items?.length || 0);
     
     // Transform data to match application format - using type assertion to fix type issues
     const result = lists.map((list: DbGroceryList) => {
       // Map items with correct structure
-      const mappedItems = items
+      const listItems = items
         .filter((item: DbGroceryItem) => item.list_id === list.id)
         .map((item: DbGroceryItem) => {
           // Ensure product_data has the required properties with proper type assertions
@@ -121,23 +132,28 @@ export const getUserGroceryLists = async (userId: string): Promise<GroceryList[]
           };
         });
         
+      console.log(`List ${list.id} has ${listItems.length} items`);
+      
       return {
         id: list.id,
         name: list.name,
         createdBy: list.created_by,
         createdAt: list.created_at,
         collaborators: list.collaborators || [],
-        items: mappedItems
+        items: listItems
       } as GroceryList; // Type assertion to fix compatibility issue
     });
     
+    console.log('Transformed lists:', result.length);
     return result;
   } catch (error) {
     console.error('Error in getUserGroceryLists:', error);
     
     // Fallback to localStorage if Supabase fails
     const localLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
-    return localLists.filter((list: GroceryList) => list.createdBy === userId);
+    const userLocalLists = localLists.filter((list: GroceryList) => list.createdBy === userId);
+    console.log('Falling back to localStorage, found', userLocalLists.length, 'lists');
+    return userLocalLists;
   }
 };
 
@@ -245,6 +261,8 @@ export const addProductToGroceryList = async (
   quantity: number = 1
 ): Promise<{ success: boolean; message?: string; list?: GroceryList }> => {
   try {
+    console.log(`Adding product to list: listId=${listId}, userId=${userId}, productId=${product.id}`);
+    
     // Create product data that matches expected structure
     const productData = {
       id: product.id,
@@ -258,14 +276,12 @@ export const addProductToGroceryList = async (
       // Adding required fields mentioned in error
       image: product.imageUrl || '',
       prices: [{
-        storeId: product.store?.toLowerCase() || 'unknown',
+        storeId: (product.store?.toLowerCase() || 'unknown'),
         price: product.price,
         currency: '₡',
         date: new Date().toISOString()
       }]
     };
-
-    // Skip user_products operations since the table doesn't exist
 
     let databaseSuccess = false;
     let errorMessage = '';
@@ -296,25 +312,28 @@ export const addProductToGroceryList = async (
           databaseSuccess = true;
         }
       } else {
-        // Insert new item, only using columns we know exist
-        const newItemId = uuidv4(); // Generate a new UUID for the item
+        // Insert new item, strictly following the database schema
+        const newItemId = uuidv4(); // Generate a UUID for the id field
+        console.log('Generated new item ID:', newItemId);
+        
         const { error: insertError } = await supabase
           .from('grocery_items')
           .insert({
-            id: newItemId, // Add the ID field here
+            id: newItemId, // Required UUID primary key
             list_id: listId,
             product_id: product.id,
-            quantity,
+            quantity: quantity,
             checked: false,
-            product_data: productData,
-            added_by: userId,
-            added_at: new Date().toISOString()
+            added_by: userId, // Not user_id (from SQL schema)
+            added_at: new Date().toISOString(), // Not created_at (from SQL schema)
+            product_data: productData // JSONB field in the database
           });
 
         if (insertError) {
           console.error('Error inserting item into Supabase:', insertError);
-          errorMessage = `Database error: ${insertError.message}`;
+          errorMessage = `Database error: ${insertError.message || 'Unknown error'}`;
         } else {
+          console.log('Successfully inserted item with ID:', newItemId);
           databaseSuccess = true;
         }
       }
@@ -328,10 +347,10 @@ export const addProductToGroceryList = async (
     const listIndex = localLists.findIndex((list: GroceryList) => list.id === listId);
     
     if (listIndex === -1) {
-      return Promise.resolve({ 
+      return { 
         success: databaseSuccess, 
         message: databaseSuccess ? 'Added to list' : 'Grocery list not found'
-      });
+      };
     }
     
     const list = localLists[listIndex];
@@ -357,17 +376,17 @@ export const addProductToGroceryList = async (
     // Update localStorage
     localStorage.setItem('grocery_lists', JSON.stringify(localLists));
     
-    return Promise.resolve({ 
+    return { 
       success: true,
       message: databaseSuccess ? 'Added to list' : 'Added to list (local only)',
       list 
-    });
+    };
   } catch (error: any) {
     console.error('Error adding product to list:', error);
-    return Promise.resolve({ 
+    return { 
       success: false, 
       message: `Failed to add product to list: ${error.message || 'Unknown error'}`
-    });
+    };
   }
 };
 
