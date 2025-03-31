@@ -279,22 +279,30 @@ export const addProductToGroceryList = async (
     // Ensure product has store information properly set
     if (product.store) {
       // Normalize store property for consistency
-      const storeName = product.store.trim();
+      const storeName = product.store.trim().toLowerCase();
       
-      // Ensure Walmart is properly categorized
-      if (storeName.includes('Walmart') || storeName.toLowerCase().includes('walmart')) {
+      // Check for Walmart first to prevent false positives
+      if (storeName === 'walmart' || storeName.includes('walmart')) {
         product.store = 'Walmart';
-      } else if (storeName.includes('MaxiPali') || storeName.toLowerCase().includes('maxipali')) {
+      } else if (storeName === 'maxipali' || storeName.includes('maxipali')) {
         product.store = 'MaxiPali';
-      } else if (storeName.includes('MasxMenos') || storeName.toLowerCase().includes('masxmenos')) {
+      } else if (storeName === 'masxmenos' || storeName.includes('masxmenos')) {
         product.store = 'MasxMenos';
       }
     } else {
       // If store is missing, try to detect from product ID or name
-      if (product.id && (
-          product.id.includes('walmart') || 
-          (product.name && product.name.toLowerCase().includes('walmart')))) {
+      const productId = product.id?.toLowerCase() || '';
+      const productName = product.name?.toLowerCase() || '';
+      
+      // Check for Walmart first to prevent false positives
+      if (productId.includes('walmart') || productName.includes('walmart')) {
         product.store = 'Walmart';
+      } else if (productId.includes('maxipali') || productName.includes('maxipali')) {
+        product.store = 'MaxiPali';
+      } else if (productId.includes('masxmenos') || productName.includes('masxmenos')) {
+        product.store = 'MasxMenos';
+      } else {
+        product.store = 'Unknown';
       }
     }
     
@@ -314,18 +322,23 @@ export const addProductToGroceryList = async (
     
     // Ensure store property is always set correctly
     if (!productData.store) {
-      // Try to detect store from product_id or name
-      const productId = product.id.toLowerCase();
-      if (productId.includes('walmart') || (product.name && product.name.toLowerCase().includes('walmart'))) {
+      const productId = product.id?.toLowerCase() || '';
+      const productName = product.name?.toLowerCase() || '';
+      
+      // Check for Walmart first to prevent false positives
+      if (productId.includes('walmart') || productName.includes('walmart')) {
         productData.store = 'Walmart';
-      } else if (productId.includes('maxipali') || (product.name && product.name.toLowerCase().includes('maxipali'))) {
+      } else if (productId.includes('maxipali') || productName.includes('maxipali')) {
         productData.store = 'MaxiPali';
-      } else if (productId.includes('masxmenos') || (product.name && product.name.toLowerCase().includes('masxmenos'))) {
+      } else if (productId.includes('masxmenos') || productName.includes('masxmenos')) {
         productData.store = 'MasxMenos';
       } else {
         productData.store = 'Unknown';
       }
     }
+    
+    // Log the store information for debugging
+    console.log(`Adding product to list with store: ${productData.store}`);
     
     const { error: insertError } = await supabase
       .from('grocery_items')
@@ -359,36 +372,34 @@ export const addProductToGroceryList = async (
     const list = localLists[listIndex];
     const existingItemIndex = list.items.findIndex(item => item.productId === product.id);
     
-    if (existingItemIndex !== -1) {
-      // Update quantity if product already exists
+    if (existingItemIndex >= 0) {
+      // Update quantity of existing item
       list.items[existingItemIndex].quantity += quantity;
     } else {
-      // Add new item with complete product data
-      const newItem: GroceryListItem = {
-        id: uuidv4(),
+      // Add new item with normalized store information
+      list.items.push({
+        id: itemId,
         productId: product.id,
-        quantity,
+        quantity: quantity,
         addedBy: userId,
         addedAt: new Date().toISOString(),
         checked: false,
-        productData: productData as any // Use 'as any' to bypass type checking issue
-      };
-      list.items.push(newItem);
+        productData: productData
+      });
     }
     
-    // Update localStorage
     localStorage.setItem('grocery_lists', JSON.stringify(localLists));
     
     return { 
-      success: true,
-      message: 'Added to list',
-      list: targetList
+      success: true, 
+      message: 'Added to list successfully',
+      list: list
     };
-  } catch (error: any) {
-    console.error('Error adding product to list:', error);
+  } catch (error) {
+    console.error('Error in addProductToGroceryList:', error);
     return { 
       success: false, 
-      message: `Failed to add product to list: ${error.message || 'Unknown error'}`
+      message: error instanceof Error ? error.message : 'Unknown error occurred'
     };
   }
 };

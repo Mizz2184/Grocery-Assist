@@ -623,14 +623,14 @@ const Product = () => {
       const productToAdd = getProductToAdd();
       
       if (!productToAdd) {
-        toast({
+      toast({
           title: translateUI("Error"),
           description: translateUI("No se pudo agregar el producto a la lista"),
           variant: "destructive"
-        });
-        return;
-      }
-      
+      });
+      return;
+    }
+
       const defaultList = await getOrCreateDefaultList(user.id);
       if (!defaultList) {
         throw new Error(translateUI("No se pudo encontrar o crear una lista de compras predeterminada"));
@@ -731,8 +731,8 @@ const Product = () => {
     const maxiPaliPrice: Price = {
       storeId: 'maxipali', // Ensure lowercase consistent with stores.find lookup
       price: maxiPaliProduct?.price || 0,
-      currency: '₡',
-      date: new Date().toISOString()
+        currency: '₡',
+        date: new Date().toISOString()
     };
     console.log("Adding MaxiPali price:", maxiPaliPrice);
     prices.push(maxiPaliPrice);
@@ -741,8 +741,8 @@ const Product = () => {
     const masxMenosPrice: Price = {
       storeId: 'masxmenos', // Ensure lowercase consistent with stores.find lookup
       price: masxMenosProduct?.price || 0,
-      currency: '₡',
-      date: new Date().toISOString()
+        currency: '₡',
+        date: new Date().toISOString()
     };
     console.log("Adding MasxMenos price:", masxMenosPrice);
     prices.push(masxMenosPrice);
@@ -879,7 +879,7 @@ const Product = () => {
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           <TranslatedText es="Volver a resultados" en="Back to results" />
-        </Button>
+            </Button>
         
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -891,12 +891,12 @@ const Product = () => {
             {mainProduct && (
               <div className="flex flex-col md:flex-row gap-6">
                 <div className="flex-shrink-0 w-full md:w-1/3 aspect-square rounded-xl border bg-white dark:bg-slate-950 p-4 flex items-center justify-center">
-                  <img 
-                    src={mainProduct.imageUrl || 'https://placehold.co/400?text=No+Image'} 
+            <img 
+              src={mainProduct.imageUrl || 'https://placehold.co/400?text=No+Image'} 
                     alt={translateTitle(mainProduct.name)}
                     className="max-h-full max-w-full object-contain"
-                  />
-                </div>
+            />
+            </div>
                 <div className="flex-1 space-y-4">
                   <div>
                     <h1 className="text-2xl font-bold leading-tight">
@@ -906,16 +906,16 @@ const Product = () => {
                       <p className="text-muted-foreground">
                         {translateText(mainProduct.brand) || translateText('Marca desconocida')}
                       </p>
-                      {compareResult?.bestPrice && (
+            {compareResult?.bestPrice && (
                         <Badge className="bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900 dark:text-green-100">
                           <TranslatedText es={`Es más barato en ${compareResult.bestPrice.store}`} en={`It's cheaper at ${compareResult.bestPrice.store}`} />
-                        </Badge>
-                      )}
+                </Badge>
+            )}
                     </div>
-                  </div>
-                  
+          </div>
+          
                   <div className="flex flex-wrap items-center gap-4">
-                    <div>
+            <div>
                       <p className="text-sm text-muted-foreground">
                         <TranslatedText es="Precio" en="Price" />
                       </p>
@@ -924,7 +924,7 @@ const Product = () => {
                           <TranslatedText es="Precio no disponible" en="Price not available" />
                         }
                       </p>
-                    </div>
+              </div>
                     
                     {compareResult?.bestPrice && compareResult.bestPrice.savings > 0 && (
                       <div>
@@ -936,32 +936,32 @@ const Product = () => {
                         </p>
                       </div>
                     )}
-                  </div>
-                  
+            </div>
+            
                   <div className="pt-4 flex gap-2">
-                    <Button
-                      onClick={handleAddToList}
+            <Button
+              onClick={handleAddToList}
                       disabled={isAdding || isInList}
                       className="flex-1"
-                    >
+            >
                       {isAdding ? (
-                        <>
+                <>
                           <Loader className="mr-2 h-4 w-4 animate-spin" />
                           <TranslatedText es="Agregando..." en="Adding..." />
-                        </>
+                </>
                       ) : isInList ? (
-                        <>
+                <>
                           <Check className="mr-2 h-4 w-4" />
                           <TranslatedText es="Añadido a la lista" en="Added to list" />
-                        </>
-                      ) : (
-                        <>
+                </>
+              ) : (
+                <>
                           <Plus className="mr-2 h-4 w-4" />
                           <TranslatedText es="Añadir a la lista" en="Add to list" />
-                        </>
-                      )}
-                    </Button>
-                    
+                </>
+              )}
+            </Button>
+            
                     <Button
                       variant="outline"
                       onClick={handleShare}
@@ -971,8 +971,8 @@ const Product = () => {
                         <TranslatedText es="Compartir" en="Share" />
                       </span>
                     </Button>
-                  </div>
-                  
+              </div>
+              
                   {/* Product description if available */}
                   {mainProduct.description && (
                     <div className="pt-4 border-t">
@@ -985,9 +985,9 @@ const Product = () => {
                     </div>
                   )}
                 </div>
-              </div>
-            )}
-            
+                  </div>
+                )}
+                
             {/* Tabs for price comparison and alternatives */}
             <Tabs defaultValue="comparison">
               <TabsList className="w-full md:w-auto">
@@ -1059,19 +1059,19 @@ const Product = () => {
                                 <h4 className="font-medium text-sm">MaxiPali</h4>
                               </div>
                               <div className="flex items-center gap-3">
-                                <div className="w-16 h-16 rounded bg-muted overflow-hidden flex-shrink-0">
-                                  <img 
+                      <div className="w-16 h-16 rounded bg-muted overflow-hidden flex-shrink-0">
+                        <img 
                                     src={match.maxiPali.imageUrl || 'https://placehold.co/400?text=No+Image'} 
                                     alt={translateTitle(match.maxiPali.name)}
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                                <div>
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                          <div>
                                   <p className="font-medium text-sm line-clamp-2">{translateTitle(match.maxiPali.name)}</p>
                                   <p className="text-xs text-muted-foreground">{translateText(match.maxiPali.brand) || translateText('Marca desconocida')}</p>
                                   <p className="font-bold mt-1">₡{match.maxiPali.price.toLocaleString('es-CR')}</p>
-                                </div>
-                              </div>
+                          </div>
+                          </div>
                               <Button 
                                 variant="outline" 
                                 size="sm" 
@@ -1081,9 +1081,9 @@ const Product = () => {
                                 <ShoppingCart className="w-3 h-3 mr-1" />
                                 <TranslatedText es="Añadir" en="Add" />
                               </Button>
-                            </div>
-                          )}
-                          
+                    </div>
+                  )}
+                  
                           {match.masxMenos && (
                             <div className="border-b md:border-b-0 md:border-r p-4">
                               <div className="flex items-center gap-2 mb-2">
@@ -1093,19 +1093,19 @@ const Product = () => {
                                 <h4 className="font-medium text-sm">MasxMenos</h4>
                               </div>
                               <div className="flex items-center gap-3">
-                                <div className="w-16 h-16 rounded bg-muted overflow-hidden flex-shrink-0">
-                                  <img 
+                      <div className="w-16 h-16 rounded bg-muted overflow-hidden flex-shrink-0">
+                        <img 
                                     src={match.masxMenos.imageUrl || 'https://placehold.co/400?text=No+Image'} 
                                     alt={translateTitle(match.masxMenos.name)}
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                                <div>
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                          <div>
                                   <p className="font-medium text-sm line-clamp-2">{translateTitle(match.masxMenos.name)}</p>
                                   <p className="text-xs text-muted-foreground">{translateText(match.masxMenos.brand) || translateText('Marca desconocida')}</p>
                                   <p className="font-bold mt-1">₡{match.masxMenos.price.toLocaleString('es-CR')}</p>
-                                </div>
-                              </div>
+                          </div>
+                          </div>
                               <Button 
                                 variant="outline" 
                                 size="sm" 
@@ -1115,17 +1115,17 @@ const Product = () => {
                                 <ShoppingCart className="w-3 h-3 mr-1" />
                                 <TranslatedText es="Añadir" en="Add" />
                               </Button>
-                            </div>
-                          )}
-                          
+                    </div>
+                  )}
+                  
                           {match.walmart && (
                             <div className="p-4">
                               <div className="flex items-center gap-2 mb-2">
                                 <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
                                   <Store className="w-3 h-3 text-white" />
-                                </div>
+                      </div>
                                 <h4 className="font-medium text-sm">Walmart</h4>
-                              </div>
+                        </div>
                               <div className="flex items-center gap-3">
                                 <div className="w-16 h-16 rounded bg-muted overflow-hidden flex-shrink-0">
                                   <img 
@@ -1133,13 +1133,13 @@ const Product = () => {
                                     alt={translateTitle(match.walmart.name)}
                                     className="w-full h-full object-cover"
                                   />
-                                </div>
-                                <div>
+                      </div>
+                        <div>
                                   <p className="font-medium text-sm line-clamp-2">{translateTitle(match.walmart.name)}</p>
                                   <p className="text-xs text-muted-foreground">{translateText(match.walmart.brand) || translateText('Marca desconocida')}</p>
                                   <p className="font-bold mt-1">₡{match.walmart.price.toLocaleString('es-CR')}</p>
-                                </div>
-                              </div>
+                        </div>
+                      </div>
                               <Button 
                                 variant="outline" 
                                 size="sm" 
@@ -1149,18 +1149,18 @@ const Product = () => {
                                 <ShoppingCart className="w-3 h-3 mr-1" />
                                 <TranslatedText es="Añadir" en="Add" />
                               </Button>
-                            </div>
-                          )}
-                        </div>
+                    </div>
+                  )}
+                </div>
                       </CardContent>
                     </Card>
                   ))}
-                </div>
+              </div>
               </TabsContent>
             </Tabs>
-          </div>
+            </div>
         )}
-      </div>
+                      </div>
     </div>
   );
 };

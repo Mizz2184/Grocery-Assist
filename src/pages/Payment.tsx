@@ -24,6 +24,15 @@ const Payment = () => {
         // Check if the user has already paid
         const paymentStatus = await checkUserPaymentStatus(user.id);
         setHasPaid(paymentStatus);
+        
+        // If user has already paid, redirect to home
+        if (paymentStatus) {
+          toast({
+            title: "Already Paid",
+            description: "You have already completed your payment. Redirecting to home...",
+          });
+          navigate('/');
+        }
       } catch (error) {
         console.error("Error checking payment status:", error);
         toast({
@@ -41,47 +50,46 @@ const Payment = () => {
     } else if (!loading) {
       setIsLoading(false);
     }
-  }, [user, loading, toast]);
+  }, [user, loading, toast, navigate]);
 
   const handlePaymentRedirect = () => {
-    // For demo purposes, let's add a simulated callback parameter with the user ID
-    // In production, you'd implement proper Stripe webhook handling
-    const redirectUrl = `${STRIPE_PAYMENT_LINK}?client_reference_id=${user?.id}&success_url=${encodeURIComponent(window.location.origin + '/payment-success')}`;
+    if (!user) return;
+    
+    // Create a unique session ID for this payment attempt
+    const sessionId = Math.random().toString(36).substring(7);
+    
+    // Store the session ID in localStorage to verify payment completion
+    localStorage.setItem(`payment_session_${user.id}`, sessionId);
+    
+    // Create the payment URL with necessary parameters
+    const redirectUrl = `${STRIPE_PAYMENT_LINK}?client_reference_id=${user.id}&session_id=${sessionId}&success_url=${encodeURIComponent(window.location.origin + '/payment-success')}`;
     
     // Open payment link in new tab/window
     window.open(redirectUrl, '_blank');
   };
 
-  // For demo purposes - normally this would be handled by a webhook
-  const handleSimulatePayment = () => {
-    if (!user) return;
-    
-    // Mark the user as paid in local storage
-    markUserAsPaid(user.id);
-    setHasPaid(true);
-    
-    toast({
-      title: "Payment successful",
-      description: "Thank you for subscribing to Fam-Assist!",
-    });
-  };
+  // Show loading state
+  if (loading || isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
+        <Card className="w-full max-w-md shadow-lg animate-fade-in">
+          <CardHeader className="text-center">
+            <CardTitle>Loading...</CardTitle>
+            <CardDescription>Checking your payment status...</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
-  // Redirect to login if not logged in
-  if (!loading && !user) {
+  // If user is not logged in, redirect to login
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // Redirect to home if already paid
-  if (!isLoading && hasPaid) {
+  // If user has already paid, redirect to home
+  if (hasPaid) {
     return <Navigate to="/" replace />;
-  }
-
-  if (loading || isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="animate-spin h-12 w-12 rounded-full border-4 border-primary border-t-transparent"></div>
-      </div>
-    );
   }
 
   return (
@@ -138,15 +146,6 @@ const Payment = () => {
             <CreditCard className="h-5 w-5" />
             Pay with Stripe
             <ArrowRight className="h-5 w-5" />
-          </Button>
-          
-          {/* For demo purposes only - simulate payment */}
-          <Button 
-            variant="outline" 
-            className="w-full" 
-            onClick={handleSimulatePayment}
-          >
-            Simulate Successful Payment
           </Button>
           
           <p className="text-xs text-center text-muted-foreground pt-2">

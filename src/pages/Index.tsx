@@ -30,51 +30,73 @@ const VirtualizedProductGrid = ({ products, onAddToList, isProductInList }: {
                       window.innerWidth >= 1024 ? 3 : 
                       window.innerWidth >= 640 ? 2 : 1;
   
-  const ITEM_WIDTH = window.innerWidth >= 1536 ? 300 :
-                     window.innerWidth >= 1024 ? 320 :
-                     window.innerWidth >= 640 ? 360 : 400;
+  // Calculate item width based on container width
+  const getItemWidth = (containerWidth: number) => {
+    if (window.innerWidth >= 1536) return 300;
+    if (window.innerWidth >= 1024) return 320;
+    if (window.innerWidth >= 640) return 360;
+    // On mobile, make items take up full width minus padding
+    return containerWidth - 32; // 16px padding on each side
+  };
   
   const ITEM_HEIGHT = 400;
   const ROW_COUNT = Math.ceil(products.length / COLUMN_COUNT);
 
   return (
-    <div style={{ width: '100%', height: '100%' }}>
+    <div className="w-full h-[calc(100vh-300px)] overflow-x-hidden">
       <AutoSizer>
-        {({ height, width }) => (
-          <FixedSizeGrid
-            columnCount={COLUMN_COUNT}
-            columnWidth={ITEM_WIDTH}
-            height={height}
-            rowCount={ROW_COUNT}
-            rowHeight={ITEM_HEIGHT}
-            width={width}
-            style={{ padding: '1rem' }}
-            itemData={products}
-          >
-            {({ columnIndex, rowIndex, style }) => {
-              const index = rowIndex * COLUMN_COUNT + columnIndex;
-              const product = products[index];
-              
-              if (!product) return null;
-              
-              return (
-                <div style={{
-                  ...style,
-                  padding: '0.5rem',
-                  display: 'flex',
-                  justifyContent: 'center'
-                }}>
-                  <ProductCard
-                    product={product}
-                    isInList={isProductInList(product.id, product.store || '')}
-                    onAddToList={onAddToList}
-                    index={index}
-                  />
-                </div>
-              );
-            }}
-          </FixedSizeGrid>
-        )}
+        {({ height, width }) => {
+          const itemWidth = getItemWidth(width);
+          const columnWidth = Math.min(itemWidth, width / COLUMN_COUNT);
+          
+          return (
+            <FixedSizeGrid
+              columnCount={COLUMN_COUNT}
+              columnWidth={columnWidth}
+              height={height}
+              rowCount={ROW_COUNT}
+              rowHeight={ITEM_HEIGHT}
+              width={width}
+              style={{ 
+                padding: '1rem',
+                overflowX: 'hidden',
+                width: '100%',
+                maxWidth: '100vw'
+              }}
+              itemData={products}
+              overscanColumnCount={0}
+              overscanRowCount={2}
+              className="overflow-x-hidden"
+            >
+              {({ columnIndex, rowIndex, style }) => {
+                const index = rowIndex * COLUMN_COUNT + columnIndex;
+                const product = products[index];
+                
+                if (!product) return null;
+                
+                return (
+                  <div style={{
+                    ...style,
+                    padding: '0.5rem',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    width: '100%',
+                    maxWidth: '100%',
+                    overflow: 'hidden',
+                    boxSizing: 'border-box'
+                  }}>
+                    <ProductCard
+                      product={product}
+                      isInList={isProductInList(product.id, product.store || '')}
+                      onAddToList={onAddToList}
+                      index={index}
+                    />
+                  </div>
+                );
+              }}
+            </FixedSizeGrid>
+          );
+        }}
       </AutoSizer>
     </div>
   );
@@ -584,7 +606,7 @@ const Index = () => {
       />
 
       {query ? (
-        <div className="space-y-6 h-[calc(100vh-200px)]" ref={searchResultsRef}>
+        <div className="space-y-6" ref={searchResultsRef}>
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <h2 className="text-xl font-medium">
               {isSearching ? (
@@ -628,11 +650,13 @@ const Index = () => {
               ))}
             </div>
           ) : filteredResults && filteredResults.length > 0 ? (
-            <VirtualizedProductGrid
-              products={filteredResults}
-              onAddToList={handleAddToList}
-              isProductInList={isProductInList}
-            />
+            <div className="w-full relative">
+              <VirtualizedProductGrid
+                products={filteredResults}
+                onAddToList={handleAddToList}
+                isProductInList={isProductInList}
+              />
+            </div>
           ) : searchResults.length > 0 ? (
             // Display this when there are search results but filtered results is empty
             <div className="text-center py-12">
