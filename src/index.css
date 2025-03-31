@@ -238,12 +238,13 @@ html {
   max-height: 90vh;
   overflow-y: auto;
   position: relative;
+  z-index: 999 !important;
 }
 
 /* Radix UI dropdown specific fixes */
 [data-radix-popper-content-wrapper] {
   position: fixed !important;
-  z-index: 100 !important;
+  z-index: 9999 !important;
   max-height: calc(100vh - 10px) !important;
   overflow: auto !important;
   max-width: 100vw !important;

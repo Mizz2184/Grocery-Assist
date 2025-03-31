@@ -32,25 +32,48 @@ export const ProductCard = ({
     setIsInListLocal(isInList);
   }, [isInList]);
 
-  // Debug log to check product data and list status
-  useEffect(() => {
-    console.log(`ProductCard [${product.id}]: isInList=${isInList}, isInListLocal=${isInListLocal}`);
-  }, [product.id, isInList, isInListLocal]);
+  // Safety check - if product is invalid or missing, display an error card
+  if (!product || !product.id) {
+    console.error('ProductCard received invalid product data:', product);
+    return (
+      <Card className="overflow-hidden h-full flex flex-col group hover:shadow-md transition-shadow">
+        <div className="p-4 space-y-3 flex-1 flex flex-col justify-center items-center">
+          <h3 className="font-medium text-lg text-red-500">Invalid Product Data</h3>
+          <p className="text-sm text-muted-foreground">This product cannot be displayed.</p>
+        </div>
+      </Card>
+    );
+  }
 
-  // Debug log to check product data
-  console.log('Product in ProductCard:', product);
-  console.log('Image URL:', product.imageUrl);
+  // Debug function to verify product data
+  const verifyProduct = () => {
+    const issues = [];
+    
+    if (!product.name) issues.push('Missing product name');
+    if (typeof product.price !== 'number') issues.push(`Invalid price: ${product.price}`);
+    if (!product.store) issues.push('Missing store property');
+    
+    if (issues.length > 0) {
+      console.warn(`ProductCard found issues with product ${product.id}:`, issues);
+      console.log('Problematic product data:', JSON.stringify(product));
+    }
+    
+    return issues.length === 0;
+  };
+  
+  // Verify product on mount and on changes
+  useEffect(() => {
+    verifyProduct();
+  }, [product]);
 
   const handleAddToList = async () => {
     if (!onAddToList) return;
     
-    console.log(`Attempting to add product ${product.id} to list`);
     setIsAdding(true);
     try {
       await onAddToList(product.id);
       // Update local state to show check mark immediately
       setIsInListLocal(true);
-      console.log(`Successfully added product ${product.id} to list`);
     } catch (error) {
       console.error(`Error adding product ${product.id} to list:`, error);
       toast({

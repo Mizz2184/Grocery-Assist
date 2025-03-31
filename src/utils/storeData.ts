@@ -20,5 +20,12 @@ export const stores: StoreInfo[] = [
     logo: '/masxmenos-logo.png', // Placeholder
     color: '#E3000F',
     website: 'https://www.masxmenos.cr/',
+  },
+  {
+    id: 'walmart',
+    name: 'Walmart',
+    logo: '/walmart-logo.png', // Placeholder
+    color: '#0071DC',
+    website: 'https://www.walmart.co.cr/',
   }
 ];

@@ -748,6 +748,201 @@ app.get('/api/proxy/masxmenos/barcode/:ean', async (req, res) => {
   }
 });
 
+// Walmart API proxy endpoint
+app.post('/api/proxy/walmart/search', async (req, res) => {
+  try {
+    const { query, page = 1, pageSize = 49 } = req.body;
+    console.log('Received Walmart search request:', { query, page, pageSize });
+    
+    // Initialize searchData variable at the top level
+    let searchData = [];
+    
+    // Try path-based search first
+    try {
+      console.log(`Attempting path-based search for: ${query}`);
+      const pathSearchResponse = await axios.get(`https://www.walmart.co.cr/api/catalog_system/pub/products/search/${encodeURIComponent(query)}`, {
+        params: {
+          '_from': (page - 1) * pageSize,
+          '_to': (page * pageSize) - 1
+        },
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+          'Origin': 'https://www.walmart.co.cr',
+          'Referer': 'https://www.walmart.co.cr/'
+        },
+        timeout: 15000
+      });
+      
+      if (pathSearchResponse.data && pathSearchResponse.data.length > 0) {
+        console.log(`Path-based search found ${pathSearchResponse.data.length} products`);
+        searchData = pathSearchResponse.data;
+      } else {
+        console.log('Path-based search returned no results, trying ft search');
+      }
+    } catch (pathError) {
+      console.error('Path-based search error:', pathError.message);
+      // Continue to next search method
+    }
+    
+    // If path search returned no results, try ft parameter search
+    if (searchData.length === 0) {
+      try {
+        console.log(`Attempting ft parameter search for: ${query}`);
+        const ftSearchResponse = await axios.get('https://www.walmart.co.cr/api/catalog_system/pub/products/search', {
+          params: {
+            'ft': query,
+            '_from': (page - 1) * pageSize,
+            '_to': (page * pageSize) - 1
+          },
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Origin': 'https://www.walmart.co.cr',
+            'Referer': 'https://www.walmart.co.cr/'
+          },
+          timeout: 15000
+        });
+        
+        if (ftSearchResponse.data && ftSearchResponse.data.length > 0) {
+          console.log(`ft parameter search found ${ftSearchResponse.data.length} products`);
+          searchData = ftSearchResponse.data;
+        } else {
+          console.log('ft parameter search returned no results');
+        }
+      } catch (ftError) {
+        console.error('ft parameter search error:', ftError.message);
+      }
+    }
+    
+    // Transform response to match our format
+    const transformedData = {
+      products: (searchData || []).map(p => {
+        const price = p.items?.[0]?.sellers?.[0]?.commertialOffer?.Price || 
+                     p.items?.[0]?.sellers?.[0]?.commertialOffer?.ListPrice || 0;
+        
+        return {
+          id: p.productId || `walmart-api-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          name: p.productName,
+          brand: p.brand || 'Walmart',
+          price: price,
+          imageUrl: p.items?.[0]?.images?.[0]?.imageUrl || '',
+          store: 'Walmart',
+          category: p.categories && p.categories[0] ? p.categories[0].split('/').pop() : 'Grocery',
+          sku: p.items?.[0]?.itemId || '',
+          barcode: p.items?.[0]?.ean || '',
+          inStock: true
+        };
+      }),
+      total: searchData?.length || 0,
+      page: parseInt(page),
+      pageSize: parseInt(pageSize),
+      hasMore: (searchData?.length || 0) === pageSize
+    };
+
+    // Filter out products with zero price
+    const filteredProducts = transformedData.products.filter(p => p.price > 0);
+    console.log(`Filtered from ${transformedData.products.length} to ${filteredProducts.length} Walmart products with price > 0`);
+    transformedData.products = filteredProducts;
+    transformedData.total = filteredProducts.length;
+
+    console.log(`Found ${transformedData.products.length} Walmart products from API`);
+    if (transformedData.products.length > 0) {
+      console.log('First Walmart product:', transformedData.products[0]);
+    }
+    
+    return res.json(transformedData);
+  } catch (error) {
+    console.error('Error in Walmart search:', error.message);
+    console.error('Full error details:', {
+      status: error.response?.status,
+      data: error.response?.data?.message || error.response?.data,
+      url: error.config?.url,
+      method: error.config?.method
+    });
+    return res.status(500).json({
+      error: 'Search failed',
+      details: error.message,
+      products: [],
+      total: 0,
+      page: parseInt(req.body.page || 1),
+      pageSize: parseInt(req.body.pageSize || 49),
+      hasMore: false
+    });
+  }
+});
+
+// Walmart barcode lookup endpoint
+app.get('/api/proxy/walmart/barcode/:ean', async (req, res) => {
+  try {
+    const { ean } = req.params;
+    console.log(`Received Walmart barcode lookup request for EAN: ${ean}`);
+    
+    // Walmart API URL for barcode search
+    const url = 'https://www.walmart.co.cr/api/catalog_system/pub/products/search';
+    const fullUrl = `${url}?fq=ean:${encodeURIComponent(ean)}`;
+    console.log(`Sending request to Walmart API for barcode: ${fullUrl}`);
+    
+    const response = await axios.get(fullUrl, {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Origin': 'https://www.walmart.co.cr',
+        'Referer': 'https://www.walmart.co.cr/'
+      },
+      timeout: 15000
+    });
+    
+    console.log(`Walmart barcode API returned status: ${response.status}`);
+    console.log(`Walmart barcode API returned ${response.data ? response.data.length : 0} results`);
+    
+    if (Array.isArray(response.data) && response.data.length > 0) {
+      const product = response.data[0];
+      console.log(`Found product by barcode: ${product.productName}`);
+      
+      const price = product.items?.[0]?.sellers?.[0]?.commertialOffer?.Price || 
+                   product.items?.[0]?.sellers?.[0]?.commertialOffer?.ListPrice || 0;
+      
+      const transformedProduct = {
+        id: product.productId,
+        name: product.productName,
+        brand: product.brand || 'Walmart',
+        price: price,
+        imageUrl: product.items?.[0]?.images?.[0]?.imageUrl || '',
+        store: 'Walmart',
+        category: product.categories && product.categories[0] ? product.categories[0].split('/').pop() : 'Grocery',
+        sku: product.items?.[0]?.itemId || '',
+        barcode: product.items?.[0]?.ean || ean,
+        inStock: true
+      };
+      
+      console.log('Transformed product from barcode:', transformedProduct);
+      return res.json({ success: true, product: transformedProduct });
+    } else {
+      console.log(`No products found for barcode ${ean} in Walmart`);
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+  } catch (error) {
+    console.error(`Error in Walmart barcode lookup for ${req.params.ean}:`, error.message);
+    console.error('Full error details:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      url: error.config?.url
+    });
+    return res.status(500).json({
+      success: false,
+      message: 'Barcode lookup failed',
+      details: error.message
+    });
+  }
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

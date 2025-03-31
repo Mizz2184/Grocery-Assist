@@ -13,7 +13,8 @@ import {
   ShoppingBag,
   ArrowDown,
   Scale,
-  Loader
+  Loader,
+  ShoppingCart
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,8 @@ import {
   TabsList, 
   TabsTrigger 
 } from "@/components/ui/tabs";
+import { useTranslation } from "@/context/TranslationContext";
+import { TranslatedText } from "@/App";
 
 // Price type for the PriceComparison component
 interface Price {
@@ -54,6 +57,8 @@ interface MatchedProducts {
 
 // Create separate store product display components to better handle the rendering
 const MaxiPaliProductDisplay = ({ product, isLowestPrice }: { product: ProductType | null, isLowestPrice: boolean }) => {
+  const { translateTitle, translateText } = useTranslation();
+  
   return (
     <div className={cn(
       "p-4 rounded-lg border",
@@ -70,7 +75,7 @@ const MaxiPaliProductDisplay = ({ product, isLowestPrice }: { product: ProductTy
         <h4 className="font-medium text-lg">MaxiPali</h4>
         {product && isLowestPrice && (
           <Badge variant="outline" className="ml-auto bg-green-50 text-green-700 border-green-100">
-            Best Price
+            <TranslatedText es="Mejor Precio" en="Best Price" />
           </Badge>
         )}
       </div>
@@ -81,13 +86,13 @@ const MaxiPaliProductDisplay = ({ product, isLowestPrice }: { product: ProductTy
             <div className="w-16 h-16 rounded bg-muted overflow-hidden flex-shrink-0">
               <img 
                 src={product.imageUrl || 'https://placehold.co/400?text=No+Image'} 
-                alt={product.name} 
+                alt={translateTitle(product.name)} 
                 className="w-full h-full object-cover"
               />
             </div>
             <div>
-              <p className="font-medium line-clamp-2">{product.name}</p>
-              <p className="text-sm text-muted-foreground">{product.brand || 'Unknown brand'}</p>
+              <p className="font-medium line-clamp-2">{translateTitle(product.name)}</p>
+              <p className="text-sm text-muted-foreground">{translateText(product.brand) || translateText('Marca desconocida')}</p>
             </div>
           </div>
           <div className="font-bold text-lg">
@@ -97,7 +102,7 @@ const MaxiPaliProductDisplay = ({ product, isLowestPrice }: { product: ProductTy
       ) : (
         <div className="py-8 text-center">
           <p className="text-muted-foreground">
-            Product not available at MaxiPali
+            <TranslatedText es="Producto no disponible en MaxiPali" en="Product not available at MaxiPali" />
           </p>
         </div>
       )}
@@ -106,6 +111,8 @@ const MaxiPaliProductDisplay = ({ product, isLowestPrice }: { product: ProductTy
 };
 
 const MasxMenosProductDisplay = ({ product, isLowestPrice }: { product: ProductType | null, isLowestPrice: boolean }) => {
+  const { translateTitle, translateText } = useTranslation();
+  
   return (
     <div className={cn(
       "p-4 rounded-lg border",
@@ -122,7 +129,7 @@ const MasxMenosProductDisplay = ({ product, isLowestPrice }: { product: ProductT
         <h4 className="font-medium text-lg">MasxMenos</h4>
         {product && isLowestPrice && (
           <Badge variant="outline" className="ml-auto bg-green-50 text-green-700 border-green-100">
-            Best Price
+            <TranslatedText es="Mejor Precio" en="Best Price" />
           </Badge>
         )}
       </div>
@@ -133,13 +140,13 @@ const MasxMenosProductDisplay = ({ product, isLowestPrice }: { product: ProductT
             <div className="w-16 h-16 rounded bg-muted overflow-hidden flex-shrink-0">
               <img 
                 src={product.imageUrl || 'https://placehold.co/400?text=No+Image'} 
-                alt={product.name} 
+                alt={translateTitle(product.name)} 
                 className="w-full h-full object-cover"
               />
             </div>
             <div>
-              <p className="font-medium line-clamp-2">{product.name}</p>
-              <p className="text-sm text-muted-foreground">{product.brand || 'Unknown brand'}</p>
+              <p className="font-medium line-clamp-2">{translateTitle(product.name)}</p>
+              <p className="text-sm text-muted-foreground">{translateText(product.brand) || translateText('Marca desconocida')}</p>
             </div>
           </div>
           <div className="font-bold text-lg">
@@ -149,7 +156,7 @@ const MasxMenosProductDisplay = ({ product, isLowestPrice }: { product: ProductT
       ) : (
         <div className="py-8 text-center">
           <p className="text-muted-foreground">
-            Product not available at MasxMenos
+            <TranslatedText es="Producto no disponible en MasxMenos" en="Product not available at MasxMenos" />
           </p>
         </div>
       )}
@@ -159,11 +166,34 @@ const MasxMenosProductDisplay = ({ product, isLowestPrice }: { product: ProductT
 
 // Walmart Product Display Component
 const WalmartProductDisplay = ({ product, isLowestPrice }: { product: ProductType | null, isLowestPrice: boolean }) => {
+  const { translateTitle, translateText } = useTranslation();
+  
+  console.log('WalmartProductDisplay component rendering with product:', product);
+  
+  if (!product) {
+    console.log('No Walmart product available to display');
+    return (
+      <div className="product-not-found">
+        <div className="text-center p-4">
+          <h3 className="text-lg font-medium mb-2">
+            <TranslatedText es="No se encontró producto similar en Walmart" en="No matching product found at Walmart" />
+          </h3>
+          <p className="text-muted-foreground">
+            <TranslatedText es="No pudimos encontrar un producto similar en Walmart." en="We couldn't find a similar product at Walmart." />
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const isBestPrice = isLowestPrice;
+  console.log('Is Walmart product the best price?', isBestPrice);
+  
   return (
     <div className={cn(
       "p-4 rounded-lg border",
       product 
-        ? (isLowestPrice 
+        ? (isBestPrice 
           ? "border-blue-400 bg-blue-50 dark:bg-blue-900/20" 
           : "")
         : "border-dashed border-muted"
@@ -173,9 +203,9 @@ const WalmartProductDisplay = ({ product, isLowestPrice }: { product: ProductTyp
           <Store className="w-4 h-4 text-white" />
         </div>
         <h4 className="font-medium text-lg">Walmart</h4>
-        {product && isLowestPrice && (
+        {product && isBestPrice && (
           <Badge variant="outline" className="ml-auto bg-green-50 text-green-700 border-green-100">
-            Best Price
+            <TranslatedText es="Mejor Precio" en="Best Price" />
           </Badge>
         )}
       </div>
@@ -186,13 +216,13 @@ const WalmartProductDisplay = ({ product, isLowestPrice }: { product: ProductTyp
             <div className="w-16 h-16 rounded bg-muted overflow-hidden flex-shrink-0">
               <img 
                 src={product.imageUrl || 'https://placehold.co/400?text=No+Image'} 
-                alt={product.name} 
+                alt={translateTitle(product.name)} 
                 className="w-full h-full object-cover"
               />
             </div>
             <div>
-              <p className="font-medium line-clamp-2">{product.name}</p>
-              <p className="text-sm text-muted-foreground">{product.brand || 'Unknown brand'}</p>
+              <p className="font-medium line-clamp-2">{translateTitle(product.name)}</p>
+              <p className="text-sm text-muted-foreground">{translateText(product.brand) || translateText('Marca desconocida')}</p>
             </div>
           </div>
           <div className="font-bold text-lg">
@@ -202,7 +232,7 @@ const WalmartProductDisplay = ({ product, isLowestPrice }: { product: ProductTyp
       ) : (
         <div className="py-8 text-center">
           <p className="text-muted-foreground">
-            Product not available at Walmart
+            <TranslatedText es="Producto no disponible en Walmart" en="Product not available at Walmart" />
           </p>
         </div>
       )}
@@ -230,7 +260,7 @@ const Product = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [matchedProducts, setMatchedProducts] = useState<MatchedProducts[]>([]);
-  const [selectedTab, setSelectedTab] = useState<string>("compare");
+  const { translateTitle, translateDescription, translateText, translateUI } = useTranslation();
 
   useEffect(() => {
     const fetchProductComparison = async () => {
@@ -562,74 +592,63 @@ const Product = () => {
     console.log("walmartProduct state updated:", walmartProduct);
   }, [walmartProduct]);
 
+  // Function to get the product to add based on best price
+  const getProductToAdd = (): ProductType | null => {
+    if (compareResult?.bestPrice?.store === 'MaxiPali' && maxiPaliProduct) {
+      return maxiPaliProduct;
+    } else if (compareResult?.bestPrice?.store === 'MasxMenos' && masxMenosProduct) {
+      return masxMenosProduct;
+    } else if (compareResult?.bestPrice?.store === 'Walmart' && walmartProduct) {
+      return walmartProduct;
+    } else {
+      // If no best price or the preferred store doesn't have the product,
+      // use whatever product is available
+      return maxiPaliProduct || masxMenosProduct || walmartProduct;
+    }
+  };
+
   const handleAddToList = async () => {
     if (!user) {
       toast({
-        title: "Sign in required",
-        description: "Please sign in to add items to your grocery list.",
-        variant: "destructive",
-      });
-      navigate("/profile");
-      return;
-    }
-
-    if (!maxiPaliProduct && !masxMenosProduct && !walmartProduct) {
-      toast({
-        title: "Error",
-        description: "No product available to add to your list.",
-        variant: "destructive",
+        title: translateUI("Debe iniciar sesión"),
+        description: translateUI("Por favor inicie sesión para agregar productos a su lista"),
+        variant: "destructive"
       });
       return;
     }
 
     setIsAdding(true);
-    
     try {
-      // Get user's default list
-      const defaultList = await getOrCreateDefaultList(user.id);
-      
-      // Choose the product from the store with the best price
-      let productToAdd = null;
-      
-      if (compareResult?.bestPrice?.store === 'MaxiPali' && maxiPaliProduct) {
-        productToAdd = maxiPaliProduct;
-      } else if (compareResult?.bestPrice?.store === 'MasxMenos' && masxMenosProduct) {
-        productToAdd = masxMenosProduct;
-      } else if (compareResult?.bestPrice?.store === 'Walmart' && walmartProduct) {
-        productToAdd = walmartProduct;
-      } else {
-        // If no best price or the preferred store doesn't have the product,
-        // use whatever product is available
-        productToAdd = maxiPaliProduct || masxMenosProduct || walmartProduct;
-      }
+      // Always use the best price product from any store
+      const productToAdd = getProductToAdd();
       
       if (!productToAdd) {
-        throw new Error('No product available to add');
+        toast({
+          title: translateUI("Error"),
+          description: translateUI("No se pudo agregar el producto a la lista"),
+          variant: "destructive"
+        });
+        return;
       }
       
-      // Add to grocery list
-      const result = await addProductToGroceryList(
-        defaultList.id,
-        user.id,
-        productToAdd
-      );
-      
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to add product to list');
+      const defaultList = await getOrCreateDefaultList(user.id);
+      if (!defaultList) {
+        throw new Error(translateUI("No se pudo encontrar o crear una lista de compras predeterminada"));
       }
       
-      toast({
-        title: "Added to list",
-        description: `${productToAdd.name} has been added to your list from ${productToAdd.store}.`,
-      });
+      await addProductToGroceryList(defaultList.id, user.id, productToAdd);
       
       setIsInList(true);
-    } catch (error) {
-      console.error('Error adding to list:', error);
       toast({
-        title: "Error",
-        description: "Failed to add product to your list.",
-        variant: "destructive",
+        title: translateUI("Producto agregado"),
+        description: translateUI("Producto agregado a tu lista de compras"),
+      });
+    } catch (error) {
+      console.error("Error adding product to list:", error);
+      toast({
+        title: translateUI("Error"),
+        description: translateUI("No se pudo agregar el producto a la lista"),
+        variant: "destructive"
       });
     } finally {
       setIsAdding(false);
@@ -850,428 +869,297 @@ const Product = () => {
   if (!mainProduct) return null;
 
   return (
-    <div className="page-container">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center gap-2 mb-6">
-          <Link to="/">
-            <Button variant="ghost" size="icon" className="rounded-full">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-          </Link>
-          <span className="text-muted-foreground">Back to search</span>
-        </div>
+    <div className="container max-w-4xl py-8">
+      <div className="mb-6">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => navigate(-1)}
+          className="mb-4"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          <TranslatedText es="Volver a resultados" en="Back to results" />
+        </Button>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="relative overflow-hidden rounded-lg bg-muted/30 aspect-square">
-            <img 
-              src={mainProduct.imageUrl || 'https://placehold.co/400?text=No+Image'} 
-              alt={mainProduct.name} 
-              className="w-full h-full object-cover animate-scale-in"
-            />
-            <div className="absolute top-2 right-2">
-              <Badge variant="secondary" className="font-normal">
-                {mainProduct.store}
-              </Badge>
-            </div>
-            {compareResult?.bestPrice && (
-              <div className="absolute bottom-2 right-2">
-                <Badge variant="default" className="bg-green-600 text-white">
-                  Best Price: {compareResult.bestPrice.store}
-                </Badge>
-              </div>
-            )}
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader className="h-6 w-6 animate-spin" />
           </div>
-          
-          <div className="space-y-6 animate-fade-in">
-            <div>
-              <div className="flex items-start justify-between gap-4">
-                <h1 className="text-3xl font-medium">{mainProduct.name}</h1>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full"
-                  onClick={handleShare}
-                >
-                  <Share2 className="w-5 h-5" />
-                </Button>
-              </div>
-              <p className="text-lg text-muted-foreground">{mainProduct.brand || 'Unknown brand'}</p>
-              <div className="flex items-center gap-2 mt-2">
-                <Badge variant="secondary" className="font-normal">
-                  {mainProduct.category || 'Grocery'}
-                </Badge>
-                {mainProduct.ean && (
-                <Badge variant="outline" className="font-normal">
-                    Barcode: {mainProduct.ean}
-                </Badge>
-                )}
-              </div>
-            </div>
-            
-            <Button
-              className={cn(
-                "w-full rounded-full h-12 gap-2",
-                isInList && "bg-green-600 hover:bg-green-700"
-              )}
-              disabled={isAdding || isInList}
-              onClick={handleAddToList}
-            >
-              {isInList ? (
-                <>
-                  <Check className="h-5 w-5" />
-                  Added to List
-                </>
-              ) : isAdding ? (
-                <>
-                  <span className="h-5 w-5 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                  Adding to List...
-                </>
-              ) : (
-                <>
-                  <Plus className="h-5 w-5" />
-                  Add to Grocery List
-                </>
-              )}
-            </Button>
-            
-            {/* Price Comparison Section */}
-            <div className="rounded-lg border overflow-hidden mt-8">
-              <div className="bg-muted p-3 border-b">
-                <h3 className="font-medium text-lg flex items-center gap-2">
-                  <Scale className="w-4 h-4" />
-                  Price Comparison
-                </h3>
-              </div>
-              
-              <div className="p-4">
-                {/* Show savings summary if at least two stores have the product */}
-                {bestPrice && bestPrice.store && (maxiPaliProduct || masxMenosProduct || walmartProduct) && (
-                  <div className="mb-4 p-3 bg-green-50 border border-green-100 rounded-lg dark:bg-green-900/20 dark:border-green-900/30">
-                    <h4 className="text-green-700 dark:text-green-400 font-medium flex items-center gap-1">
-                      <ArrowDown className="w-4 h-4" /> 
-                      Best Price at {bestPrice.store}
-                    </h4>
-                    <p className="text-sm text-green-700 dark:text-green-400">
-                      {bestPrice.store} offers the best price at {formatCurrency(bestPrice.price, "CRC")}.
-                      {bestPrice.savingsPercentage > 0 && ` Save up to ${bestPrice.savingsPercentage}% compared to other stores.`}
-                    </p>
+        ) : (
+          <div className="space-y-8">
+            {/* Main product information */}
+            {mainProduct && (
+              <div className="flex flex-col md:flex-row gap-6">
+                <div className="flex-shrink-0 w-full md:w-1/3 aspect-square rounded-xl border bg-white dark:bg-slate-950 p-4 flex items-center justify-center">
+                  <img 
+                    src={mainProduct.imageUrl || 'https://placehold.co/400?text=No+Image'} 
+                    alt={translateTitle(mainProduct.name)}
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </div>
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <h1 className="text-2xl font-bold leading-tight">
+                      {translateTitle(mainProduct.name)}
+                    </h1>
+                    <div className="flex items-center gap-2 mt-2">
+                      <p className="text-muted-foreground">
+                        {translateText(mainProduct.brand) || translateText('Marca desconocida')}
+                      </p>
+                      {compareResult?.bestPrice && (
+                        <Badge className="bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900 dark:text-green-100">
+                          <TranslatedText es={`Es más barato en ${compareResult.bestPrice.store}`} en={`It's cheaper at ${compareResult.bestPrice.store}`} />
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                )}
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Debug info */}
-                  {process.env.NODE_ENV !== 'production' && (
-                    <div className="col-span-3 mb-4 p-3 bg-gray-100 border border-gray-200 rounded text-xs font-mono overflow-auto max-h-32">
-                      <div>MaxiPali: {maxiPaliProduct ? '✅' : '❌'}</div>
-                      <div>MasxMenos: {masxMenosProduct ? '✅' : '❌'}</div>
-                      <div>Walmart: {walmartProduct ? '✅' : '❌'}</div>
-                      <div>MaxiPali Name: {maxiPaliProduct?.name || 'N/A'}</div>
-                      <div>MaxiPali ID: {maxiPaliProduct?.id || 'N/A'}</div>
-                      <div>MaxiPali Price: {maxiPaliProduct?.price || 'N/A'}</div>
+                  
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        <TranslatedText es="Precio" en="Price" />
+                      </p>
+                      <p className="text-3xl font-bold">
+                        {mainProduct.price ? formatCurrency(mainProduct.price) : 
+                          <TranslatedText es="Precio no disponible" en="Price not available" />
+                        }
+                      </p>
+                    </div>
+                    
+                    {compareResult?.bestPrice && compareResult.bestPrice.savings > 0 && (
+                      <div>
+                        <p className="text-sm text-green-600 dark:text-green-400">
+                          <TranslatedText es="Ahorro" en="Savings" />
+                        </p>
+                        <p className="text-xl font-semibold text-green-600 dark:text-green-400">
+                          {formatCurrency(compareResult.bestPrice.savings)} ({compareResult.bestPrice.savingsPercentage.toFixed(0)}%)
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="pt-4 flex gap-2">
+                    <Button
+                      onClick={handleAddToList}
+                      disabled={isAdding || isInList}
+                      className="flex-1"
+                    >
+                      {isAdding ? (
+                        <>
+                          <Loader className="mr-2 h-4 w-4 animate-spin" />
+                          <TranslatedText es="Agregando..." en="Adding..." />
+                        </>
+                      ) : isInList ? (
+                        <>
+                          <Check className="mr-2 h-4 w-4" />
+                          <TranslatedText es="Añadido a la lista" en="Added to list" />
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="mr-2 h-4 w-4" />
+                          <TranslatedText es="Añadir a la lista" en="Add to list" />
+                        </>
+                      )}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      onClick={handleShare}
+                    >
+                      <Share2 className="h-4 w-4" />
+                      <span className="sr-only">
+                        <TranslatedText es="Compartir" en="Share" />
+                      </span>
+                    </Button>
+                  </div>
+                  
+                  {/* Product description if available */}
+                  {mainProduct.description && (
+                    <div className="pt-4 border-t">
+                      <h3 className="text-lg font-medium mb-2">
+                        <TranslatedText es="Descripción" en="Description" />
+                      </h3>
+                      <p className="text-muted-foreground">
+                        {translateDescription(mainProduct.description)}
+                      </p>
                     </div>
                   )}
-                
-                  {/* MaxiPali product */}
-                  <MaxiPaliProductDisplay product={maxiPaliProduct} isLowestPrice={compareResult?.bestPrice?.store === "MaxiPali"} />
-                  
-                  {/* MasxMenos product */}
-                  <MasxMenosProductDisplay product={masxMenosProduct} isLowestPrice={compareResult?.bestPrice?.store === "MasxMenos"} />
-                  
-                  {/* Walmart product */}
-                  <WalmartProductDisplay product={walmartProduct} isLowestPrice={compareResult?.bestPrice?.store === "Walmart"} />
                 </div>
               </div>
-            </div>
-            
-            {/* Original PriceComparison Component for additional visualization */}
-            {getPriceComparisonData().length > 1 && (
-              <PriceComparison prices={getPriceComparisonData()} detailed compareStores={true} />
             )}
             
-            {/* Similar Products Section - Show matched products side by side */}
-            {matchedProducts.length > 1 && (
-              <div className="rounded-lg border overflow-hidden mt-8">
-                <div className="bg-muted p-3 border-b">
-                  <h3 className="font-medium text-lg flex items-center gap-2">
-                    <ShoppingBag className="w-4 h-4" />
-                    Similar Products
-                  </h3>
+            {/* Tabs for price comparison and alternatives */}
+            <Tabs defaultValue="comparison">
+              <TabsList className="w-full md:w-auto">
+                <TabsTrigger value="comparison">
+                  <Scale className="h-4 w-4 mr-2" />
+                  <TranslatedText es="Comparar Precios" en="Compare Prices" />
+                </TabsTrigger>
+                {matchedProducts.length > 0 && (
+                  <TabsTrigger value="alternatives">
+                    <ShoppingBag className="h-4 w-4 mr-2" />
+                    <TranslatedText es="Alternativas" en="Alternatives" />
+                    <span className="ml-2 text-xs rounded-full bg-secondary px-2 py-0.5">
+                      {matchedProducts.length}
+                    </span>
+                  </TabsTrigger>
+                )}
+              </TabsList>
+              
+              <TabsContent value="comparison" className="space-y-4 pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <MaxiPaliProductDisplay 
+                    product={maxiPaliProduct} 
+                    isLowestPrice={compareResult?.bestPrice?.store === 'MaxiPali' || false} 
+                  />
+                  <MasxMenosProductDisplay 
+                    product={masxMenosProduct} 
+                    isLowestPrice={compareResult?.bestPrice?.store === 'MasxMenos' || false} 
+                  />
+                  <WalmartProductDisplay 
+                    product={walmartProduct} 
+                    isLowestPrice={compareResult?.bestPrice?.store === 'Walmart' || false} 
+                  />
                 </div>
                 
-                <div className="p-4">
-                  <p className="text-sm text-muted-foreground mb-4">
-                    These products have been matched between stores based on similar names and attributes.
-                  </p>
-                  
+                {/* Show PriceComparison component if we have prices */}
+                {getPriceComparisonData().length > 0 && (
+                  <Card className="mt-8">
+                    <CardHeader>
+                      <CardTitle>
+                        <TranslatedText es="Historial de Precios" en="Price History" />
+                      </CardTitle>
+                      <CardDescription>
+                        <TranslatedText es="Comparación de precios entre tiendas" en="Price comparison between stores" />
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <PriceComparison prices={getPriceComparisonData()} />
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="alternatives" className="space-y-4 pt-4">
+                <h3 className="text-lg font-medium">
+                  <TranslatedText es="Productos Similares" en="Similar Products" />
+                </h3>
+                <div className="grid grid-cols-1 gap-4">
                   {matchedProducts.map((match, index) => (
-                    <div key={index} className="border rounded-lg p-4 mb-4">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* MaxiPali product */}
-                        <div className={cn(
-                          "p-4 rounded-lg border",
-                          match.maxiPali ? "border-yellow-200" : "border-dashed border-muted"
-                        )}>
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="w-6 h-6 rounded-full bg-yellow-500 flex items-center justify-center flex-shrink-0">
-                              <Store className="w-3 h-3 text-black" />
-                            </div>
-                            <h4 className="font-medium">MaxiPali</h4>
-                          </div>
-                          
-                          {match.maxiPali ? (
-                            <div className="space-y-2">
-                              <div className="flex gap-3">
+                    <Card key={index} className="overflow-hidden">
+                      <CardContent className="p-0">
+                        <div className="grid grid-cols-1 md:grid-cols-3">
+                          {/* Display details for each store in the match */}
+                          {match.maxiPali && (
+                            <div className="border-b md:border-b-0 md:border-r p-4">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-6 h-6 rounded-full bg-yellow-500 flex items-center justify-center flex-shrink-0">
+                                  <Store className="w-3 h-3 text-black" />
+                                </div>
+                                <h4 className="font-medium text-sm">MaxiPali</h4>
+                              </div>
+                              <div className="flex items-center gap-3">
                                 <div className="w-16 h-16 rounded bg-muted overflow-hidden flex-shrink-0">
                                   <img 
                                     src={match.maxiPali.imageUrl || 'https://placehold.co/400?text=No+Image'} 
-                                    alt={match.maxiPali.name} 
+                                    alt={translateTitle(match.maxiPali.name)}
                                     className="w-full h-full object-cover"
                                   />
                                 </div>
                                 <div>
-                                  <p className="font-medium line-clamp-2">{match.maxiPali.name}</p>
-                                  <p className="text-sm text-muted-foreground">{match.maxiPali.brand || 'Unknown brand'}</p>
-                                  <div className="font-semibold">
-                                    ₡{match.maxiPali.price.toLocaleString('es-CR')}
-                                  </div>
+                                  <p className="font-medium text-sm line-clamp-2">{translateTitle(match.maxiPali.name)}</p>
+                                  <p className="text-xs text-muted-foreground">{translateText(match.maxiPali.brand) || translateText('Marca desconocida')}</p>
+                                  <p className="font-bold mt-1">₡{match.maxiPali.price.toLocaleString('es-CR')}</p>
                                 </div>
                               </div>
-                              <div className="mt-2">
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  className="w-full text-xs"
-                                  onClick={() => handleAddMatchedProduct(match.maxiPali)}
-                                >
-                                  <Plus className="h-3 w-3 mr-1" /> Add to List
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="py-4 text-center">
-                              <p className="text-muted-foreground">
-                                Product not available at MaxiPali
-                              </p>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="mt-2 w-full"
+                                onClick={() => handleAddMatchedProduct(match.maxiPali!)}
+                              >
+                                <ShoppingCart className="w-3 h-3 mr-1" />
+                                <TranslatedText es="Añadir" en="Add" />
+                              </Button>
                             </div>
                           )}
-                        </div>
-                        
-                        {/* MasxMenos product */}
-                        <div className={cn(
-                          "p-4 rounded-lg border",
-                          match.masxMenos ? "border-green-200" : "border-dashed border-muted"
-                        )}>
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="w-6 h-6 rounded-full bg-green-600 flex items-center justify-center flex-shrink-0">
-                              <Store className="w-3 h-3 text-white" />
-                            </div>
-                            <h4 className="font-medium">MasxMenos</h4>
-                          </div>
                           
-                          {match.masxMenos ? (
-                            <div className="space-y-2">
-                              <div className="flex gap-3">
+                          {match.masxMenos && (
+                            <div className="border-b md:border-b-0 md:border-r p-4">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-6 h-6 rounded-full bg-green-600 flex items-center justify-center flex-shrink-0">
+                                  <Store className="w-3 h-3 text-white" />
+                                </div>
+                                <h4 className="font-medium text-sm">MasxMenos</h4>
+                              </div>
+                              <div className="flex items-center gap-3">
                                 <div className="w-16 h-16 rounded bg-muted overflow-hidden flex-shrink-0">
                                   <img 
                                     src={match.masxMenos.imageUrl || 'https://placehold.co/400?text=No+Image'} 
-                                    alt={match.masxMenos.name} 
+                                    alt={translateTitle(match.masxMenos.name)}
                                     className="w-full h-full object-cover"
                                   />
                                 </div>
                                 <div>
-                                  <p className="font-medium line-clamp-2">{match.masxMenos.name}</p>
-                                  <p className="text-sm text-muted-foreground">{match.masxMenos.brand || 'Unknown brand'}</p>
-                                  <div className="font-semibold">
-                                    ₡{match.masxMenos.price.toLocaleString('es-CR')}
-                                  </div>
+                                  <p className="font-medium text-sm line-clamp-2">{translateTitle(match.masxMenos.name)}</p>
+                                  <p className="text-xs text-muted-foreground">{translateText(match.masxMenos.brand) || translateText('Marca desconocida')}</p>
+                                  <p className="font-bold mt-1">₡{match.masxMenos.price.toLocaleString('es-CR')}</p>
                                 </div>
                               </div>
-                              <div className="mt-2">
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  className="w-full text-xs"
-                                  onClick={() => handleAddMatchedProduct(match.masxMenos)}
-                                >
-                                  <Plus className="h-3 w-3 mr-1" /> Add to List
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="py-4 text-center">
-                              <p className="text-muted-foreground">
-                                Product not available at MasxMenos
-                              </p>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="mt-2 w-full"
+                                onClick={() => handleAddMatchedProduct(match.masxMenos!)}
+                              >
+                                <ShoppingCart className="w-3 h-3 mr-1" />
+                                <TranslatedText es="Añadir" en="Add" />
+                              </Button>
                             </div>
                           )}
-                        </div>
-                        
-                        {/* Walmart product */}
-                        <div className={cn(
-                          "p-4 rounded-lg border",
-                          match.walmart ? "border-blue-200" : "border-dashed border-muted"
-                        )}>
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
-                              <Store className="w-3 h-3 text-white" />
-                            </div>
-                            <h4 className="font-medium">Walmart</h4>
-                          </div>
                           
-                          {match.walmart ? (
-                            <div className="space-y-2">
-                              <div className="flex gap-3">
+                          {match.walmart && (
+                            <div className="p-4">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
+                                  <Store className="w-3 h-3 text-white" />
+                                </div>
+                                <h4 className="font-medium text-sm">Walmart</h4>
+                              </div>
+                              <div className="flex items-center gap-3">
                                 <div className="w-16 h-16 rounded bg-muted overflow-hidden flex-shrink-0">
                                   <img 
                                     src={match.walmart.imageUrl || 'https://placehold.co/400?text=No+Image'} 
-                                    alt={match.walmart.name} 
+                                    alt={translateTitle(match.walmart.name)}
                                     className="w-full h-full object-cover"
                                   />
                                 </div>
                                 <div>
-                                  <p className="font-medium line-clamp-2">{match.walmart.name}</p>
-                                  <p className="text-sm text-muted-foreground">{match.walmart.brand || 'Unknown brand'}</p>
-                                  <div className="font-semibold">
-                                    ₡{match.walmart.price.toLocaleString('es-CR')}
-                                  </div>
+                                  <p className="font-medium text-sm line-clamp-2">{translateTitle(match.walmart.name)}</p>
+                                  <p className="text-xs text-muted-foreground">{translateText(match.walmart.brand) || translateText('Marca desconocida')}</p>
+                                  <p className="font-bold mt-1">₡{match.walmart.price.toLocaleString('es-CR')}</p>
                                 </div>
                               </div>
-                              <div className="mt-2">
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  className="w-full text-xs"
-                                  onClick={() => handleAddMatchedProduct(match.walmart)}
-                                >
-                                  <Plus className="h-3 w-3 mr-1" /> Add to List
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="py-4 text-center">
-                              <p className="text-muted-foreground">
-                                Product not available at Walmart
-                              </p>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="mt-2 w-full"
+                                onClick={() => handleAddMatchedProduct(match.walmart!)}
+                              >
+                                <ShoppingCart className="w-3 h-3 mr-1" />
+                                <TranslatedText es="Añadir" en="Add" />
+                              </Button>
                             </div>
                           )}
                         </div>
-                      </div>
-                      
-                      {/* Price comparison and savings */}
-                      {(match.maxiPali && match.masxMenos) || (match.maxiPali && match.walmart) || (match.masxMenos && match.walmart) ? (
-                        <div className="mt-3 pt-3 border-t">
-                          {/* MaxiPali vs MasxMenos */}
-                          {match.maxiPali && match.masxMenos && match.maxiPali.price !== match.masxMenos.price && (
-                            <div className="flex items-center justify-between text-sm mb-2">
-                              <span className="text-muted-foreground">MaxiPali vs MasxMenos:</span>
-                              <Badge 
-                                variant={match.maxiPali.price < match.masxMenos.price ? "secondary" : "default"}
-                                className={cn(
-                                  "font-normal",
-                                  match.maxiPali.price < match.masxMenos.price 
-                                    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" 
-                                    : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                                )}
-                              >
-                                {match.maxiPali.price < match.masxMenos.price ? 'MaxiPali cheaper by' : 'MasxMenos cheaper by'} 
-                                {' '}₡{Math.abs(match.maxiPali.price - match.masxMenos.price).toLocaleString('es-CR')}
-                                {' '}({Math.round((Math.abs(match.maxiPali.price - match.masxMenos.price) / Math.max(match.maxiPali.price, match.masxMenos.price)) * 100)}%)
-                              </Badge>
-                            </div>
-                          )}
-                          
-                          {/* MaxiPali vs Walmart */}
-                          {match.maxiPali && match.walmart && match.maxiPali.price !== match.walmart.price && (
-                            <div className="flex items-center justify-between text-sm mb-2">
-                              <span className="text-muted-foreground">MaxiPali vs Walmart:</span>
-                              <Badge 
-                                variant={match.maxiPali.price < match.walmart.price ? "secondary" : "default"}
-                                className={cn(
-                                  "font-normal",
-                                  match.maxiPali.price < match.walmart.price 
-                                    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" 
-                                    : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-                                )}
-                              >
-                                {match.maxiPali.price < match.walmart.price ? 'MaxiPali cheaper by' : 'Walmart cheaper by'} 
-                                {' '}₡{Math.abs(match.maxiPali.price - match.walmart.price).toLocaleString('es-CR')}
-                                {' '}({Math.round((Math.abs(match.maxiPali.price - match.walmart.price) / Math.max(match.maxiPali.price, match.walmart.price)) * 100)}%)
-                              </Badge>
-                            </div>
-                          )}
-                          
-                          {/* MasxMenos vs Walmart */}
-                          {match.masxMenos && match.walmart && match.masxMenos.price !== match.walmart.price && (
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground">MasxMenos vs Walmart:</span>
-                              <Badge 
-                                variant={match.masxMenos.price < match.walmart.price ? "secondary" : "default"}
-                                className={cn(
-                                  "font-normal",
-                                  match.masxMenos.price < match.walmart.price 
-                                    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" 
-                                    : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-                                )}
-                              >
-                                {match.masxMenos.price < match.walmart.price ? 'MasxMenos cheaper by' : 'Walmart cheaper by'} 
-                                {' '}₡{Math.abs(match.masxMenos.price - match.walmart.price).toLocaleString('es-CR')}
-                                {' '}({Math.round((Math.abs(match.masxMenos.price - match.walmart.price) / Math.max(match.masxMenos.price, match.walmart.price)) * 100)}%)
-                              </Badge>
-                            </div>
-                          )}
-                        </div>
-                      ) : null}
-                    </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
-              </div>
-            )}
-            
-            {/* Store Links Section */}
-            <div className="pt-4">
-              <h3 className="text-lg font-medium mb-3">Visit Store</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {getPriceComparisonData().map((price) => {
-                  const storeId = price.storeId;
-                  const store = stores.find(s => s.id === storeId);
-                  if (!store) return null;
-                  
-                  // Check if this is the best price store
-                  const isLowestPrice = compareResult?.bestPrice?.store.toLowerCase() === storeId.toLowerCase();
-                  
-                  return (
-                    <a 
-                      key={storeId}
-                      href={store.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 p-3 rounded-lg glass-card glass-hover"
-                      style={{ borderLeft: `3px solid ${store.color}` }}
-                    >
-                      <div 
-                        className="w-8 h-8 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: store.color }}
-                      >
-                        <Store className="w-4 h-4 text-white" />
-                      </div>
-                      <div className="flex flex-col">
-                      <span className="font-medium">{store.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {price.currency}{price.price.toLocaleString('es-CR', {minimumFractionDigits: 0})}
-                          {isLowestPrice && (
-                            <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0 h-4 bg-green-50 text-green-700 border-green-100">
-                              Best Price
-                            </Badge>
-                          )}
-                        </span>
-                      </div>
-                    </a>
-                  );
-                })}
-              </div>
-            </div>
+              </TabsContent>
+            </Tabs>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

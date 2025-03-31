@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import React from "react";
 
 export const Navbar = () => {
   const { user, signOut } = useAuth();
@@ -31,6 +32,7 @@ export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { translateText, isTranslated } = useTranslation();
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   // Track scroll position to add backdrop when scrolled
   useEffect(() => {
@@ -40,6 +42,20 @@ export const Navbar = () => {
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Handle click outside of dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        document.getElementById('profile-dropdown')?.classList.add('hidden');
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   // Toggle the menu
@@ -108,6 +124,60 @@ export const Navbar = () => {
 
   const isActive = (path: string) => location.pathname === path;
 
+  // Toggle dropdown visibility
+  const toggleDropdown = () => {
+    const dropdown = document.getElementById('profile-dropdown');
+    dropdown?.classList.toggle('hidden');
+    
+    // If we just showed the dropdown, focus the first link
+    if (!dropdown?.classList.contains('hidden')) {
+      const firstLink = dropdown?.querySelector('a, button') as HTMLElement;
+      firstLink?.focus();
+    }
+  };
+  
+  // Handle keyboard navigation
+  const handleDropdownKeyDown = (e: React.KeyboardEvent) => {
+    const dropdown = document.getElementById('profile-dropdown');
+    
+    if (e.key === 'Escape') {
+      dropdown?.classList.add('hidden');
+      return;
+    }
+    
+    if (!dropdown?.classList.contains('hidden')) {
+      const focusableElements = dropdown?.querySelectorAll('a, button') as NodeListOf<HTMLElement>;
+      
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const focused = document.activeElement;
+        let nextIndex = 0;
+        
+        focusableElements.forEach((el, i) => {
+          if (el === focused && i < focusableElements.length - 1) {
+            nextIndex = i + 1;
+          }
+        });
+        
+        focusableElements[nextIndex]?.focus();
+      }
+      
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const focused = document.activeElement;
+        let prevIndex = focusableElements.length - 1;
+        
+        focusableElements.forEach((el, i) => {
+          if (el === focused && i > 0) {
+            prevIndex = i - 1;
+          }
+        });
+        
+        focusableElements[prevIndex]?.focus();
+      }
+    }
+  };
+
   return (
     <header 
       className={cn(
@@ -148,42 +218,68 @@ export const Navbar = () => {
           </Link>
           
           {user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="rounded-full h-9 gap-2">
-                  <Avatar className="h-6 w-6">
-                    <AvatarImage src={user.user_metadata?.avatar_url || user.user_metadata?.picture} />
-                    <AvatarFallback>{getUserInitials()}</AvatarFallback>
-                  </Avatar>
-                  <span className="hidden sm:inline">
-                    {user.user_metadata?.full_name || user.user_metadata?.name || user.email}
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" sideOffset={8} className="z-[60] w-56 dropdown-menu-container" avoidCollisions={true} collisionPadding={20}>
-                <DropdownMenuLabel>
+            <div className="relative" ref={dropdownRef}>
+              <Button 
+                variant="ghost" 
+                className="rounded-full h-9 gap-2 cursor-pointer hover:bg-accent active:bg-accent/80"
+                onClick={toggleDropdown}
+                onKeyDown={(e) => e.key === 'Enter' && toggleDropdown()}
+                aria-label="Open profile menu"
+                aria-haspopup="true"
+                aria-expanded={!document.getElementById('profile-dropdown')?.classList.contains('hidden')}
+                type="button"
+              >
+                <Avatar className="h-6 w-6">
+                  <AvatarImage src={user.user_metadata?.avatar_url || user.user_metadata?.picture} />
+                  <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                </Avatar>
+                <span className="hidden sm:inline">
+                  {user.user_metadata?.full_name || user.user_metadata?.name || user.email}
+                </span>
+              </Button>
+              
+              <div 
+                id="profile-dropdown" 
+                className="hidden absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-popover border border-border p-1 z-[999]"
+                onKeyDown={handleDropdownKeyDown}
+                role="menu"
+              >
+                <div className="px-2 py-1.5 text-sm font-semibold">
                   {isTranslated ? "My Account" : translateText("Mi Cuenta")}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link to="/profile" className="w-full cursor-pointer">
-                    <User className="w-4 h-4 mr-2" />
-                    {isTranslated ? "Profile" : translateText("Perfil")}
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/settings" className="w-full cursor-pointer">
-                    <Settings className="w-4 h-4 mr-2" />
-                    {isTranslated ? "Settings" : translateText("Ajustes")}
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut} className="text-red-500 focus:text-red-500 cursor-pointer">
+                </div>
+                <div className="-mx-1 my-1 h-px bg-muted"></div>
+                <Link 
+                  to="/profile" 
+                  className="flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent cursor-pointer"
+                  onClick={toggleDropdown}
+                  role="menuitem"
+                >
+                  <User className="w-4 h-4 mr-2" />
+                  {isTranslated ? "Profile" : translateText("Perfil")}
+                </Link>
+                <Link 
+                  to="/settings" 
+                  className="flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent cursor-pointer"
+                  onClick={toggleDropdown}
+                  role="menuitem"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  {isTranslated ? "Settings" : translateText("Ajustes")}
+                </Link>
+                <div className="-mx-1 my-1 h-px bg-muted"></div>
+                <button
+                  onClick={() => {
+                    toggleDropdown();
+                    handleSignOut();
+                  }}
+                  className="flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent cursor-pointer text-red-500 w-full text-left"
+                  role="menuitem"
+                >
                   <LogOut className="w-4 h-4 mr-2" />
                   {isTranslated ? "Sign Out" : translateText("Cerrar Sesión")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </button>
+              </div>
+            </div>
           ) : (
             <Link to="/login">
               <Button variant="outline" className="rounded-full h-9">

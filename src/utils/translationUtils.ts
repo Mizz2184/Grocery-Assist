@@ -144,12 +144,47 @@ export function translateToEnglish(text: string): string {
     return commonTranslations[text];
   }
   
-  // Handle compound terms by translating each word
-  const words = text.split(/\s+/);
+  // Check if we have a manual override translation
+  if (manualTranslations[text]) {
+    return manualTranslations[text];
+  }
+  
+  // Check for common patterns like product titles that follow specific formats
+  // Example: "Arroz Tío Pelón 1kg" -> "Uncle Baldy Rice 1kg"
+  const productMatch = text.match(/^(\w+)\s+(.+?)(?:\s+(\d+\s*[kgl][gl]?|unidad))?$/i);
+  if (productMatch) {
+    const [_, productType, brand, size] = productMatch;
+    const translatedType = commonTranslations[productType] || productType;
+    const translatedBrand = commonTranslations[brand] || brand;
+    return `${translatedBrand} ${translatedType}${size ? ' ' + size : ''}`;
+  }
+  
+  // Handle compound terms by translating each word and phrase
+  let translatedText = text;
+  
+  // First try to match and translate common phrases
+  Object.keys(commonTranslations).forEach(phrase => {
+    if (phrase.includes(' ') && text.includes(phrase)) {
+      translatedText = translatedText.replace(
+        new RegExp(phrase, 'gi'), 
+        commonTranslations[phrase]
+      );
+    }
+  });
+  
+  // Then translate individual words
+  const words = translatedText.split(/\s+/);
   if (words.length > 1) {
     const translatedWords = words.map(word => {
-      // Try to translate individual word
-      return commonTranslations[word] || word;
+      // Remove punctuation for lookup
+      const cleanWord = word.replace(/[.,;!?()]/g, '');
+      const translation = commonTranslations[cleanWord] || commonTranslations[cleanWord.toLowerCase()];
+      
+      // If we found a translation, replace just the word part, keeping punctuation
+      if (translation) {
+        return word.replace(cleanWord, translation);
+      }
+      return word;
     });
     
     return translatedWords.join(' ');
@@ -202,7 +237,7 @@ export function createTranslationState() {
 export const translationState = createTranslationState();
 
 // Object for specific translations that don't work well with automatic translation
-const manualTranslations: Record<string, string> = {
+export const manualTranslations: Record<string, string> = {
   "Comparar Precios": "Compare Prices",
   "Lista de Mercado": "Grocery List",
   "Configuración": "Settings",
@@ -223,5 +258,20 @@ const manualTranslations: Record<string, string> = {
   "Inglés": "English",
   "Asistente de Compras": "Fam-Assist",
   "Buscar productos...": "Search products...",
-  // ... existing code ...
+  
+  // Product descriptions and additional content
+  "Producto fresco": "Fresh product",
+  "Producto congelado": "Frozen product",
+  "Producto importado": "Imported product",
+  "Oferta especial": "Special offer",
+  "Descuento": "Discount",
+  "Nuevo": "New",
+  "Sin gluten": "Gluten free",
+  "Orgánico": "Organic",
+  "Sin azúcar añadido": "No added sugar",
+  "Bajo en sodio": "Low sodium",
+  "Bajo en grasa": "Low fat",
+  "Alto en proteína": "High protein",
+  "Vegano": "Vegan",
+  "Vegetariano": "Vegetarian"
 }; 

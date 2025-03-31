@@ -6,7 +6,17 @@ import { cn } from "@/lib/utils"
 
 const DropdownMenu = DropdownMenuPrimitive.Root
 
-const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
+const DropdownMenuTrigger = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Trigger>
+>((props, ref) => (
+  <DropdownMenuPrimitive.Trigger
+    ref={ref}
+    className={cn("cursor-pointer outline-none", props.className)}
+    {...props}
+  />
+))
+DropdownMenuTrigger.displayName = DropdownMenuPrimitive.Trigger.displayName
 
 const DropdownMenuGroup = DropdownMenuPrimitive.Group
 
@@ -58,7 +68,6 @@ const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
 >(({ className, sideOffset = 4, ...props }, ref) => {
-  const [isOpen, setIsOpen] = React.useState(true);
   const touchStartY = React.useRef<number | null>(null);
   const contentRef = React.useRef<HTMLDivElement>(null);
   
@@ -100,8 +109,6 @@ const DropdownMenuContent = React.forwardRef<
       
       // If swiping more than threshold, close the dropdown
       if (translateY > 75) {
-        setIsOpen(false);
-        
         // Find the closest dropdown root and close it
         const event = new KeyboardEvent('keydown', {
           key: 'Escape',

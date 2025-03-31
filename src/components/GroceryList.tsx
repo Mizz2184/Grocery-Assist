@@ -156,10 +156,26 @@ export const GroceryList = () => {
   // Add this function to group items by store
   const groupItemsByStore = (items: any[]) => {
     return items.reduce((groups: any, item: any) => {
-      const store = item.productData?.store || 'Unknown';
+      const productData = item.productData || {};
+      let store = productData.store || 'Unknown';
+      
+      // Normalize store names
+      if (typeof store === 'string') {
+        store = store.trim();
+        if (store.includes('MaxiPali') || store.toLowerCase() === 'maxipali') {
+          store = 'MaxiPali';
+        } else if (store.includes('MasxMenos') || store.toLowerCase() === 'masxmenos') {
+          store = 'MasxMenos';
+        } else if (store.includes('Walmart') || store.toLowerCase() === 'walmart') {
+          store = 'Walmart';
+        }
+      }
+      
+      // Initialize the store group if it doesn't exist
       if (!groups[store]) {
         groups[store] = [];
       }
+      
       groups[store].push(item);
       return groups;
     }, {});

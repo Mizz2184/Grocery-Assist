@@ -276,96 +276,72 @@ export const addProductToGroceryList = async (
   quantity: number = 1
 ): Promise<{ success: boolean; message?: string; list?: GroceryList }> => {
   try {
-    console.log(`Adding product to list: listId=${listId}, userId=${userId}, productId=${product.id}`);
-    console.log('Product store information:', {
-      id: product.id,
-      store: product.store, 
-      name: product.name
-    });
-    
-    // Create product data that matches expected structure
-    const productData = {
-      id: product.id,
-      name: product.name,
-      brand: product.brand || 'Unknown',
-      imageUrl: product.imageUrl || '',
-      barcode: product.barcode || product.ean || '',
-      category: product.category || 'Other',
-      price: product.price,
-      store: product.store, // Preserve original store value exactly as is
-      // Adding required fields mentioned in error
-      image: product.imageUrl || '',
-      prices: [{
-        storeId: (product.store?.toLowerCase() || 'unknown'),
-        price: product.price,
-        currency: '₡',
-        date: new Date().toISOString()
-      }]
-    };
-    
-    console.log('Product data being stored:', {
-      id: productData.id,
-      store: productData.store,
-      pricesStoreId: productData.prices[0].storeId
-    });
-
-    let databaseSuccess = false;
-    let errorMessage = '';
-
-    // Check if item already exists in grocery_items - using listId and productId only
-    try {
-      const { data: existingItems, error: existingItemsError } = await supabase
-        .from('grocery_items')
-        .select('id, quantity')
-        .eq('list_id', listId)
-        .eq('product_id', product.id);
-
-      if (existingItemsError) {
-        console.error('Error checking for existing items:', existingItemsError);
-        errorMessage = 'Error accessing your grocery list';
-      } else if (existingItems && existingItems.length > 0) {
-        // Update quantity if item exists
-        const existingItem = existingItems[0];
-        const { error: updateError } = await supabase
-          .from('grocery_items')
-          .update({ quantity: existingItem.quantity + quantity })
-          .eq('id', existingItem.id);
-
-        if (updateError) {
-          console.error('Error updating item quantity in Supabase:', updateError);
-          errorMessage = 'Error updating item quantity';
-        } else {
-          databaseSuccess = true;
-        }
-      } else {
-        // Insert new item, strictly following the database schema
-        const newItemId = uuidv4(); // Generate a UUID for the id field
-        console.log('Generated new item ID:', newItemId);
-        
-        const { error: insertError } = await supabase
-          .from('grocery_items')
-          .insert({
-            id: newItemId, // Required UUID primary key
-            list_id: listId,
-            product_id: product.id,
-            quantity: quantity,
-            checked: false,
-            added_by: userId, // Not user_id (from SQL schema)
-            added_at: new Date().toISOString(), // Not created_at (from SQL schema)
-            product_data: productData // JSONB field in the database
-          });
-
-        if (insertError) {
-          console.error('Error inserting item into Supabase:', insertError);
-          errorMessage = `Database error: ${insertError.message || 'Unknown error'}`;
-        } else {
-          console.log('Successfully inserted item with ID:', newItemId);
-          databaseSuccess = true;
-        }
+    // Ensure product has store information properly set
+    if (product.store) {
+      // Normalize store property for consistency
+      const storeName = product.store.trim();
+      
+      // Ensure Walmart is properly categorized
+      if (storeName.includes('Walmart') || storeName.toLowerCase().includes('walmart')) {
+        product.store = 'Walmart';
+      } else if (storeName.includes('MaxiPali') || storeName.toLowerCase().includes('maxipali')) {
+        product.store = 'MaxiPali';
+      } else if (storeName.includes('MasxMenos') || storeName.toLowerCase().includes('masxmenos')) {
+        product.store = 'MasxMenos';
       }
-    } catch (dbError: any) {
-      console.error('Database operation error:', dbError);
-      errorMessage = `Database error: ${dbError.message || 'Unknown error'}`;
+    } else {
+      // If store is missing, try to detect from product ID or name
+      if (product.id && (
+          product.id.includes('walmart') || 
+          (product.name && product.name.toLowerCase().includes('walmart')))) {
+        product.store = 'Walmart';
+      }
+    }
+    
+    // Check if the user already has this product in any list
+    const lists = await getUserGroceryLists(userId);
+    const targetList = lists.find(list => list.id === listId);
+    
+    if (!targetList) {
+      return { success: false, message: 'Grocery list not found' };
+    }
+    
+    // Try to insert into Supabase first
+    const itemId = uuidv4();
+    
+    // Make sure product_data has correct store information
+    const productData = { ...product };
+    
+    // Ensure store property is always set correctly
+    if (!productData.store) {
+      // Try to detect store from product_id or name
+      const productId = product.id.toLowerCase();
+      if (productId.includes('walmart') || (product.name && product.name.toLowerCase().includes('walmart'))) {
+        productData.store = 'Walmart';
+      } else if (productId.includes('maxipali') || (product.name && product.name.toLowerCase().includes('maxipali'))) {
+        productData.store = 'MaxiPali';
+      } else if (productId.includes('masxmenos') || (product.name && product.name.toLowerCase().includes('masxmenos'))) {
+        productData.store = 'MasxMenos';
+      } else {
+        productData.store = 'Unknown';
+      }
+    }
+    
+    const { error: insertError } = await supabase
+      .from('grocery_items')
+      .insert({
+        id: itemId,
+        list_id: listId,
+        product_id: product.id,
+        quantity: quantity,
+        added_by: userId,
+        added_at: new Date().toISOString(),
+        checked: false,
+        product_data: productData
+      });
+
+    if (insertError) {
+      return { success: false, message: `Database error: ${insertError.message || 'Unknown error'}` };
     }
 
     // Always update localStorage for immediate UI updates and fallback
@@ -374,8 +350,9 @@ export const addProductToGroceryList = async (
     
     if (listIndex === -1) {
       return { 
-        success: databaseSuccess, 
-        message: databaseSuccess ? 'Added to list' : 'Grocery list not found'
+        success: true, 
+        message: 'Added to list (local only)',
+        list: targetList
       };
     }
     
@@ -404,8 +381,8 @@ export const addProductToGroceryList = async (
     
     return { 
       success: true,
-      message: databaseSuccess ? 'Added to list' : 'Added to list (local only)',
-      list 
+      message: 'Added to list',
+      list: targetList
     };
   } catch (error: any) {
     console.error('Error adding product to list:', error);
@@ -680,7 +657,7 @@ export const addCollaborator = async (userId: string, listId: string, collaborat
     try {
       const { data: listData, error: listError } = await supabase
         .from('grocery_lists')
-        .select('id, created_by, collaborators')
+        .select('id, created_by, name, collaborators')
         .eq('id', listId)
         .single();
       
@@ -712,11 +689,29 @@ export const addCollaborator = async (userId: string, listId: string, collaborat
         return true;
       }
       
+      // Step 4: Try to find the user by email to ensure they exist
+      // Even if we don't find them, we'll still add the email to the collaborators array
+      // but this will help us know if we need to send an invitation
+      let collaboratorExists = false;
+      try {
+        const { data: users, error: usersError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', normalizedEmail)
+          .limit(1);
+          
+        collaboratorExists = !usersError && users && users.length > 0;
+        console.log(`User with email ${normalizedEmail} exists: ${collaboratorExists}`);
+      } catch (userError) {
+        console.error('Error checking if user exists:', userError);
+        // Continue anyway, we'll still add the email
+      }
+      
       // Add the new collaborator
       collaborators.push(normalizedEmail);
       console.log('New collaborators array:', collaborators);
       
-      // Step 4: Update the list with the new collaborators
+      // Step 5: Update the list with the new collaborators
       const { error: updateError } = await supabase
         .from('grocery_lists')
         .update({ collaborators })
@@ -725,6 +720,44 @@ export const addCollaborator = async (userId: string, listId: string, collaborat
       if (updateError) {
         console.error('Error updating collaborators:', updateError);
         return handleCollaboratorWithLocalStorage(listId, normalizedEmail);
+      }
+      
+      // Step 6: Create a notification for the new collaborator
+      try {
+        // Get current user's profile to include in notification
+        const { data: { user } } = await supabase.auth.getUser();
+        const senderName = user?.user_metadata?.full_name || user?.email || 'Someone';
+        
+        // Create notification in the database
+        await supabase
+          .from('notifications')
+          .insert({
+            user_email: normalizedEmail,
+            type: 'share_invitation',
+            content: `${senderName} shared a grocery list with you: "${listData.name}"`,
+            metadata: {
+              listId: listId,
+              listName: listData.name,
+              senderId: userId,
+              senderName: senderName
+            },
+            is_read: false,
+            created_at: new Date().toISOString()
+          });
+          
+        console.log('Created notification for collaborator');
+      } catch (notificationError) {
+        console.error('Error creating notification:', notificationError);
+        // Continue anyway, the collaborator was already added
+      }
+      
+      // Step 7: Try to send an invitation email
+      try {
+        await sendCollaboratorInvite(userId, listId, listData.name, normalizedEmail);
+        console.log('Sent invitation email');
+      } catch (emailError) {
+        console.error('Error sending invitation email:', emailError);
+        // Continue anyway, the collaborator was already added
       }
       
       // Update localStorage for immediate UI updates
@@ -912,17 +945,71 @@ export const sendCollaboratorInvite = async (
   collaboratorEmail: string
 ): Promise<boolean> => {
   try {
-    // This would typically connect to a server-side function
-    // For now, we'll just log the attempt and return success
-    console.log(`[INVITE EMAIL] Would send email to ${collaboratorEmail} for list ${listName} (${listId})`);
+    // Log the attempt
+    console.log(`Sending invitation email to ${collaboratorEmail} for list ${listName} (${listId})`);
     
-    // In a real implementation, you would call a server function:
-    // const { error } = await supabase.functions.invoke('send-collaborator-invite', {
-    //   body: { userId, listId, listName, collaboratorEmail }
-    // });
+    // First, create a sharing link
+    const shareUrl = `${window.location.origin}/shared-list/${listId}`;
     
-    // For now, we'll return true to indicate success
-    return true;
+    // Try to send email using Supabase Edge Functions if in production
+    if (import.meta.env.PROD) {
+      try {
+        const { error } = await supabase.functions.invoke('send-collaborator-invite', {
+          body: { 
+            userId, 
+            listId, 
+            listName, 
+            collaboratorEmail,
+            shareUrl
+          }
+        });
+        
+        if (error) {
+          console.error('Error invoking Edge Function:', error);
+          throw new Error('Failed to send email via Edge Function');
+        }
+        
+        return true;
+      } catch (edgeFunctionError) {
+        console.error('Edge Function error:', edgeFunctionError);
+        // Continue to fallback method
+      }
+    }
+    
+    // Fallback: Store the invitation in the database
+    try {
+      // Get current user's details
+      const { data: { user } } = await supabase.auth.getUser();
+      const senderName = user?.user_metadata?.full_name || user?.email || 'Someone';
+      
+      // Store invitation in database
+      const { error: insertError } = await supabase
+        .from('invitations')
+        .insert({
+          sender_id: userId,
+          sender_name: senderName,
+          recipient_email: collaboratorEmail,
+          list_id: listId,
+          list_name: listName,
+          share_url: shareUrl,
+          created_at: new Date().toISOString(),
+          status: 'pending'
+        });
+        
+      if (insertError) {
+        console.error('Error storing invitation:', insertError);
+        throw new Error('Failed to store invitation');
+      }
+      
+      console.log('Stored invitation in database');
+      return true;
+    } catch (dbError) {
+      console.error('Database error:', dbError);
+    }
+    
+    // As a last resort, display a message that user can manually share
+    console.log(`Unable to send invitation. Share this URL manually: ${shareUrl}`);
+    return false;
   } catch (error) {
     console.error('Error sending invite email:', error);
     return false;

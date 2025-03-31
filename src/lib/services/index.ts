@@ -1,5 +1,6 @@
 import { Product, ProductSearchParams, ProductSearchResponse } from "@/lib/types/store";
 import { getSearchTranslations } from "@/utils/translations";
+import axios from "axios";
 
 export const searchMaxiPaliProducts = async ({ 
   query, 
@@ -173,16 +174,22 @@ export const searchMasxMenosProducts = async ({
   }
 };
 
-export const searchWalmartProducts = async ({ 
-  query, 
-  page = 1,
-  pageSize = 49
-}: ProductSearchParams): Promise<ProductSearchResponse> => {
+// Define interface for Walmart API response
+interface WalmartSearchResponse {
+  products: Array<Partial<Product> & { store?: string }>;
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+export const searchWalmartProducts = async ({ query, page = 1, pageSize = 30 }: ProductSearchParams): Promise<ProductSearchResponse> => {
   try {
-    console.log('Searching Walmart for:', query);
+    console.log(`Searching Walmart products with query "${query}"`);
     
-    // If no query is provided, return empty results
+    // Make sure we have a valid query
     if (!query || query.trim() === '') {
+      console.log('Empty query provided to searchWalmartProducts, returning empty results');
       return {
         products: [],
         total: 0,
@@ -192,57 +199,77 @@ export const searchWalmartProducts = async ({
       };
     }
     
-    // Get all possible translations for the search query
-    const searchTerms = getSearchTranslations(query);
-    console.log('Search terms with translations:', searchTerms);
-    
-    // Note: This is a mock implementation until a real Walmart API can be integrated
-    // Generate mock products based on the search query
-    const mockProducts: Product[] = [
-      {
-        id: `walmart-${query.replace(/\s/g, '-')}-1`,
-        name: `${query} Product 1`,
-        price: Math.floor(Math.random() * 10000) / 100,
-        description: `A great ${query} product from Walmart`,
-        imageUrl: "https://placehold.co/400x400?text=Walmart",
-        brand: "Great Value",
-        category: "Grocery",
-        store: 'Walmart',
-        inStock: true
-      },
-      {
-        id: `walmart-${query.replace(/\s/g, '-')}-2`,
-        name: `${query} Product 2`,
-        price: Math.floor(Math.random() * 10000) / 100,
-        description: `Another ${query} product from Walmart`,
-        imageUrl: "https://placehold.co/400x400?text=Walmart",
-        brand: "Equate",
-        category: "Grocery",
-        store: 'Walmart',
-        inStock: true
-      },
-      {
-        id: `walmart-${query.replace(/\s/g, '-')}-3`,
-        name: `Premium ${query}`,
-        price: Math.floor(Math.random() * 15000) / 100,
-        description: `Premium ${query} product from Walmart`,
-        imageUrl: "https://placehold.co/400x400?text=Walmart",
-        brand: "Sam's Choice",
-        category: "Grocery",
-        store: 'Walmart',
-        inStock: true
+    console.log(`Sending request to Walmart API endpoint with query: "${query}"`);
+    const response = await axios.post<WalmartSearchResponse>('/api/proxy/walmart/search', {
+      query,
+      page,
+      pageSize
+    });
+
+    console.log('Walmart API response:', {
+      status: response.status,
+      hasData: !!response.data,
+      hasProducts: !!(response.data && response.data.products),
+      productCount: response.data?.products?.length || 0
+    });
+
+    // Ensure we have valid product data
+    if (!response.data?.products || !Array.isArray(response.data.products)) {
+      console.error('Invalid response from Walmart API:', response.data);
+      // Return empty results instead of throwing, to prevent blocking other stores
+      return {
+        products: [],
+        total: 0,
+        page,
+        pageSize,
+        hasMore: false
+      };
+    }
+
+    // Check if the products have all required fields and add proper store
+    const validProducts = response.data.products.map(product => {
+      if (!product.store) {
+        console.warn('Walmart product missing store field, adding it');
+        product.store = 'Walmart';
       }
-    ];
+      
+      // Debug log for each product
+      console.log(`Processing Walmart product: id=${product.id}, name=${product.name}, price=${product.price}`);
+      
+      // Fix any other missing fields
+      return {
+        ...product,
+        store: 'Walmart', // Ensure this is always set
+        id: product.id || `walmart-api-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        name: product.name || 'Unknown Walmart Product',
+        price: product.price || 0,
+        imageUrl: product.imageUrl || ''
+      } as Product;
+    });
+
+    console.log(`Processed ${validProducts.length} valid Walmart products`);
     
+    // Filter out any products with zero or invalid prices
+    const filteredProducts = validProducts.filter(p => p.price > 0);
+    console.log(`Filtered to ${filteredProducts.length} Walmart products with valid prices`);
+    
+    // Log the final products we're returning
+    if (filteredProducts.length > 0) {
+      console.log('First Walmart product being returned:', JSON.stringify(filteredProducts[0]));
+    } else {
+      console.warn('No Walmart products to return after filtering');
+    }
+
     return {
-      products: mockProducts,
-      total: mockProducts.length,
+      products: filteredProducts,
+      total: filteredProducts.length,
       page,
       pageSize,
-      hasMore: false
+      hasMore: filteredProducts.length >= pageSize
     };
   } catch (error) {
-    console.error('Error fetching Walmart products:', error);
+    console.error('Error searching Walmart products:', error);
+    // Return empty results instead of throwing, to prevent blocking other stores
     return {
       products: [],
       total: 0,

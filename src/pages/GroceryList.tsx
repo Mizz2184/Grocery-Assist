@@ -65,21 +65,20 @@ const getProductStore = (product: any): string => {
   // Use type assertion to avoid TypeScript errors
   const anyProduct = product as any;
   
-  console.log('Getting store for product:', anyProduct.id, anyProduct);
-  
   // Direct store property
   if (anyProduct.store) {
     // Normalize store names
     const storeName = String(anyProduct.store).trim();
-    console.log('Store from product.store:', storeName);
     
     // Handle exact matches first to avoid confusion
     if (storeName === 'MaxiPali') return 'MaxiPali';
     if (storeName === 'MasxMenos') return 'MasxMenos';
+    if (storeName === 'Walmart') return 'Walmart';
     
     // Then handle partial matches
     if (storeName.includes('MaxiPali') || storeName.toLowerCase().includes('maxipali')) return 'MaxiPali';
     if (storeName.includes('MasxMenos') || storeName.toLowerCase().includes('masxmenos')) return 'MasxMenos';
+    if (storeName.includes('Walmart') || storeName.toLowerCase().includes('walmart')) return 'Walmart';
     
     return storeName;
   }
@@ -87,21 +86,35 @@ const getProductStore = (product: any): string => {
   // If product has prices array (mock product structure)
   if (anyProduct.prices && Array.isArray(anyProduct.prices) && anyProduct.prices.length > 0) {
     const storeId = String(anyProduct.prices[0].storeId || '').toLowerCase();
-    console.log('Store from prices array storeId:', storeId);
     
     if (storeId === 'maxipali') return 'MaxiPali';
     if (storeId === 'masxmenos') return 'MasxMenos';
+    if (storeId === 'walmart') return 'Walmart';
   }
   
-  // Fallback to checking product ID patterns if applicable
+  // Check product ID or name for store hints
   if (anyProduct.id) {
     const productId = String(anyProduct.id);
+    
     if (productId.startsWith('mp-') || productId.includes('-maxipali-')) return 'MaxiPali';
     if (productId.startsWith('mm-') || productId.includes('-masxmenos-')) return 'MasxMenos';
+    if (productId.startsWith('wm-') || productId.includes('-walmart-') || productId.includes('walmart')) {
+      return 'Walmart';
+    }
   }
   
-  console.log('Defaulting to Other for store');
-  return 'Other';
+  // Try to detect from product name
+  if (anyProduct.name) {
+    const productName = String(anyProduct.name).toLowerCase();
+    
+    if (productName.includes('maxipali')) return 'MaxiPali';
+    if (productName.includes('masxmenos') || productName.includes('mas x menos')) return 'MasxMenos';
+    if (productName.includes('walmart')) {
+      return 'Walmart';
+    }
+  }
+  
+  return 'Unknown';
 };
 
 const GroceryList = () => {
@@ -391,34 +404,53 @@ const GroceryList = () => {
         email: collaboratorEmail.trim(), 
         hasUser: !!user 
       });
+      toast({
+        title: "Missing information",
+        description: "Please enter a valid email address to invite.",
+        variant: "destructive",
+      });
       return;
     }
     
-    console.log('Active list structure:', {
-      id: activeList.id,
-      name: activeList.name,
-      createdBy: activeList.createdBy,
-      collaborators: activeList.collaborators,
-      itemsCount: activeList.items.length
-    });
+    // Normalize and validate the email
+    const normalizedEmail = collaboratorEmail.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      toast({
+        title: "Invalid email format",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Don't allow inviting yourself
+    if (user.email && normalizedEmail === user.email.toLowerCase()) {
+      toast({
+        title: "Invalid invitation",
+        description: "You cannot invite yourself to your own list.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Check if already a collaborator
+    if (activeList.collaborators && activeList.collaborators.includes(normalizedEmail)) {
+      toast({
+        title: "Already a collaborator",
+        description: `${normalizedEmail} is already invited to this list.`,
+      });
+      return;
+    }
     
     setAddingCollaborator(true);
     
     try {
-      // Normalize the email
-      const normalizedEmail = collaboratorEmail.trim().toLowerCase();
-      
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(normalizedEmail)) {
-        toast({
-          title: "Invalid email",
-          description: "Please enter a valid email address.",
-          variant: "destructive",
-        });
-        setAddingCollaborator(false);
-        return;
-      }
+      // Show initial feedback
+      toast({
+        title: "Sending invitation...",
+        description: `Inviting ${normalizedEmail} to collaborate on "${activeList.name}"`,
+      });
       
       console.log('Inviting collaborator:', { 
         userId: user.id, 
@@ -426,61 +458,28 @@ const GroceryList = () => {
         email: normalizedEmail
       });
       
-      let success = false;
+      // Call the service function to add collaborator
+      const success = await addCollaborator(user.id, activeList.id, normalizedEmail);
       
-      // First try through the service function
-      try {
-        success = await addCollaborator(user.id, activeList.id, normalizedEmail);
-        console.log('Service function result:', success);
-      } catch (serviceError) {
-        console.error('Service function error:', serviceError);
-        // We'll handle this in the fallback
-      }
-      
-      // Database fallback - update local state directly if DB operations fail
-      if (!success) {
-        console.log('Database operation failed, using local state fallback');
-        
+      if (success) {
         // Update UI with the new collaborator
         const updatedCollaborators = [...(activeList.collaborators || []), normalizedEmail];
-        
-        // Update UI state with new collaborator
         updateUI(updatedCollaborators);
         
-        // Also update localStorage for immediate UI updates
-        updateLocalCollaborators(activeList.id, updatedCollaborators);
-        
-        // Flag that we should show success to the user
-        success = true;
-        
-        // Add a note about cloud sync
         toast({
-          title: "Local update successful",
-          description: "Collaborator was added to your local list. Cloud sync will be attempted later.",
+          title: "Invitation sent",
+          description: `${normalizedEmail} has been invited to collaborate on "${activeList.name}".`,
         });
+        
+        // Clear input field
+        setCollaboratorEmail("");
       } else {
-        // Normal flow - update UI and localStorage for consistency
-        const updatedCollaborators = [...(activeList.collaborators || []), normalizedEmail];
-        updateUI(updatedCollaborators);
-        updateLocalCollaborators(activeList.id, updatedCollaborators);
+        toast({
+          title: "Invitation failed",
+          description: "We couldn't add this collaborator. Please try again.",
+          variant: "destructive",
+        });
       }
-      
-      // Try to send email notification, but don't fail if it errors
-      try {
-        // For this version, we'll just log instead of attempting to send emails
-        console.log(`Would send invitation email to ${normalizedEmail} for list ${activeList.name}`);
-      } catch (emailError) {
-        console.warn('Failed to send email notification:', emailError);
-        // Continue anyway since this is optional
-      }
-      
-      // Show success message
-      toast({
-        title: "Invitation sent",
-        description: `${normalizedEmail} has been invited to collaborate on this list.`,
-      });
-      
-      setCollaboratorEmail("");
     } catch (error) {
       console.error('Error inviting collaborator:', error);
       
@@ -757,6 +756,29 @@ const GroceryList = () => {
 
   const { total, currency } = calculateTotalPrice();
 
+  // Define the proper store names and their order
+  const storeOrder = ['Walmart', 'MaxiPali', 'MasxMenos', 'PriceSmart', 'Automercado', 'Unknown'];
+
+  // Define store groups (for rendering section headers)
+  const storeGroupNames: { [key: string]: string } = {
+    'Walmart': 'Walmart',
+    'MaxiPali': 'MaxiPali',
+    'MasxMenos': 'MasxMenos',
+    'PriceSmart': 'PriceSmart',
+    'Automercado': 'Automercado',
+    'Unknown': 'Other Stores'
+  };
+  
+  // Initialize store groups for storing actual items
+  const storeGroups: Record<string, GroceryItem[]> = {
+    'Walmart': [],
+    'MaxiPali': [],
+    'MasxMenos': [],
+    'PriceSmart': [],
+    'Automercado': [],
+    'Unknown': []
+  };
+
   return (
     <div className="page-container">
       <div className="max-w-4xl mx-auto">
@@ -772,23 +794,6 @@ const GroceryList = () => {
             </Button>
             <h1 className="text-3xl font-bold">Grocery List</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="rounded-full"
-              onClick={handleShare}
-            >
-              <Share2 className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="rounded-full"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -802,24 +807,14 @@ const GroceryList = () => {
                       {activeList.items.length} items
                     </CardDescription>
                   </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="icon" 
-                      className="rounded-full"
-                      onClick={handleShare}
-                    >
-                      <Share2 className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="icon" 
-                      className="rounded-full"
-                    >
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="rounded-full flex items-center gap-2"
+                    onClick={handleShare}
+                  >
+                    <Share2 className="h-4 w-4" />
+                    Share List
+                  </Button>
                 </CardHeader>
                 
                 <CardContent className="space-y-4">
@@ -844,87 +839,78 @@ const GroceryList = () => {
                     <div className="space-y-6 mt-6">
                       {/* Group items by store */}
                       {(() => {
-                        // Define the proper store names and their order
-                        const storeOrder = ['MaxiPali', 'MasxMenos', 'Other'];
-                        const storeGroups: Record<string, GroceryItem[]> = {
-                          'MaxiPali': [],
-                          'MasxMenos': [],
-                          'Other': []
-                        };
-                        
-                        console.log('Starting to group items by store, total items:', activeList.items.length);
-                        
                         // Group items by store using the getProductStore helper
                         activeList.items.forEach(item => {
                           // Use the helper function to determine the store
-                          let store = 'Other';
+                          let store = 'Unknown';
                           
                           if (item.productData) {
                             store = getProductStore(item.productData);
-                            console.log(`Item ${item.id} (${item.productData.name}) - Assigned to group: ${store}`);
-                          } else {
-                            console.log(`Item ${item.id} has no productData, assigned to Other`);
                           }
                           
                           // Ensure we're using one of our defined groups
                           if (!storeGroups[store]) {
-                            console.log(`Store ${store} is not in our defined groups, using Other instead`);
-                            store = 'Other';
+                            store = 'Unknown';
                           }
                           
-                          // Add to appropriate group
+                          // Add to the appropriate store group
                           storeGroups[store].push(item);
                         });
                         
-                        // Log the final group counts
-                        console.log('Final group counts:', {
-                          MaxiPali: storeGroups['MaxiPali'].length,
-                          MasxMenos: storeGroups['MasxMenos'].length,
-                          Other: storeGroups['Other'].length
-                        });
-                        
-                        // Render each store group in order, only if they have items
+                        // Render store groups in specified order
                         return storeOrder
                           .filter(store => storeGroups[store].length > 0)
                           .map(store => (
-                          <div key={store} className="space-y-3">
-                            <div className="flex items-center gap-2 mb-2">
+                            <div key={store} className="space-y-3">
+                              <div className="flex items-center space-x-2">
+                                <div className={cn(
+                                  "h-6 w-6 rounded-full flex items-center justify-center text-white text-xs font-medium",
+                                  store === 'Walmart' ? "bg-blue-600" : 
+                                  store === 'MaxiPali' ? "bg-yellow-500" : 
+                                  store === 'MasxMenos' ? "bg-green-600" : 
+                                  store === 'PriceSmart' ? "bg-purple-600" : 
+                                  store === 'Automercado' ? "bg-pink-600" : 
+                                  "bg-gray-500"
+                                )}>
+                                  {store === 'Walmart' ? 'W' : 
+                                   store === 'MaxiPali' ? 'MP' : 
+                                   store === 'MasxMenos' ? 'MxM' : 
+                                   store === 'PriceSmart' ? 'PS' :
+                                   store === 'Automercado' ? 'AM' :
+                                   'O'}
+                                </div>
+                                <span className="font-semibold text-sm">
+                                  {storeGroupNames[store]} ({storeGroups[store].length})
+                                </span>
+                              </div>
+                              
                               <div className={cn(
-                                "h-6 w-6 rounded-full flex items-center justify-center text-white text-xs font-medium",
-                                store === 'MaxiPali' ? "bg-yellow-500" : 
-                                store === 'MasxMenos' ? "bg-green-600" : "bg-gray-500"
+                                "space-y-3 border-l-4 pl-4",
+                                store === 'Walmart' ? "border-blue-600" : 
+                                store === 'MaxiPali' ? "border-yellow-500" : 
+                                store === 'MasxMenos' ? "border-green-600" : 
+                                store === 'PriceSmart' ? "border-purple-600" : 
+                                store === 'Automercado' ? "border-pink-600" : 
+                                "border-gray-500"
                               )}>
-                                {store.charAt(0)}
-                              </div>
-                              <h3 className="font-medium">{store}</h3>
-                              <div className="text-xs text-muted-foreground">
-                                ({storeGroups[store].length} {storeGroups[store].length === 1 ? 'item' : 'items'})
+                                {storeGroups[store].map((item) => (
+                                  <GroceryListItem
+                                    key={item.id}
+                                    item={item}
+                                    onUpdateQuantity={(id, quantity) => 
+                                      updateListItem(activeList.id, id, { quantity })
+                                    }
+                                    onToggleCheck={(id, checked) => 
+                                      updateListItem(activeList.id, id, { checked })
+                                    }
+                                    onRemove={(id) => 
+                                      removeListItem(activeList.id, id)
+                                    }
+                                  />
+                                ))}
                               </div>
                             </div>
-                            
-                            <div className={cn(
-                              "space-y-3 border-l-4 pl-4",
-                              store === 'MaxiPali' ? "border-yellow-500" : 
-                              store === 'MasxMenos' ? "border-green-600" : "border-gray-500"
-                            )}>
-                              {storeGroups[store].map(item => (
-                                <GroceryListItem
-                                  key={item.id}
-                                  item={item}
-                                  onUpdateQuantity={(id, quantity) => 
-                                    updateListItem(activeList.id, id, { quantity })
-                                  }
-                                  onToggleCheck={(id, checked) => 
-                                    updateListItem(activeList.id, id, { checked })
-                                  }
-                                  onRemove={(id) => 
-                                    removeListItem(activeList.id, id)
-                                  }
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        ));
+                          ));
                       })()}
                     </div>
                   ) : (
@@ -957,24 +943,51 @@ const GroceryList = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Input 
-                    placeholder="Email address"
-                    value={collaboratorEmail}
-                    onChange={(e) => setCollaboratorEmail(e.target.value)} 
-                    disabled={addingCollaborator}
-                  />
-                  <Button 
-                    className="rounded-full flex-shrink-0" 
-                    disabled={!collaboratorEmail || addingCollaborator}
-                    onClick={handleInviteCollaborator}
-                  >
-                    {addingCollaborator ? (
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <UserPlus className="h-4 w-4" />
-                    )}
-                  </Button>
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-muted-foreground">
+                    Share this list with others by inviting them via email. They'll receive an invitation to join this grocery list.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      placeholder="Enter email address"
+                      value={collaboratorEmail}
+                      onChange={(e) => setCollaboratorEmail(e.target.value)} 
+                      disabled={addingCollaborator}
+                    />
+                    <Button 
+                      className="rounded-full flex-shrink-0" 
+                      disabled={!collaboratorEmail || addingCollaborator}
+                      onClick={handleInviteCollaborator}
+                    >
+                      {addingCollaborator ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <UserPlus className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="mt-4">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    You can also share a direct link to this list:
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      value={`${window.location.origin}/shared-list/${activeList?.id}`}
+                      readOnly
+                      className="text-xs"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="flex-shrink-0"
+                      onClick={handleShare}
+                      title="Copy to clipboard"
+                    >
+                      <Clipboard className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 
                 {activeList?.collaborators.length ? (
@@ -985,7 +998,10 @@ const GroceryList = () => {
                         key={index} 
                         className="flex items-center justify-between p-2 bg-muted rounded-lg"
                       >
-                        <span className="text-sm">{email}</span>
+                        <div className="flex items-center gap-2">
+                          <UserPlus className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">{email}</span>
+                        </div>
                         <Button 
                           variant="ghost" 
                           size="icon" 
@@ -1012,7 +1028,7 @@ const GroceryList = () => {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground mt-2">
+                  <p className="text-sm text-muted-foreground mt-4">
                     No collaborators yet. Invite someone to share this list.
                   </p>
                 )}

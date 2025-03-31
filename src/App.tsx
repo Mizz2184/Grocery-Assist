@@ -7,7 +7,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Navbar } from "@/components/Navbar";
 import { useTranslation } from "@/context/TranslationContext";
-import React from "react";
+import React, { useMemo } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PaymentRequired from "@/components/PaymentRequired";
 
@@ -30,29 +30,90 @@ interface TranslatedTextProps {
   en?: string;
   children?: React.ReactNode;
   className?: string;
+  as?: React.ElementType;
+  dangerouslySetInnerHTML?: boolean;
 }
 
 export const TranslatedText: React.FC<TranslatedTextProps> = ({ 
   es, 
   en, 
   children,
-  className
+  className,
+  as: Component = 'span',
+  dangerouslySetInnerHTML = false
 }) => {
   const { isTranslated, translateText } = useTranslation();
   
   if (children) {
     return (
-      <span className={className}>
+      <Component className={className}>
         {children}
-      </span>
+      </Component>
+    );
+  }
+  
+  const translatedContent = isTranslated ? (en || translateText(es)) : es;
+  
+  if (dangerouslySetInnerHTML) {
+    return (
+      <Component 
+        className={className} 
+        dangerouslySetInnerHTML={{ __html: translatedContent }} 
+      />
     );
   }
   
   return (
-    <span className={className}>
-      {isTranslated ? (en || translateText(es)) : es}
-    </span>
+    <Component className={className}>
+      {translatedContent}
+    </Component>
   );
+};
+
+// Hook for automatically translating text anywhere in the app
+export const useAutoTranslate = () => {
+  const { isTranslated, translateText } = useTranslation();
+  
+  // Function to translate any text
+  const t = useMemo(() => {
+    return (text: string | undefined | null, fallback?: string): string => {
+      if (!text) return fallback || '';
+      return isTranslated ? translateText(text) : text;
+    };
+  }, [isTranslated, translateText]);
+  
+  // Function to translate objects with text properties
+  const tObject = useMemo(() => {
+    return <T extends Record<string, any>>(obj: T): T => {
+      if (!obj || typeof obj !== 'object') return obj;
+      
+      const result = { ...(obj as any) } as any;
+      
+      // Recursively translate all string properties
+      Object.keys(result).forEach(key => {
+        const value = result[key];
+        
+        if (typeof value === 'string') {
+          result[key] = t(value);
+        } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+          result[key] = tObject(value);
+        } else if (Array.isArray(value)) {
+          result[key] = value.map(item => 
+            typeof item === 'string' ? t(item) : 
+            (typeof item === 'object' ? tObject(item) : item)
+          );
+        }
+      });
+      
+      return result as T;
+    };
+  }, [t]);
+  
+  return {
+    t,                 // Translate single text
+    tObject,           // Translate object with text properties
+    isTranslated       // Current translation state
+  };
 };
 
 const queryClient = new QueryClient();

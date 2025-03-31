@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { v4 as uuidv4 } from 'uuid';
+import { useTranslation } from "@/context/TranslationContext";
+import { TranslatedText } from "@/App";
 
 const Index = () => {
   const { 
@@ -32,6 +34,7 @@ const Index = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const searchResultsRef = useRef<HTMLDivElement>(null);
+  const { translateUI } = useTranslation();
 
   // Restore scroll position when returning to the page
   useEffect(() => {
@@ -152,58 +155,124 @@ const Index = () => {
 
     try {
       // Perform searches in parallel
+      console.log('Starting parallel store searches...');
       const [maxiPaliResults, masxMenosResults, walmartResults] = await Promise.all([
         searchMaxiPaliProducts({ query: searchQuery }),
         searchMasxMenosProducts({ query: searchQuery }),
         searchWalmartProducts({ query: searchQuery })
       ]);
+      console.log('All store API searches completed');
+
+      // Debug full response data
+      console.log('=== DEBUG SEARCH RESPONSES ===');
+      console.log('MaxiPali response structure:', JSON.stringify(maxiPaliResults).substring(0, 200) + '...');
+      console.log('MasxMenos response structure:', JSON.stringify(masxMenosResults).substring(0, 200) + '...');
+      console.log('Walmart response structure:', JSON.stringify(walmartResults).substring(0, 200) + '...');
 
       let combinedResults: Product[] = [];
       let totalProductCount = 0;
       
       // Add MaxiPali results
-      if (maxiPaliResults.products && maxiPaliResults.products.length > 0) {
-        combinedResults = [...combinedResults, ...maxiPaliResults.products];
+      if (maxiPaliResults && maxiPaliResults.products && maxiPaliResults.products.length > 0) {
+        console.log(`Adding ${maxiPaliResults.products.length} MaxiPali products`);
+        // Make sure store field is set correctly
+        const maxiPaliWithStore = maxiPaliResults.products.map(p => ({
+          ...p,
+          store: 'MaxiPali' as const
+        }));
+        combinedResults = [...combinedResults, ...maxiPaliWithStore];
         totalProductCount += maxiPaliResults.products.length;
         console.log(`Found ${maxiPaliResults.products.length} MaxiPali products`);
+      } else {
+        console.log('No MaxiPali products found');
       }
       
       // Add MasxMenos results
-      if (masxMenosResults.products && masxMenosResults.products.length > 0) {
-        // Add MasxMenos results directly without additional filtering
-        combinedResults = [...combinedResults, ...masxMenosResults.products];
+      if (masxMenosResults && masxMenosResults.products && masxMenosResults.products.length > 0) {
+        console.log(`Adding ${masxMenosResults.products.length} MasxMenos products`);
+        // Make sure store field is set correctly
+        const masxMenosWithStore = masxMenosResults.products.map(p => ({
+          ...p,
+          store: 'MasxMenos' as const
+        }));
+        combinedResults = [...combinedResults, ...masxMenosWithStore];
         totalProductCount += masxMenosResults.products.length;
         console.log(`Found ${masxMenosResults.products.length} MasxMenos products`);
+      } else {
+        console.log('No MasxMenos products found');
       }
       
       // Add Walmart results
-      if (walmartResults.products && walmartResults.products.length > 0) {
-        // Add Walmart results directly without additional filtering
-        combinedResults = [...combinedResults, ...walmartResults.products];
+      if (walmartResults && walmartResults.products && walmartResults.products.length > 0) {
+        console.log(`Adding ${walmartResults.products.length} Walmart products`);
+        // Make sure store field is set correctly
+        const walmartWithStore = walmartResults.products.map(p => ({
+          ...p,
+          store: 'Walmart' as const
+        }));
+        
+        // Additional debug logging for Walmart products
+        console.log('Walmart product examples:');
+        walmartResults.products.slice(0, 2).forEach((p, i) => {
+          console.log(`Walmart product ${i}: id=${p.id}, name=${p.name}, price=${p.price}, store=${p.store}`);
+        });
+        
+        combinedResults = [...combinedResults, ...walmartWithStore];
         totalProductCount += walmartResults.products.length;
         console.log(`Found ${walmartResults.products.length} Walmart products`);
+      } else {
+        console.log('No Walmart products found or results are invalid');
+        console.log('Walmart results structure:', walmartResults);
       }
       
-      // If both searches failed or returned no results
+      // If all searches failed or returned no results
       if (combinedResults.length === 0) {
+        console.log('No products found across any store');
         toast({
-          title: "No Results Found",
-          description: `We couldn't find any products matching "${searchQuery}"`,
+          title: translateUI("No Se Encontraron Resultados"),
+          description: translateUI(`No pudimos encontrar productos que coincidan con "${searchQuery}"`),
           variant: "destructive"
         });
       } else {
-        console.log(`Found ${combinedResults.length} total products`);
-        toast({
-          title: `Found ${totalProductCount} Products`,
-          description: `Showing results for "${searchQuery}"`
+        console.log(`Found ${combinedResults.length} total products, by store count: MaxiPali=${maxiPaliResults.products?.length || 0}, MasxMenos=${masxMenosResults.products?.length || 0}, Walmart=${walmartResults.products?.length || 0}`);
+        
+        // Ensure all products have required properties
+        combinedResults = combinedResults.filter(product => {
+          if (!product.id || !product.name || typeof product.price !== 'number') {
+            console.error('Invalid product found in results:', product);
+            return false;
+          }
+          return true;
         });
-        setSearchResults(combinedResults);
+        
+        // Check for store type issues
+        const storeTypes = combinedResults.map(p => p.store);
+        const uniqueStores = [...new Set(storeTypes)];
+        console.log('Store types in combined results:', uniqueStores);
+        
+        // Log sample of combined results
+        console.log('Sample of combined results (first 2 products):', 
+          combinedResults.slice(0, 2).map(p => ({
+            id: p.id,
+            name: p.name,
+            store: p.store,
+            price: p.price
+          }))
+        );
+        
+        toast({
+          title: translateUI(`Se Encontraron ${totalProductCount} Productos`),
+          description: translateUI(`Mostrando resultados para "${searchQuery}"`)
+        });
       }
+      
+      setSearchResults(combinedResults);
+      console.log('Set search results called with', combinedResults.length, 'products');
     } catch (error) {
       console.error('Error during search:', error);
       toast({
-        title: "Search Error",
-        description: "An error occurred during the search. Please try again.",
+        title: translateUI("Error de Búsqueda"),
+        description: translateUI("Ocurrió un error durante la búsqueda. Por favor intenta de nuevo."),
         variant: "destructive"
       });
     } finally {
@@ -215,8 +284,8 @@ const Index = () => {
     try {
       if (!user) {
         toast({
-          title: "Sign in required",
-          description: "Please sign in to add items to your grocery list.",
+          title: translateUI("Se requiere iniciar sesión"),
+          description: translateUI("Por favor inicie sesión para agregar artículos a su lista de compras."),
           variant: "destructive",
         });
         navigate("/profile");
@@ -229,8 +298,8 @@ const Index = () => {
       if (!product) {
         console.error('Product not found in search results');
         toast({
-          title: "Error",
-          description: "Could not find product details",
+          title: translateUI("Error"),
+          description: translateUI("No se pudieron encontrar los detalles del producto"),
           variant: "destructive",
         });
         return Promise.reject(new Error('Product not found'));
@@ -292,8 +361,8 @@ const Index = () => {
       
       if (!result.success) {
         toast({
-          title: "Error",
-          description: result.message || "Failed to add product to list",
+          title: translateUI("Error"),
+          description: result.message ? translateUI(result.message) : translateUI("No se pudo agregar el producto a la lista"),
           variant: "destructive",
         });
         return Promise.reject(new Error(result.message));
@@ -303,16 +372,16 @@ const Index = () => {
       setProductsInList(prev => new Set([...prev, product.id]));
       
       toast({
-        title: "Added to list",
-        description: `${product.name || 'Product'} added to ${defaultList.name}`,
+        title: translateUI("Agregado a la lista"),
+        description: translateUI(`${product.name || 'Producto'} agregado a ${defaultList.name}`),
       });
       
       return Promise.resolve();
     } catch (error) {
       console.error('Error adding product to list:', error);
       toast({
-        title: "Error",
-        description: "Failed to add product to your list",
+        title: translateUI("Error"),
+        description: translateUI("No se pudo agregar el producto a tu lista"),
         variant: "destructive",
       });
       return Promise.reject(error);
@@ -322,8 +391,8 @@ const Index = () => {
   const handleAddScannedProduct = async (product: Product) => {
     if (!user) {
       toast({
-        title: "Sign in required",
-        description: "Please sign in to add items to your grocery list.",
+        title: translateUI("Se requiere iniciar sesión"),
+        description: translateUI("Por favor inicie sesión para agregar artículos a su lista de compras."),
         variant: "destructive",
       });
       navigate("/profile");
@@ -343,8 +412,8 @@ const Index = () => {
       
       if (!result.success) {
         toast({
-          title: "Error",
-          description: result.message || "Failed to add product to list",
+          title: translateUI("Error"),
+          description: result.message ? translateUI(result.message) : translateUI("No se pudo agregar el producto a la lista"),
           variant: "destructive",
         });
         return Promise.reject(new Error(result.message));
@@ -354,8 +423,8 @@ const Index = () => {
       setProductsInList(prev => new Set([...prev, product.id]));
       
       toast({
-        title: "Added to list",
-        description: `${product.name || 'Product'} added to ${defaultList.name}`,
+        title: translateUI("Agregado a la lista"),
+        description: translateUI(`${product.name || 'Producto'} agregado a ${defaultList.name}`),
       });
       
       return Promise.resolve();
@@ -365,48 +434,81 @@ const Index = () => {
     }
   };
 
-  // Filter products by selected store if needed
+  // Filter results by store if needed
   const filteredResults = useMemo(() => {
-    if (storeFilter === 'all') {
-      return searchResults;
+    if (!searchResults || searchResults.length === 0) {
+      console.log('No search results to filter');
+      return [];
     }
     
-    return searchResults.filter(product => {
-      // Normalize store name for consistent filtering
-      let normalizedStore = product.store;
-      if (normalizedStore?.includes('MaxiPali') || normalizedStore === 'MaxiPali') {
-        normalizedStore = 'MaxiPali';
-      } else if (normalizedStore?.includes('MasxMenos') || normalizedStore === 'MasxMenos') {
-        normalizedStore = 'MasxMenos';
-      } else if (normalizedStore?.includes('Walmart') || normalizedStore === 'Walmart') {
-        normalizedStore = 'Walmart';
-      }
+    console.log(`Filtering search results, total: ${searchResults.length}, filter: ${storeFilter}`);
+    
+    // If there are Walmart products, log them to verify
+    const walmartProducts = searchResults.filter(product => product.store === 'Walmart');
+    const maxiPaliProducts = searchResults.filter(product => product.store === 'MaxiPali');
+    const masxMenosProducts = searchResults.filter(product => product.store === 'MasxMenos');
+    
+    console.log(`Current search results by store: Walmart=${walmartProducts.length}, MaxiPali=${maxiPaliProducts.length}, MasxMenos=${masxMenosProducts.length}`);
+    
+    if (walmartProducts.length > 0) {
+      console.log('First Walmart product:', walmartProducts[0]);
+    } else {
+      console.warn('No Walmart products found in search results');
+    }
+    
+    // Apply store filter
+    let results = searchResults;
+    
+    if (storeFilter !== 'all') {
+      results = searchResults.filter(product => {
+        // Handle undefined store or malformed data
+        if (!product.store) {
+          console.error('Product missing store property:', product);
+          return false;
+        }
+        
+        // Direct comparison
+        const storeMatches = product.store === storeFilter;
+        return storeMatches;
+      });
+    }
       
-      return normalizedStore === storeFilter;
-    });
-  }, [searchResults, storeFilter]);
+    console.log(`After filtering, ${results.length} products remain, filter: ${storeFilter}`);
+    
+    // Sort results by relevance
+    const sortedResults = sortProductsByRelevance(results, query);
+    console.log(`After sorting, returned ${sortedResults.length} products for display`);
+    
+    return sortedResults;
+  }, [searchResults, storeFilter, query]);
 
   return (
     <div className="page-container">
       <div className="max-w-2xl mx-auto text-center mb-8 animate-fade-up">
         <h1 className="text-4xl font-semibold tracking-tight mb-2">
-          Compare Prices, Save Money
+          <TranslatedText es="Comparar Precios, Ahorrar Dinero" en="Compare Prices, Save Money" />
         </h1>
         <p className="text-muted-foreground text-lg">
-          Find the best grocery deals at MaxiPali, MasxMenos, and Walmart
+          <TranslatedText es="Encuentra las mejores ofertas de supermercados en MaxiPali, MasxMenos y Walmart" en="Find the best grocery deals at MaxiPali, MasxMenos, and Walmart" />
         </p>
       </div>
 
       <div className="max-w-xl mx-auto mb-12 animate-fade-up animate-delay-100">
         <div className="flex gap-2 items-center">
           <div className="flex-1">
-            <SearchBar initialQuery={query} onSearch={handleSearch} expanded />
+            <SearchBar 
+              initialQuery={query} 
+              onSearch={handleSearch} 
+              expanded 
+              onQueryChange={setQuery}
+              isSearching={isSearching}
+            />
           </div>
           <Button 
             onClick={() => setIsScannerOpen(true)} 
             variant="outline"
             className="rounded-full h-12 w-12 flex items-center justify-center text-muted-foreground hover:text-primary"
-            aria-label="Scan barcode"
+            aria-label={translateUI("Escanear código de barras")}
           >
             <Scan className="h-5 w-5" />
           </Button>
@@ -425,11 +527,17 @@ const Index = () => {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <h2 className="text-xl font-medium">
               {isSearching ? (
-                "Searching..."
+                <TranslatedText es="Buscando..." en="Searching..." />
               ) : searchResults.length > 0 ? (
-                `Found ${searchResults.length} results for "${query}"`
+                <TranslatedText 
+                  es={`Se encontraron ${searchResults.length} resultados para "${query}"`}
+                  en={`Found ${searchResults.length} results for "${query}"`}
+                />
               ) : (
-                `No results for "${query}"`
+                <TranslatedText 
+                  es={`No hay resultados para "${query}"`}
+                  en={`No results for "${query}"`}
+                />
               )}
             </h2>
             
@@ -440,7 +548,7 @@ const Index = () => {
                 className="w-full md:w-auto"
               >
                 <TabsList className="grid grid-cols-4 w-full md:w-auto">
-                  <TabsTrigger value="all">All Stores</TabsTrigger>
+                  <TabsTrigger value="all"><TranslatedText es="Todas las Tiendas" en="All Stores" /></TabsTrigger>
                   <TabsTrigger value="MaxiPali">MaxiPali</TabsTrigger>
                   <TabsTrigger value="MasxMenos">MasxMenos</TabsTrigger>
                   <TabsTrigger value="Walmart">Walmart</TabsTrigger>
@@ -458,11 +566,11 @@ const Index = () => {
                 />
               ))}
             </div>
-          ) : searchResults.length > 0 ? (
+          ) : filteredResults && filteredResults.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredResults.map((product, index) => (
                 <ProductCard 
-                  key={`${product.id}-${index}`} 
+                  key={`${product.id}-${product.store}-${index}`}  
                   product={product} 
                   isInList={isProductInList(product.id, product.store || '')}
                   onAddToList={handleAddToList}
@@ -470,14 +578,41 @@ const Index = () => {
                 />
               ))}
             </div>
+          ) : searchResults.length > 0 ? (
+            // Display this when there are search results but filtered results is empty
+            <div className="text-center py-12">
+              <div className="inline-flex justify-center items-center w-16 h-16 rounded-full bg-muted mb-4">
+                <Filter className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-medium mb-1">
+                <TranslatedText es="Ningún producto coincide con el filtro actual" en="No products match the current filter" />
+              </h3>
+              <p className="text-muted-foreground">
+                <TranslatedText es="Intenta cambiar el filtro de tienda para ver más resultados" en="Try changing the store filter to see more results" />
+              </p>
+              <div className="mt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setStoreFilter('all')}
+                  className="mx-auto"
+                >
+                  <TranslatedText es="Mostrar todas las tiendas" en="Show all stores" />
+                </Button>
+              </div>
+            </div>
           ) : (
             <div className="text-center py-12">
               <div className="inline-flex justify-center items-center w-16 h-16 rounded-full bg-muted mb-4">
                 <SearchIcon className="w-8 h-8 text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-medium mb-1">No results found</h3>
+              <h3 className="text-lg font-medium mb-1">
+                <TranslatedText es="No se encontraron resultados" en="No results found" />
+              </h3>
               <p className="text-muted-foreground">
-                Try adjusting your search term or try a different keyword
+                <TranslatedText 
+                  es="Intenta ajustar tu término de búsqueda o prueba con una palabra clave diferente" 
+                  en="Try adjusting your search term or try a different keyword" 
+                />
               </p>
             </div>
           )}
@@ -485,7 +620,9 @@ const Index = () => {
       ) : (
         <div className="space-y-12 animate-fade-up animate-delay-200">
           <section>
-            <h2 className="section-title">Featured Store</h2>
+            <h2 className="section-title">
+              <TranslatedText es="Tiendas Destacadas" en="Featured Store" />
+            </h2>
             <div className="grid grid-cols-1 gap-4">
               {stores.map((store) => (
                 <div 
@@ -510,11 +647,16 @@ const Index = () => {
           </section>
 
           <section>
-            <h2 className="section-title">Popular Products</h2>
+            <h2 className="section-title">
+              <TranslatedText es="Productos Populares" en="Popular Products" />
+            </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               <div className="text-center py-12 col-span-full">
                 <p className="text-muted-foreground">
-                  Search for products to start comparing prices
+                  <TranslatedText 
+                    es="Busca productos para comenzar a comparar precios"
+                    en="Search for products to start comparing prices" 
+                  />
                 </p>
               </div>
             </div>

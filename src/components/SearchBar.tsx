@@ -4,24 +4,40 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/context/TranslationContext";
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
   initialQuery?: string;
   expanded?: boolean;
   className?: string;
+  placeholder?: string;
+  query?: string;
+  onQueryChange?: (query: string) => void;
+  isSearching?: boolean;
 }
 
-export const SearchBar = ({ onSearch, initialQuery = "", expanded = false, className }: SearchBarProps) => {
-  const [query, setQuery] = useState(initialQuery);
+export const SearchBar = ({
+  onSearch,
+  initialQuery = "",
+  expanded = false,
+  className,
+  placeholder,
+  query: controlledQuery,
+  onQueryChange,
+  isSearching = false,
+}: SearchBarProps) => {
+  const [localQuery, setLocalQuery] = useState(initialQuery);
+  const query = controlledQuery !== undefined ? controlledQuery : localQuery;
   const [isExpanded, setIsExpanded] = useState(expanded);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const { translateText, isTranslated } = useTranslation();
 
   // Initialize query with initialQuery when it changes
   useEffect(() => {
     if (initialQuery !== query) {
-      setQuery(initialQuery);
+      setLocalQuery(initialQuery);
     }
   }, [initialQuery]);
 
@@ -32,6 +48,13 @@ export const SearchBar = ({ onSearch, initialQuery = "", expanded = false, class
     }
   }, [isExpanded]);
 
+  // Update the local query if the controlled query changes
+  useEffect(() => {
+    if (controlledQuery !== undefined) {
+      setLocalQuery(controlledQuery);
+    }
+  }, [controlledQuery]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
@@ -39,8 +62,25 @@ export const SearchBar = ({ onSearch, initialQuery = "", expanded = false, class
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      handleSubmit(e);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newQuery = e.target.value;
+    setLocalQuery(newQuery);
+    if (onQueryChange) {
+      onQueryChange(newQuery);
+    }
+  };
+
   const handleClear = () => {
-    setQuery("");
+    setLocalQuery('');
+    if (onQueryChange) {
+      onQueryChange('');
+    }
     if (inputRef.current) {
       inputRef.current.focus();
     }
@@ -66,13 +106,15 @@ export const SearchBar = ({ onSearch, initialQuery = "", expanded = false, class
           ref={inputRef}
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
           onFocus={() => setIsExpanded(true)}
-          placeholder="Search products, brands, barcodes..."
+          placeholder={placeholder || (isTranslated ? "Search products..." : translateText("Buscar productos..."))}
           className={cn(
             "pl-10 pr-20 h-12 rounded-full transition-all duration-300 focus:ring-2 focus:ring-primary/20",
             isExpanded ? "bg-background shadow-lg" : "bg-secondary/80"
           )}
+          disabled={isSearching}
         />
         
         <div className="absolute right-2 flex items-center gap-1">
@@ -97,10 +139,14 @@ export const SearchBar = ({ onSearch, initialQuery = "", expanded = false, class
               "bg-black dark:bg-white text-white dark:text-black",
               !query && "opacity-30"
             )}
-            disabled={!query.trim()}
+            disabled={!query.trim() || isSearching}
             aria-label="Search"
           >
-            <ArrowRight className="w-4 h-4" />
+            {isSearching ? (
+              <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+            ) : (
+              <Search className="w-4 h-4" />
+            )}
           </Button>
         </div>
       </div>

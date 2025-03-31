@@ -61,6 +61,7 @@ const getProductStore = (product: any): string => {
     const storeName = String(product.store).trim();
     if (storeName.includes('MaxiPali') || storeName.toLowerCase() === 'maxipali') return 'MaxiPali';
     if (storeName.includes('MasxMenos') || storeName.toLowerCase() === 'masxmenos') return 'MasxMenos';
+    if (storeName.includes('Walmart') || storeName.toLowerCase() === 'walmart') return 'Walmart';
     return storeName;
   }
   
@@ -69,6 +70,15 @@ const getProductStore = (product: any): string => {
     const storeId = String(product.prices[0].storeId).toLowerCase();
     if (storeId === 'maxipali') return 'MaxiPali';
     if (storeId === 'masxmenos') return 'MasxMenos';
+    if (storeId === 'walmart') return 'Walmart';
+  }
+  
+  // Check product ID for store hints
+  if (product.id) {
+    const id = String(product.id).toLowerCase();
+    if (id.includes('maxipali')) return 'MaxiPali';
+    if (id.includes('masxmenos')) return 'MasxMenos';
+    if (id.includes('walmart')) return 'Walmart';
   }
   
   return 'Other';
@@ -126,7 +136,9 @@ export const GroceryListItem = ({
         ? "text-yellow-600" 
         : storeName === 'MasxMenos' 
           ? "text-green-600" 
-          : "text-gray-600"
+          : storeName === 'Walmart'
+            ? "text-blue-600"
+            : "text-gray-600"
     )}
   >
     {storeName}
@@ -134,14 +146,23 @@ export const GroceryListItem = ({
   
   // Determine store color 
   const getStoreColor = (store: string) => {
-    switch(store) {
-      case 'MaxiPali':
-        return 'bg-yellow-500';
-      case 'MasxMenos':
-        return 'bg-green-600';
-      default:
-        return 'bg-gray-500';
-    }
+    const normalizedStore = store.trim();
+    
+    // First check for exact matches
+    if (normalizedStore === 'MaxiPali') return 'bg-yellow-500';
+    if (normalizedStore === 'MasxMenos') return 'bg-green-600';
+    if (normalizedStore === 'Walmart') return 'bg-blue-600';
+    
+    // Then check for partial matches
+    if (normalizedStore.includes('MaxiPali') || normalizedStore.toLowerCase().includes('maxipali')) 
+      return 'bg-yellow-500';
+    if (normalizedStore.includes('MasxMenos') || normalizedStore.toLowerCase().includes('masxmenos')) 
+      return 'bg-green-600';
+    if (normalizedStore.includes('Walmart') || normalizedStore.toLowerCase().includes('walmart')) 
+      return 'bg-blue-600';
+    
+    // Default for unknown stores
+    return 'bg-gray-500';
   };
   
   const handleRemove = async () => {
@@ -248,7 +269,13 @@ export const GroceryListItem = ({
               variant="outline" 
               className={cn(
                 "text-[8px] rounded-sm py-0 h-4 font-normal",
-                `text-${storeName === 'MaxiPali' ? 'yellow' : 'green'}-600`
+                storeName === 'MaxiPali' 
+                  ? "text-yellow-600" 
+                  : storeName === 'MasxMenos' 
+                    ? "text-green-600" 
+                    : storeName === 'Walmart'
+                      ? "text-blue-600"
+                      : "text-gray-600"
               )}
             >
               {storeName}

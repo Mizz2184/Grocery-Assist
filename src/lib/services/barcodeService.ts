@@ -24,6 +24,24 @@ interface MaxiPaliErrorResponse {
   [key: string]: any;
 }
 
+// Add interface for Walmart API response
+interface WalmartApiResponse {
+  success: boolean;
+  product?: {
+    id: string;
+    name: string;
+    brand?: string;
+    price: number;
+    imageUrl?: string;
+    store: string;
+    category?: string;
+    sku?: string;
+    barcode?: string;
+    inStock?: boolean;
+  };
+  message?: string;
+}
+
 // Helper function to safely parse price values
 const safeParsePrice = (price: any): number => {
   if (typeof price === 'number') {
@@ -277,79 +295,66 @@ export const searchProductByBarcode = async (ean: string): Promise<{
       }
     } catch (maxiPaliError) {
       console.error('All MaxiPali API attempts failed:', maxiPaliError);
-      
-      // If MaxiPali failed, try MasxMenos
-      try {
-        console.log('Trying MasxMenos API for EAN:', ean);
-        const masxMenosResponse = await axios.get(`/api/proxy/masxmenos/barcode/${ean}`, {
-          headers: {
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache'
-          },
-          timeout: 15000 // 15 second timeout
-        });
-        
-        console.log('MasxMenos API response status:', masxMenosResponse.status);
-        
-        // Check if the response contains data
-        if (masxMenosResponse.data) {
-          const productData = masxMenosResponse.data as MaxiPaliProductData;
-          const errorData = masxMenosResponse.data as MaxiPaliErrorResponse;
-          
-          // Check if the response contains an error
-          if (errorData.error) {
-            console.error('MasxMenos API returned an error:', errorData.error);
-            throw new Error(errorData.details || 'API error');
-          }
-          
-          // Check if we have all required data
-          if (!productData.name) {
-            console.error('Invalid product data from MasxMenos API:', productData);
-            throw new Error('Invalid product data received from API');
-          }
-          
-          // Ensure price is a number
-          const productPrice = safeParsePrice(productData.price);
-          
-          console.log('MasxMenos price information:', {
-            rawPrice: productData.price,
-            processedPrice: productPrice,
-            type: typeof productPrice
-          });
-          
-          const product: Product = {
-            id: productData.id || `masxmenos-${ean}`,
-            name: productData.name,
-            brand: productData.brand || 'Unknown',
-            imageUrl: productData.imageUrl || productData.image || '',
-            price: productPrice,
-            store: 'MasxMenos',
-            category: productData.category || 'Grocery',
-            barcode: ean,
-            ean: ean,
-            sku: productData.sku || ''
-          };
-          
-          console.log('Final product object from MasxMenos:', product);
-          return { success: true, product };
-        }
-      } catch (masxMenosError) {
-        console.error('MasxMenos API error:', masxMenosError);
-      }
     }
     
-    // If no product was found in any API, return failure
-    console.warn('Product not found in any API for EAN:', ean);
+    // Try Walmart if MaxiPali failed
+    try {
+      console.log('Trying Walmart for EAN:', ean);
+      const walmartResponse = await axios.get<WalmartApiResponse>(`/api/proxy/walmart/barcode/${ean}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+        timeout: 15000
+      });
+      
+      console.log('Walmart API response status:', walmartResponse.status);
+      
+      if (walmartResponse.data && walmartResponse.data.success && walmartResponse.data.product) {
+        console.log('Found product in Walmart API:', walmartResponse.data.product.name);
+        
+        // Ensure we have a valid product
+        const product = walmartResponse.data.product;
+        
+        // Validate essential fields
+        if (!product.name || !product.id) {
+          console.error('Invalid product data from Walmart API:', product);
+          throw new Error('Invalid product data received from Walmart API');
+        }
+        
+        // Construct the product object
+        const finalProduct: Product = {
+          id: product.id,
+          name: product.name,
+          brand: product.brand || 'Walmart',
+          imageUrl: product.imageUrl || '',
+          price: typeof product.price === 'number' ? product.price : safeParsePrice(product.price),
+          store: 'Walmart',
+          category: product.category || 'Grocery',
+          barcode: ean,
+          ean: ean,
+          sku: product.sku || ''
+        };
+        
+        console.log('Final product object from Walmart API:', finalProduct);
+        return { success: true, product: finalProduct };
+      } else {
+        console.log('No product found in Walmart API or invalid response');
+      }
+    } catch (walmartError) {
+      console.error('Walmart API error:', walmartError);
+    }
+
+    // If we reach here, we didn't find a product
     return { 
       success: false, 
-      message: "Producto no encontrado. Por favor, intente con otro código EAN." 
+      message: 'Product not found with barcode: ' + ean 
     };
   } catch (error) {
-    console.error('Error searching product by EAN:', error);
-    
+    console.error('Error searching for product by barcode:', error);
     return { 
-      success: false,
-      message: `Error al buscar producto: ${error instanceof Error ? error.message : 'Error desconocido'}` 
+      success: false, 
+      message: 'Error searching for product: ' + (error instanceof Error ? error.message : String(error))
     };
   }
 };
