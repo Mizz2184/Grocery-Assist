@@ -18,6 +18,67 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { v4 as uuidv4 } from 'uuid';
 import { useTranslation } from "@/context/TranslationContext";
 import { TranslatedText } from "@/App";
+import { FixedSizeGrid } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
+
+const VirtualizedProductGrid = ({ products, onAddToList, isProductInList }: { 
+  products: Product[], 
+  onAddToList: (id: string) => void,
+  isProductInList: (id: string, store: string) => boolean 
+}) => {
+  const COLUMN_COUNT = window.innerWidth >= 1536 ? 4 : 
+                      window.innerWidth >= 1024 ? 3 : 
+                      window.innerWidth >= 640 ? 2 : 1;
+  
+  const ITEM_WIDTH = window.innerWidth >= 1536 ? 300 :
+                     window.innerWidth >= 1024 ? 320 :
+                     window.innerWidth >= 640 ? 360 : 400;
+  
+  const ITEM_HEIGHT = 400;
+  const ROW_COUNT = Math.ceil(products.length / COLUMN_COUNT);
+
+  return (
+    <div style={{ height: 'calc(100vh - 300px)', width: '100%' }}>
+      <AutoSizer>
+        {({ height, width }) => (
+          <FixedSizeGrid
+            columnCount={COLUMN_COUNT}
+            columnWidth={ITEM_WIDTH}
+            height={height}
+            rowCount={ROW_COUNT}
+            rowHeight={ITEM_HEIGHT}
+            width={width}
+            style={{ padding: '1rem' }}
+            itemData={products}
+          >
+            {({ columnIndex, rowIndex, style }) => {
+              const index = rowIndex * COLUMN_COUNT + columnIndex;
+              const product = products[index];
+              
+              if (!product) return null;
+              
+              return (
+                <div style={{
+                  ...style,
+                  padding: '0.5rem',
+                  display: 'flex',
+                  justifyContent: 'center'
+                }}>
+                  <ProductCard
+                    product={product}
+                    isInList={isProductInList(product.id, product.store || '')}
+                    onAddToList={onAddToList}
+                    index={index}
+                  />
+                </div>
+              );
+            }}
+          </FixedSizeGrid>
+        )}
+      </AutoSizer>
+    </div>
+  );
+};
 
 const Index = () => {
   const { 
@@ -567,17 +628,11 @@ const Index = () => {
               ))}
             </div>
           ) : filteredResults && filteredResults.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredResults.map((product, index) => (
-                <ProductCard 
-                  key={`${product.id}-${product.store}-${index}`}  
-                  product={product} 
-                  isInList={isProductInList(product.id, product.store || '')}
-                  onAddToList={handleAddToList}
-                  index={index}
-                />
-              ))}
-            </div>
+            <VirtualizedProductGrid
+              products={filteredResults}
+              onAddToList={handleAddToList}
+              isProductInList={isProductInList}
+            />
           ) : searchResults.length > 0 ? (
             // Display this when there are search results but filtered results is empty
             <div className="text-center py-12">
