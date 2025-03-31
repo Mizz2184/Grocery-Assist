@@ -38,7 +38,7 @@ const VirtualizedProductGrid = ({ products, onAddToList, isProductInList }: {
   const ROW_COUNT = Math.ceil(products.length / COLUMN_COUNT);
 
   return (
-    <div style={{ height: 'calc(100vh - 300px)', width: '100%' }}>
+    <div style={{ width: '100%', height: '100%' }}>
       <AutoSizer>
         {({ height, width }) => (
           <FixedSizeGrid
@@ -584,7 +584,7 @@ const Index = () => {
       />
 
       {query ? (
-        <div className="space-y-6" ref={searchResultsRef}>
+        <div className="space-y-6 h-[calc(100vh-200px)]" ref={searchResultsRef}>
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <h2 className="text-xl font-medium">
               {isSearching ? (
