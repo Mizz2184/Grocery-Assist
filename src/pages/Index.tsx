@@ -747,38 +747,50 @@ const Index = () => {
                     console.log(`Tab selection changed to: ${value}`);
                     handleStoreFilterChange(value);
                   }}
-                  className="w-full md:w-auto"
+                  className="w-full"
                   defaultValue="all"
                 >
-                  <TabsList className="grid grid-cols-4 w-full md:w-auto">
+                  <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full gap-1 p-1.5 md:flex md:w-auto">
                     <TabsTrigger 
                       value="all"
-                      className={storeFilter === 'all' ? 'font-semibold' : ''}
-                      onClick={() => console.log('All stores tab clicked')}
+                      className={`px-3 py-2 text-center hover:bg-gray-50 dark:hover:bg-gray-800/50 ${
+                        storeFilter === 'all' 
+                          ? 'font-semibold bg-gray-100 dark:bg-gray-800' 
+                          : 'bg-white/80 dark:bg-gray-900/30'
+                      }`}
                     >
                       <TranslatedText es="Todas las Tiendas" en="All Stores" /> 
                       <span className="ml-1 text-xs">({searchResults.length})</span>
                     </TabsTrigger>
                     <TabsTrigger 
                       value="MaxiPali"
-                      className={storeFilter === 'MaxiPali' ? 'font-semibold bg-yellow-100 dark:bg-yellow-900/20' : ''}
-                      onClick={() => console.log('MaxiPali tab clicked')}
+                      className={`px-3 py-2 text-center hover:bg-yellow-50 dark:hover:bg-yellow-900/30 ${
+                        storeFilter === 'MaxiPali' 
+                          ? 'font-semibold bg-yellow-100 dark:bg-yellow-900/40' 
+                          : 'bg-white/80 dark:bg-gray-900/30'
+                      }`}
                     >
                       MaxiPali
                       <span className="ml-1 text-xs">({searchResults.filter(p => p.store === 'MaxiPali').length})</span>
                     </TabsTrigger>
                     <TabsTrigger 
                       value="MasxMenos"
-                      className={storeFilter === 'MasxMenos' ? 'font-semibold bg-green-100 dark:bg-green-900/20' : ''}
-                      onClick={() => console.log('MasxMenos tab clicked')}
+                      className={`px-3 py-2 text-center hover:bg-green-50 dark:hover:bg-green-900/30 ${
+                        storeFilter === 'MasxMenos' 
+                          ? 'font-semibold bg-green-100 dark:bg-green-900/40' 
+                          : 'bg-white/80 dark:bg-gray-900/30'
+                      }`}
                     >
                       MasxMenos
                       <span className="ml-1 text-xs">({searchResults.filter(p => p.store === 'MasxMenos').length})</span>
                     </TabsTrigger>
                     <TabsTrigger 
                       value="Walmart"
-                      className={storeFilter === 'Walmart' ? 'font-semibold bg-blue-100 dark:bg-blue-900/20' : ''}
-                      onClick={() => console.log('Walmart tab clicked')}
+                      className={`px-3 py-2 text-center hover:bg-blue-50 dark:hover:bg-blue-900/30 ${
+                        storeFilter === 'Walmart' 
+                          ? 'font-semibold bg-blue-100 dark:bg-blue-900/40' 
+                          : 'bg-white/80 dark:bg-gray-900/30'
+                      }`}
                     >
                       Walmart
                       <span className="ml-1 text-xs">({searchResults.filter(p => p.store === 'Walmart').length})</span>
