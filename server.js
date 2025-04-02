@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
+import Stripe from 'stripe';
 
 const app = express();
 
@@ -1030,7 +1031,7 @@ if (process.env.NODE_ENV !== 'production') {
 export default app;
 
 // Add Stripe API integration
-const stripe = require('stripe')('sk_test_51R79AbGPu5qL5mf2yllS01MspAtL9sfwkw5eXI8w7gPi99rXb5erIyPT7SdQpyxUw8d42xSESWn3WMjCDdP26IKE00FTfNFOAm');
+const stripe = new Stripe('sk_test_51R79AbGPu5qL5mf2yllS01MspAtL9sfwkw5eXI8w7gPi99rXb5erIyPT7SdQpyxUw8d42xSESWn3WMjCDdP26IKE00FTfNFOAm');
 
 // Stripe payment endpoint
 app.post('/api/create-payment-intent', async (req, res) => {
