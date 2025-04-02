@@ -274,11 +274,6 @@ export const GroceryListItem = ({
             </Badge>
           </div>
         </div>
-        {item.quantity > 1 && (
-          <div className="text-sm font-semibold text-right mt-1">
-            {renderPrice()}
-          </div>
-        )}
       </div>
       
       <div className="flex items-center gap-2">

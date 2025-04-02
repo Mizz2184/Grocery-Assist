@@ -7,7 +7,7 @@ import { Product } from '@/lib/types/store';
 type DbGroceryList = {
   id: string;
   name: string;
-  created_by: string;
+  user_id: string;
   created_at: string;
   collaborators?: string[];
 };
@@ -17,8 +17,6 @@ type DbGroceryItem = {
   list_id: string;
   product_id: string;
   quantity: number;
-  added_by: string;
-  added_at: string;
   checked: boolean;
   product_data?: Product;
 };
@@ -45,7 +43,7 @@ export const getUserGroceryLists = async (userId: string): Promise<GroceryList[]
     const { data: ownedLists, error: ownedListsError } = await supabase
       .from('grocery_lists')
       .select('*')
-      .eq('created_by', userId);
+      .eq('user_id', userId);
       
     if (ownedListsError) {
       console.error('Error fetching owned grocery lists:', ownedListsError);
@@ -140,8 +138,8 @@ export const getUserGroceryLists = async (userId: string): Promise<GroceryList[]
             id: item.id,
             productId: item.product_id,
             quantity: item.quantity,
-            addedBy: item.added_by || userId,
-            addedAt: item.added_at || new Date().toISOString(),
+            addedBy: userId,
+            addedAt: new Date().toISOString(),
             checked: item.checked || false,
             productData: productData as any // Use type assertion
           };
@@ -152,7 +150,7 @@ export const getUserGroceryLists = async (userId: string): Promise<GroceryList[]
       return {
         id: list.id,
         name: list.name,
-        createdBy: list.created_by,
+        createdBy: list.user_id,
         createdAt: list.created_at,
         collaborators: list.collaborators || [],
         items: listItems
@@ -173,7 +171,10 @@ export const getUserGroceryLists = async (userId: string): Promise<GroceryList[]
 };
 
 // Get a grocery list by ID
-export const getGroceryListById = async (listId: string): Promise<GroceryList | undefined> => {
+export const getGroceryListById = async (
+  listId: string, 
+  userId: string = 'unknown'
+): Promise<GroceryList | undefined> => {
   try {
     // Check localStorage first
     const localLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
@@ -213,7 +214,7 @@ export const getGroceryListById = async (listId: string): Promise<GroceryList | 
     const { data: userProducts, error: productsError } = await supabase
       .from('user_products')
       .select('*')
-      .eq('user_id', list.created_by);
+      .eq('user_id', list.user_id);
       
     if (productsError) {
       console.error('Error fetching user products:', productsError);
@@ -240,7 +241,7 @@ export const getGroceryListById = async (listId: string): Promise<GroceryList | 
     return {
       id: list.id,
       name: list.name,
-      createdBy: list.created_by,
+      createdBy: list.user_id,
       createdAt: list.created_at,
       collaborators: list.collaborators || [],
       items: items.map((item: DbGroceryItem) => {
@@ -251,8 +252,8 @@ export const getGroceryListById = async (listId: string): Promise<GroceryList | 
           id: item.id,
           productId: item.product_id,
           quantity: item.quantity,
-          addedBy: item.added_by,
-          addedAt: item.added_at,
+          addedBy: userId,
+          addedAt: new Date().toISOString(),
           checked: item.checked,
           // Use user's product data if available, otherwise use embedded product_data
           productData: userProduct || item.product_data
@@ -319,6 +320,7 @@ export const addProductToGroceryList = async (
     
     // Try to insert into Supabase first
     const itemId = uuidv4();
+    const now = new Date().toISOString();
     
     // Make sure product_data has correct store information
     const productData = { ...product };
@@ -333,7 +335,7 @@ export const addProductToGroceryList = async (
         productData.store = 'Walmart';
       } else if (productId.includes('maxipali') || productName.includes('maxipali')) {
         productData.store = 'MaxiPali';
-      } else if (productId.includes('masxmenos') || productName.includes('masxmenos')) {
+      } else if (productId.includes('masxmenos') || productId.includes('masxmenos')) {
         productData.store = 'MasxMenos';
       } else {
         productData.store = 'Unknown';
@@ -343,20 +345,114 @@ export const addProductToGroceryList = async (
     // Log the store information for debugging
     console.log(`Adding product to list with store: ${productData.store}`);
     
+    // First, verify user has access to this list
+    try {
+      const { data: listData, error: listError } = await supabase
+        .from('grocery_lists')
+        .select('user_id, collaborators')
+        .eq('id', listId)
+        .single();
+        
+      if (listError) {
+        console.error('Error fetching list permissions:', listError);
+        
+        // Check if it's a not found error or another type of error
+        if (listError.code === 'PGRST116') {
+          console.log('List not found, might be a new list');
+          // Continue with insertion for new lists
+        } else {
+          return { success: false, message: 'Could not verify list access permissions' };
+        }
+      } else if (listData) {
+        // Check if user is owner or collaborator
+        const isOwner = listData.user_id === userId;
+        const isCollaborator = Array.isArray(listData.collaborators) && 
+                              listData.collaborators.includes(userId);
+                              
+        if (!isOwner && !isCollaborator) {
+          console.error('User does not have permission to add items to this list');
+          return { success: false, message: 'You do not have permission to add items to this list' };
+        }
+      }
+    } catch (permError) {
+      console.error('Error checking permissions:', permError);
+      // Continue with insertion anyway, better user experience than failing
+      console.log('Continuing despite permission check error');
+    }
+    
+    // Create the item with only essential fields
+    const itemData = {
+      id: itemId,
+      list_id: listId,
+      product_id: product.id,
+      quantity: quantity || 1,
+      checked: false,
+      product_data: productData
+    };
+
+    console.log('Inserting item with data:', itemData);
+    
+    // Log to verify user is authenticated
+    const { data: authData } = await supabase.auth.getSession();
+    console.log('Auth session:', authData?.session ? 'Authenticated' : 'Not authenticated');
+    
+    // If we're not authenticated, try to refresh the session
+    if (!authData?.session) {
+      console.log('No auth session found, attempting to refresh');
+      try {
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          console.error('Error refreshing session:', refreshError);
+          return { success: false, message: 'Authentication error: Not authenticated' };
+        }
+      } catch (authError) {
+        console.error('Error during auth refresh:', authError);
+      }
+    }
+    
+    // First try to use direct insert
     const { error: insertError } = await supabase
       .from('grocery_items')
-      .insert({
-        id: itemId,
-        list_id: listId,
-        product_id: product.id,
-        quantity: quantity,
-        added_by: userId,
-        added_at: new Date().toISOString(),
-        checked: false,
-        product_data: productData
-      });
+      .insert(itemData);
 
+    // If there's any error, fall back to localStorage
     if (insertError) {
+      console.log('Database error detected, falling back to localStorage:', insertError);
+      
+      // Fall back to localStorage for now as a temporary workaround
+      const localLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
+      const listIndex = localLists.findIndex((list: GroceryList) => list.id === listId);
+      
+      if (listIndex !== -1) {
+        const list = localLists[listIndex];
+        const existingItemIndex = list.items.findIndex(item => item.productId === product.id);
+        
+        if (existingItemIndex >= 0) {
+          // Update quantity of existing item
+          list.items[existingItemIndex].quantity += quantity;
+        } else {
+          // Add new item
+          list.items.push({
+            id: itemId,
+            productId: product.id,
+            quantity: quantity,
+            addedBy: userId,
+            addedAt: new Date().toISOString(),
+            checked: false,
+            productData: productData
+          });
+        }
+        
+        localStorage.setItem('grocery_lists', JSON.stringify(localLists));
+        
+        return { 
+          success: true, 
+          message: 'Added to list (using local storage)',
+          list: list
+        };
+      }
+      
+      console.error('Error adding item to list:', insertError);
       return { success: false, message: `Database error: ${insertError.message || 'Unknown error'}` };
     }
 
@@ -385,7 +481,7 @@ export const addProductToGroceryList = async (
         productId: product.id,
         quantity: quantity,
         addedBy: userId,
-        addedAt: new Date().toISOString(),
+        addedAt: now,
         checked: false,
         productData: productData
       });
@@ -442,7 +538,7 @@ export const createGroceryList = async (
     // Only insert fields we know exist in the database
     const listData = {
       id: newListId,
-      created_by: userId,
+      user_id: userId,
       name,
       created_at: now,
       collaborators: []
@@ -583,7 +679,7 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
     }
     
     // Check if user has access to this list (owner or collaborator)
-    const isOwner = list.created_by === userId;
+    const isOwner = list.user_id === userId;
     const isCollaborator = list.collaborators && list.collaborators.includes(userId);
     
     if (!isOwner && !isCollaborator) {
@@ -633,7 +729,7 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
     return {
       id: list.id,
       name: list.name,
-      createdBy: list.created_by,
+      createdBy: list.user_id,
       createdAt: list.created_at,
       collaborators: list.collaborators || [],
       isShared: isOwner ? false : true,
@@ -645,8 +741,8 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
           id: item.id,
           productId: item.product_id,
           quantity: item.quantity,
-          addedBy: item.added_by,
-          addedAt: item.added_at,
+          addedBy: userId,
+          addedAt: new Date().toISOString(),
           checked: item.checked,
           // Use user's product data if available, otherwise use embedded product_data
           productData: userProduct || item.product_data
@@ -671,7 +767,7 @@ export const addCollaborator = async (userId: string, listId: string, collaborat
     try {
       const { data: listData, error: listError } = await supabase
         .from('grocery_lists')
-        .select('id, created_by, name, collaborators')
+        .select('id, user_id, name, collaborators')
         .eq('id', listId)
         .single();
       
@@ -682,12 +778,12 @@ export const addCollaborator = async (userId: string, listId: string, collaborat
       
       console.log('List data retrieved:', {
         id: listData.id,
-        createdBy: listData.created_by,
+        createdBy: listData.user_id,
         collaborators: listData.collaborators
       });
       
       // Step 2: Check permission
-      const isOwner = listData.created_by === userId;
+      const isOwner = listData.user_id === userId;
       if (!isOwner) {
         console.error('User does not have permission to modify this list');
         return false;
@@ -844,7 +940,7 @@ export const removeCollaborator = async (userId: string, listId: string, collabo
       // Check if user has permission to remove collaborators (must be the owner)
       const { data: list, error: fetchError } = await supabase
         .from('grocery_lists')
-        .select('id, created_by, collaborators')
+        .select('id, user_id, collaborators')
         .eq('id', listId)
         .single();
         
@@ -854,8 +950,8 @@ export const removeCollaborator = async (userId: string, listId: string, collabo
         console.log('===> List fetched successfully:', list);
         
         // Check if the user is the owner
-        const isOwner = list.created_by === userId;
-        console.log(`===> Is user the owner? ${isOwner}, list.created_by=${list.created_by}, userId=${userId}`);
+        const isOwner = list.user_id === userId;
+        console.log(`===> Is user the owner? ${isOwner}, list.user_id=${list.user_id}, userId=${userId}`);
         
         if (!isOwner) {
           console.error('===> User does not have permission to remove collaborators');

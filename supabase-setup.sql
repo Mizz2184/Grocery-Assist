@@ -25,8 +25,6 @@ CREATE TABLE IF NOT EXISTS public.grocery_items (
   list_id UUID NOT NULL REFERENCES public.grocery_lists(id) ON DELETE CASCADE,
   product_id TEXT NOT NULL,
   quantity INTEGER DEFAULT 1,
-  added_by TEXT NOT NULL,
-  added_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   checked BOOLEAN DEFAULT FALSE,
   product_data JSONB
 );

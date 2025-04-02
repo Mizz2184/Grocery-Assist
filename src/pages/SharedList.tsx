@@ -78,7 +78,9 @@ const SharedList = () => {
   const [error, setError] = useState<string | null>(null);
   const [accessRequested, setAccessRequested] = useState(false);
   const [requestingAccess, setRequestingAccess] = useState(false);
-  
+  const [notAuthorized, setNotAuthorized] = useState(false);
+  const [requestingAccessInfo, setRequestingAccessInfo] = useState<{ listId: string; listName: string; listOwner: string } | null>(null);
+
   useEffect(() => {
     const fetchSharedList = async () => {
       if (!user || !listId) {
@@ -87,39 +89,46 @@ const SharedList = () => {
       }
       
       try {
-        const list = await getSharedGroceryListById(user.id, listId);
-        
-        if (!list) {
+        const { data: listData, error: listError } = await supabase
+          .from('grocery_lists')
+          .select('*')
+          .eq('id', listId)
+          .single();
+          
+        if (listError) {
           // Try to get the list without permission check to see if it exists
           const { data: listData, error: listError } = await supabase
             .from('grocery_lists')
-            .select('id, name, created_by, collaborators')
+            .select('*')
             .eq('id', listId)
             .single();
             
           if (listError) {
-            setError("This grocery list doesn't exist.");
-            toast({
-              title: "List not found",
-              description: "This grocery list doesn't exist or has been deleted.",
-              variant: "destructive",
-            });
+            setLoading(false);
+            setError('The shared list could not be found or you do not have access to it.');
+            console.error('Error fetching list:', listError);
+            return;
           } else {
-            // The list exists but user doesn't have access
-            const isInvited = listData.collaborators && 
-              user.email && 
-              listData.collaborators.includes(user.email.toLowerCase());
-              
-            if (isInvited) {
-              setError("You need to accept the invitation to access this list.");
-              setAccessRequested(false);
-            } else {
-              setError("You don't have access to this grocery list.");
-              setAccessRequested(false);
-            }
+            // List exists but user doesn't have access
+            setNotAuthorized(true);
+            setRequestingAccessInfo({
+              listId: listData.id,
+              listName: listData.name,
+              listOwner: listData.user_id
+            });
           }
         } else {
-          setSharedList(list);
+          // Transform the listData to match the GroceryList type
+          const transformedList: GroceryListType = {
+            id: listData.id,
+            name: listData.name,
+            createdBy: listData.user_id,
+            createdAt: listData.created_at || new Date().toISOString(),
+            collaborators: listData.collaborators || [],
+            items: [],
+            isShared: true
+          };
+          setSharedList(transformedList);
         }
       } catch (error) {
         console.error('Error fetching shared list:', error);
@@ -205,7 +214,7 @@ const SharedList = () => {
       // Get list owner information
       const { data: listData, error: listError } = await supabase
         .from('grocery_lists')
-        .select('id, name, created_by')
+        .select('id, name, user_id')
         .eq('id', listId)
         .single();
         
@@ -213,11 +222,11 @@ const SharedList = () => {
         throw new Error('Failed to get list information');
       }
       
-      // Get owner user data
+      // Fetch list owner's details to display who shared the list
       const { data: ownerData, error: ownerError } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('id', listData.created_by)
+        .from('users')
+        .select('id, name, user_id')
+        .eq('id', listData.user_id)
         .single();
         
       if (ownerError) {
@@ -228,7 +237,7 @@ const SharedList = () => {
       await supabase
         .from('notifications')
         .insert({
-          user_id: listData.created_by,
+          user_id: listData.user_id,
           type: 'access_request',
           content: `${user.email} is requesting access to your list "${listData.name}"`,
           metadata: {
@@ -276,7 +285,7 @@ const SharedList = () => {
       // Get list information
       const { data: listData, error: listError } = await supabase
         .from('grocery_lists')
-        .select('id, name, created_by, collaborators')
+        .select('id, name, user_id, collaborators')
         .eq('id', listId)
         .single();
         

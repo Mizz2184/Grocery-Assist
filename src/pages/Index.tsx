@@ -35,77 +35,82 @@ const ProductGrid = ({ products, onAddToList, isProductInList }: {
 }) => {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 px-4">
-      {products.map((product, index) => (
-        <div 
-          key={product.id} 
-          className="w-full flex flex-col bg-card rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200"
-          style={{ height: "450px" }}
-          data-store={product.store || 'unknown'}
-        >
-          <div className="relative" style={{ height: "250px" }}>
-            <img 
-              src={product.imageUrl || 'https://placehold.co/400?text=No+Image'} 
-              alt={product.name}
-              className="w-full h-full object-contain rounded-t-lg bg-white"
-            />
-            <div className="absolute top-2 right-2">
-              <div className={`
-                px-2 py-1 rounded-full text-xs font-medium
-                ${product.store === 'Walmart' ? 'bg-blue-600 text-white hover:bg-blue-700' :
-                  product.store === 'MaxiPali' ? 'bg-yellow-500 text-black hover:bg-yellow-600' :
-                  product.store === 'MasxMenos' ? 'bg-green-600 text-white hover:bg-green-700' :
-                  'bg-gray-500 text-white'}
-              `}>
-                {product.store || 'Unknown'}
+      {products.map((product) => {
+        // Create a unique key by combining store and product ID
+        const uniqueKey = `${product.store}-${product.id}`;
+        
+        return (
+          <div 
+            key={uniqueKey}
+            className="w-full flex flex-col bg-card rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200"
+            style={{ height: "450px" }}
+            data-store={product.store || 'unknown'}
+          >
+            <div className="relative" style={{ height: "250px" }}>
+              <img 
+                src={product.imageUrl || 'https://placehold.co/400?text=No+Image'} 
+                alt={product.name}
+                className="w-full h-full object-contain rounded-t-lg bg-white"
+              />
+              <div className="absolute top-2 right-2">
+                <div className={`
+                  px-2 py-1 rounded-full text-xs font-medium
+                  ${product.store === 'Walmart' ? 'bg-blue-600 text-white hover:bg-blue-700' :
+                    product.store === 'MaxiPali' ? 'bg-yellow-500 text-black hover:bg-yellow-600' :
+                    product.store === 'MasxMenos' ? 'bg-green-600 text-white hover:bg-green-700' :
+                    'bg-gray-500 text-white'}
+                `}>
+                  {product.store || 'Unknown'}
+                </div>
               </div>
-            </div>
-          </div>
-          
-          <div className="flex flex-col flex-1 p-4">
-            <div className="flex items-start justify-between gap-4 mb-3">
-              <h3 className="text-base font-medium leading-tight line-clamp-2">
-                {product.name}
-              </h3>
-              <button
-                onClick={() => onAddToList(product.id)}
-                disabled={isProductInList(product.id, product.store || '')}
-                className={`
-                  shrink-0 w-8 h-8 rounded-full flex items-center justify-center
-                  ${isProductInList(product.id, product.store || '') 
-                    ? 'bg-muted text-muted-foreground' 
-                    : 'bg-primary text-primary-foreground hover:bg-primary/90'}
-                `}
-              >
-                {isProductInList(product.id, product.store || '') ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 6L9 17l-5-5"/>
-                  </svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 5v14M5 12h14"/>
-                  </svg>
-                )}
-              </button>
             </div>
             
-            <div className="mt-auto flex items-end justify-between">
-              <div>
-                <div className="text-lg font-semibold">
-                  ₡{new Intl.NumberFormat('es-CR').format(product.price)}
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  ${(product.price / 510).toFixed(2)}
-                </div>
+            <div className="flex flex-col flex-1 p-4">
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <h3 className="text-base font-medium leading-tight line-clamp-2">
+                  {product.name}
+                </h3>
+                <button
+                  onClick={() => onAddToList(product.id)}
+                  disabled={isProductInList(product.id, product.store || '')}
+                  className={`
+                    shrink-0 w-8 h-8 rounded-full flex items-center justify-center
+                    ${isProductInList(product.id, product.store || '') 
+                      ? 'bg-muted text-muted-foreground' 
+                      : 'bg-primary text-primary-foreground hover:bg-primary/90'}
+                  `}
+                >
+                  {isProductInList(product.id, product.store || '') ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                  )}
+                </button>
               </div>
-              {product.brand && (
-                <div className="text-sm text-muted-foreground">
-                  {product.brand}
+              
+              <div className="mt-auto flex items-end justify-between">
+                <div>
+                  <div className="text-lg font-semibold">
+                    ₡{new Intl.NumberFormat('es-CR').format(product.price)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    ${(product.price / 510).toFixed(2)}
+                  </div>
                 </div>
-              )}
+                {product.brand && (
+                  <div className="text-sm text-muted-foreground">
+                    {product.brand}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
@@ -119,7 +124,7 @@ const Index = () => {
   } = useSearch();
   const [productsInList, setProductsInList] = useState<Set<string>>(new Set());
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [storeFilter, setStoreFilter] = useState<string>('all');
+  const [storeFilter, setStoreFilter] = useState<'all' | 'MaxiPali' | 'MasxMenos' | 'Walmart'>('all');
   const [showBanner, setShowBanner] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -501,11 +506,12 @@ const Index = () => {
   const handleAddScannedProduct = async (product: Product) => {
     if (!user) {
       toast({
-        title: translateUI("Error"),
-        description: translateUI("Debes iniciar sesión para agregar productos a tu lista"),
+        title: translateUI("Se requiere iniciar sesión"),
+        description: translateUI("Por favor inicie sesión para agregar artículos a su lista de compras."),
         variant: "destructive",
       });
-      return;
+      navigate("/profile");
+      return Promise.reject(new Error("User not signed in"));
     }
     
     try {
@@ -513,16 +519,19 @@ const Index = () => {
       
       // Get the default list or create one if it doesn't exist
       const defaultList = await getOrCreateDefaultList(user.id);
-      if (!defaultList) {
-        throw new Error('Could not get or create default list');
-      }
+      console.log('Default list for scanned product:', defaultList);
       
       // Add the product to the list
       const result = await addProductToGroceryList(defaultList.id, user.id, product);
       console.log('Result of adding scanned product:', result);
       
-      if (!result) {
-        throw new Error('Failed to add product to list');
+      if (!result.success) {
+        toast({
+          title: translateUI("Error"),
+          description: result.message ? translateUI(result.message) : translateUI("No se pudo agregar el producto a la lista"),
+          variant: "destructive",
+        });
+        return Promise.reject(new Error(result.message));
       }
       
       // Update the list of products in user's lists with the product ID directly
@@ -533,13 +542,10 @@ const Index = () => {
         description: translateUI(`${product.name || 'Producto'} agregado a ${defaultList.name}`),
       });
       
+      return Promise.resolve();
     } catch (error) {
       console.error('Error adding scanned product to list:', error);
-      toast({
-        title: translateUI("Error"),
-        description: translateUI("Error al agregar el producto a la lista"),
-        variant: "destructive",
-      });
+      return Promise.reject(error);
     }
   };
 
@@ -659,7 +665,7 @@ const Index = () => {
     console.log(`Changing store filter from ${storeFilter} to ${value}`);
     
     // Set the new filter value
-    setStoreFilter(value);
+    setStoreFilter(value as 'all' | 'MaxiPali' | 'MasxMenos' | 'Walmart');
     
     // Debug expected count from newly selected filter
     if (value !== 'all' && searchResults.length > 0) {
@@ -747,53 +753,49 @@ const Index = () => {
               </h2>
               
               {searchResults.length > 0 && !isSearching && (
-                <div className="w-full max-w-xs mx-auto sm:mx-0">
-                  <Select 
-                    value={storeFilter} 
-                    onValueChange={(value) => {
-                      console.log(`Store selection changed to: ${value}`);
-                      handleStoreFilterChange(value);
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select Store" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">
-                        <div className="flex items-center justify-between w-full">
-                          <span><TranslatedText es="Todas las Tiendas" en="All Stores" /></span>
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800">
-                            {searchResults.length}
-                          </span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="MaxiPali">
-                        <div className="flex items-center justify-between w-full">
-                          <span>MaxiPali</span>
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/40">
-                            {searchResults.filter(p => p.store === 'MaxiPali').length}
-                          </span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="MasxMenos">
-                        <div className="flex items-center justify-between w-full">
-                          <span>MasxMenos</span>
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40">
-                            {searchResults.filter(p => p.store === 'MasxMenos').length}
-                          </span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="Walmart">
-                        <div className="flex items-center justify-between w-full">
-                          <span>Walmart</span>
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40">
-                            {searchResults.filter(p => p.store === 'Walmart').length}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <Select
+                  value={storeFilter}
+                  onValueChange={(value) => {
+                    console.log(`Store selection changed to: ${value}`);
+                    handleStoreFilterChange(value);
+                  }}
+                >
+                  <SelectTrigger className="w-full md:w-[200px] mb-4">
+                    <SelectValue placeholder="Select Store" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">
+                      <div className="flex items-center justify-between w-full">
+                        <span><TranslatedText es="Todas las Tiendas" en="All Stores" /></span>
+                        <span className="text-xs text-muted-foreground">({searchResults.length})</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="MaxiPali">
+                      <div className="flex items-center justify-between w-full">
+                        <span>MaxiPali</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({searchResults.filter(p => p.store === 'MaxiPali').length})
+                        </span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="MasxMenos">
+                      <div className="flex items-center justify-between w-full">
+                        <span>MasxMenos</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({searchResults.filter(p => p.store === 'MasxMenos').length})
+                        </span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="Walmart">
+                      <div className="flex items-center justify-between w-full">
+                        <span>Walmart</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({searchResults.filter(p => p.store === 'Walmart').length})
+                        </span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               )}
             </div>
           </div>
@@ -809,8 +811,8 @@ const Index = () => {
             </div>
           ) : filteredResults && filteredResults.length > 0 ? (
             <div style={{ width: "100%", maxWidth: "100%" }}>
-              <ProductGrid
-                products={filteredResults}
+              <ProductGrid 
+                products={filteredResults} 
                 onAddToList={handleAddToList}
                 isProductInList={isProductInList}
               />
