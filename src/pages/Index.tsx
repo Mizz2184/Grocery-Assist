@@ -750,50 +750,66 @@ const Index = () => {
                   className="w-full"
                   defaultValue="all"
                 >
-                  <TabsList className="grid grid-cols-2 gap-2 p-2 w-full">
+                  <TabsList className="flex flex-col sm:grid sm:grid-cols-4 gap-2 p-2 w-full bg-transparent">
                     <TabsTrigger 
                       value="all"
-                      className={`px-4 py-3 text-center rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 ${
-                        storeFilter === 'all' 
-                          ? 'font-semibold bg-gray-100 dark:bg-gray-800' 
-                          : 'bg-white/80 dark:bg-gray-900/30'
-                      }`}
+                      className={`w-full min-h-[48px] px-4 py-3 text-center rounded-lg transition-all
+                        ${storeFilter === 'all' 
+                          ? 'font-semibold bg-gray-100 dark:bg-gray-800 shadow-sm' 
+                          : 'bg-white dark:bg-gray-900/30 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                        }`}
                     >
-                      <TranslatedText es="Todas las Tiendas" en="All Stores" /> 
-                      <span className="ml-1 text-xs">({searchResults.length})</span>
+                      <div className="flex items-center justify-center gap-2">
+                        <span><TranslatedText es="Todas las Tiendas" en="All Stores" /></span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700">
+                          {searchResults.length}
+                        </span>
+                      </div>
                     </TabsTrigger>
                     <TabsTrigger 
                       value="MaxiPali"
-                      className={`px-4 py-3 text-center rounded-lg hover:bg-yellow-50 dark:hover:bg-yellow-900/30 ${
-                        storeFilter === 'MaxiPali' 
-                          ? 'font-semibold bg-yellow-100 dark:bg-yellow-900/40' 
-                          : 'bg-white/80 dark:bg-gray-900/30'
-                      }`}
+                      className={`w-full min-h-[48px] px-4 py-3 text-center rounded-lg transition-all
+                        ${storeFilter === 'MaxiPali' 
+                          ? 'font-semibold bg-yellow-100 dark:bg-yellow-900/40 shadow-sm' 
+                          : 'bg-white dark:bg-gray-900/30 hover:bg-yellow-50 dark:hover:bg-yellow-900/30'
+                        }`}
                     >
-                      MaxiPali
-                      <span className="ml-1 text-xs">({searchResults.filter(p => p.store === 'MaxiPali').length})</span>
+                      <div className="flex items-center justify-center gap-2">
+                        <span>MaxiPali</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-200 dark:bg-yellow-900">
+                          {searchResults.filter(p => p.store === 'MaxiPali').length}
+                        </span>
+                      </div>
                     </TabsTrigger>
                     <TabsTrigger 
                       value="MasxMenos"
-                      className={`px-4 py-3 text-center rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 ${
-                        storeFilter === 'MasxMenos' 
-                          ? 'font-semibold bg-green-100 dark:bg-green-900/40' 
-                          : 'bg-white/80 dark:bg-gray-900/30'
-                      }`}
+                      className={`w-full min-h-[48px] px-4 py-3 text-center rounded-lg transition-all
+                        ${storeFilter === 'MasxMenos' 
+                          ? 'font-semibold bg-green-100 dark:bg-green-900/40 shadow-sm' 
+                          : 'bg-white dark:bg-gray-900/30 hover:bg-green-50 dark:hover:bg-green-900/30'
+                        }`}
                     >
-                      MasxMenos
-                      <span className="ml-1 text-xs">({searchResults.filter(p => p.store === 'MasxMenos').length})</span>
+                      <div className="flex items-center justify-center gap-2">
+                        <span>MasxMenos</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-200 dark:bg-green-900">
+                          {searchResults.filter(p => p.store === 'MasxMenos').length}
+                        </span>
+                      </div>
                     </TabsTrigger>
                     <TabsTrigger 
                       value="Walmart"
-                      className={`px-4 py-3 text-center rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 ${
-                        storeFilter === 'Walmart' 
-                          ? 'font-semibold bg-blue-100 dark:bg-blue-900/40' 
-                          : 'bg-white/80 dark:bg-gray-900/30'
-                      }`}
+                      className={`w-full min-h-[48px] px-4 py-3 text-center rounded-lg transition-all
+                        ${storeFilter === 'Walmart' 
+                          ? 'font-semibold bg-blue-100 dark:bg-blue-900/40 shadow-sm' 
+                          : 'bg-white dark:bg-gray-900/30 hover:bg-blue-50 dark:hover:bg-blue-900/30'
+                        }`}
                     >
-                      Walmart
-                      <span className="ml-1 text-xs">({searchResults.filter(p => p.store === 'Walmart').length})</span>
+                      <div className="flex items-center justify-center gap-2">
+                        <span>Walmart</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-200 dark:bg-blue-900">
+                          {searchResults.filter(p => p.store === 'Walmart').length}
+                        </span>
+                      </div>
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>
