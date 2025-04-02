@@ -20,6 +20,13 @@ import { useTranslation } from "@/context/TranslationContext";
 import { TranslatedText } from "@/App";
 import { FixedSizeGrid } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 const ProductGrid = ({ products, onAddToList, isProductInList }: { 
   products: Product[], 
@@ -112,7 +119,7 @@ const Index = () => {
   } = useSearch();
   const [productsInList, setProductsInList] = useState<Set<string>>(new Set());
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [storeFilter, setStoreFilter] = useState<'all' | 'MaxiPali' | 'MasxMenos' | 'Walmart'>('all');
+  const [storeFilter, setStoreFilter] = useState<string>('all');
   const [showBanner, setShowBanner] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -494,12 +501,11 @@ const Index = () => {
   const handleAddScannedProduct = async (product: Product) => {
     if (!user) {
       toast({
-        title: translateUI("Se requiere iniciar sesión"),
-        description: translateUI("Por favor inicie sesión para agregar artículos a su lista de compras."),
+        title: translateUI("Error"),
+        description: translateUI("Debes iniciar sesión para agregar productos a tu lista"),
         variant: "destructive",
       });
-      navigate("/profile");
-      return Promise.reject(new Error("User not signed in"));
+      return;
     }
     
     try {
@@ -507,19 +513,16 @@ const Index = () => {
       
       // Get the default list or create one if it doesn't exist
       const defaultList = await getOrCreateDefaultList(user.id);
-      console.log('Default list for scanned product:', defaultList);
+      if (!defaultList) {
+        throw new Error('Could not get or create default list');
+      }
       
       // Add the product to the list
       const result = await addProductToGroceryList(defaultList.id, user.id, product);
       console.log('Result of adding scanned product:', result);
       
-      if (!result.success) {
-        toast({
-          title: translateUI("Error"),
-          description: result.message ? translateUI(result.message) : translateUI("No se pudo agregar el producto a la lista"),
-          variant: "destructive",
-        });
-        return Promise.reject(new Error(result.message));
+      if (!result) {
+        throw new Error('Failed to add product to list');
       }
       
       // Update the list of products in user's lists with the product ID directly
@@ -530,10 +533,13 @@ const Index = () => {
         description: translateUI(`${product.name || 'Producto'} agregado a ${defaultList.name}`),
       });
       
-      return Promise.resolve();
     } catch (error) {
       console.error('Error adding scanned product to list:', error);
-      return Promise.reject(error);
+      toast({
+        title: translateUI("Error"),
+        description: translateUI("Error al agregar el producto a la lista"),
+        variant: "destructive",
+      });
     }
   };
 
@@ -653,7 +659,7 @@ const Index = () => {
     console.log(`Changing store filter from ${storeFilter} to ${value}`);
     
     // Set the new filter value
-    setStoreFilter(value as 'all' | 'MaxiPali' | 'MasxMenos' | 'Walmart');
+    setStoreFilter(value);
     
     // Debug expected count from newly selected filter
     if (value !== 'all' && searchResults.length > 0) {
@@ -741,78 +747,53 @@ const Index = () => {
               </h2>
               
               {searchResults.length > 0 && !isSearching && (
-                <Tabs 
-                  value={storeFilter} 
-                  onValueChange={(value) => {
-                    console.log(`Tab selection changed to: ${value}`);
-                    handleStoreFilterChange(value);
-                  }}
-                  className="w-full"
-                  defaultValue="all"
-                >
-                  <TabsList className="flex flex-col sm:grid sm:grid-cols-4 gap-2 p-2 w-full bg-transparent">
-                    <TabsTrigger 
-                      value="all"
-                      className={`w-full min-h-[48px] px-4 py-3 text-center rounded-lg transition-all
-                        ${storeFilter === 'all' 
-                          ? 'font-semibold bg-gray-100 dark:bg-gray-800 shadow-sm' 
-                          : 'bg-white dark:bg-gray-900/30 hover:bg-gray-50 dark:hover:bg-gray-800/50'
-                        }`}
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <span><TranslatedText es="Todas las Tiendas" en="All Stores" /></span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700">
-                          {searchResults.length}
-                        </span>
-                      </div>
-                    </TabsTrigger>
-                    <TabsTrigger 
-                      value="MaxiPali"
-                      className={`w-full min-h-[48px] px-4 py-3 text-center rounded-lg transition-all
-                        ${storeFilter === 'MaxiPali' 
-                          ? 'font-semibold bg-yellow-100 dark:bg-yellow-900/40 shadow-sm' 
-                          : 'bg-white dark:bg-gray-900/30 hover:bg-yellow-50 dark:hover:bg-yellow-900/30'
-                        }`}
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <span>MaxiPali</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-200 dark:bg-yellow-900">
-                          {searchResults.filter(p => p.store === 'MaxiPali').length}
-                        </span>
-                      </div>
-                    </TabsTrigger>
-                    <TabsTrigger 
-                      value="MasxMenos"
-                      className={`w-full min-h-[48px] px-4 py-3 text-center rounded-lg transition-all
-                        ${storeFilter === 'MasxMenos' 
-                          ? 'font-semibold bg-green-100 dark:bg-green-900/40 shadow-sm' 
-                          : 'bg-white dark:bg-gray-900/30 hover:bg-green-50 dark:hover:bg-green-900/30'
-                        }`}
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <span>MasxMenos</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-200 dark:bg-green-900">
-                          {searchResults.filter(p => p.store === 'MasxMenos').length}
-                        </span>
-                      </div>
-                    </TabsTrigger>
-                    <TabsTrigger 
-                      value="Walmart"
-                      className={`w-full min-h-[48px] px-4 py-3 text-center rounded-lg transition-all
-                        ${storeFilter === 'Walmart' 
-                          ? 'font-semibold bg-blue-100 dark:bg-blue-900/40 shadow-sm' 
-                          : 'bg-white dark:bg-gray-900/30 hover:bg-blue-50 dark:hover:bg-blue-900/30'
-                        }`}
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <span>Walmart</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-200 dark:bg-blue-900">
-                          {searchResults.filter(p => p.store === 'Walmart').length}
-                        </span>
-                      </div>
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                <div className="w-full max-w-xs mx-auto sm:mx-0">
+                  <Select 
+                    value={storeFilter} 
+                    onValueChange={(value) => {
+                      console.log(`Store selection changed to: ${value}`);
+                      handleStoreFilterChange(value);
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select Store" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">
+                        <div className="flex items-center justify-between w-full">
+                          <span><TranslatedText es="Todas las Tiendas" en="All Stores" /></span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800">
+                            {searchResults.length}
+                          </span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="MaxiPali">
+                        <div className="flex items-center justify-between w-full">
+                          <span>MaxiPali</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/40">
+                            {searchResults.filter(p => p.store === 'MaxiPali').length}
+                          </span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="MasxMenos">
+                        <div className="flex items-center justify-between w-full">
+                          <span>MasxMenos</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40">
+                            {searchResults.filter(p => p.store === 'MasxMenos').length}
+                          </span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Walmart">
+                        <div className="flex items-center justify-between w-full">
+                          <span>Walmart</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40">
+                            {searchResults.filter(p => p.store === 'Walmart').length}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               )}
             </div>
           </div>
@@ -828,36 +809,6 @@ const Index = () => {
             </div>
           ) : filteredResults && filteredResults.length > 0 ? (
             <div style={{ width: "100%", maxWidth: "100%" }}>
-              {storeFilter !== 'all' && (
-                <div className={`mb-4 py-2 px-4 rounded-lg border flex items-center justify-between
-                  ${storeFilter === 'Walmart' ? 'bg-blue-50 text-blue-800 border-blue-300 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800' : 
-                   storeFilter === 'MaxiPali' ? 'bg-yellow-50 text-yellow-800 border-yellow-300 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800' : 
-                   storeFilter === 'MasxMenos' ? 'bg-green-50 text-green-800 border-green-300 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800' : 
-                   'bg-gray-50 text-gray-800 border-gray-300 dark:bg-gray-900/20 dark:text-gray-300 dark:border-gray-800'
-                  }`}>
-                  <div className="flex items-center">
-                    <div className={`w-4 h-4 rounded-full mr-2
-                      ${storeFilter === 'Walmart' ? 'bg-blue-600' : 
-                       storeFilter === 'MaxiPali' ? 'bg-yellow-500' : 
-                       storeFilter === 'MasxMenos' ? 'bg-green-600' : 
-                       'bg-gray-500'
-                      }`}></div>
-                    <span className="font-medium">
-                      <TranslatedText 
-                        es={`Mostrando solo productos de ${storeFilter}`}
-                        en={`Showing only ${storeFilter} products`}
-                      />
-                    </span>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleStoreFilterChange('all')}
-                    className="text-xs">
-                    <TranslatedText es="Ver todas las tiendas" en="View all stores" />
-                  </Button>
-                </div>
-              )}
               <ProductGrid
                 products={filteredResults}
                 onAddToList={handleAddToList}
