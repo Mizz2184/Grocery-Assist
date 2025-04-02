@@ -2,7 +2,7 @@ import { GroceryList, GroceryListItem, mockGroceryLists } from '@/utils/productD
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/lib/supabase';
 import { Product } from '@/lib/types/store';
-import { getProductStore } from '@/utils/storeUtils';
+import { getProductStore, STORE } from '@/utils/storeUtils';
 
 // Database types
 type DbGroceryList = {
@@ -283,10 +283,11 @@ export const addProductToGroceryList = async (
 ): Promise<{ success: boolean; message?: string; list?: GroceryList }> => {
   try {
     // Ensure product has store information properly set using our utility function
+    const originalStore = product.store;
     product.store = getProductStore(product);
     
     // Log the store detection for debugging
-    console.log(`Detected store for product (${product.id}): ${product.store}`);
+    console.log(`addProductToGroceryList: Product ${product.id} store detection - Original: ${originalStore}, Normalized: ${product.store}`);
     
     // Check if the user already has this product in any list
     const lists = await getUserGroceryLists(userId);
@@ -297,10 +298,44 @@ export const addProductToGroceryList = async (
     }
     
     // Check if product already exists in the list by product ID and store
-    const existingItem = targetList.items.find(item => 
-      item.productId === product.id && 
-      getProductStore(item.productData) === product.store
-    );
+    const existingItem = targetList.items.find(item => {
+      // First check if product IDs match
+      if (item.productId === product.id) {
+        // Now check if stores match using our normalized store detection
+        const itemStore = getProductStore(item.productData);
+        const newItemStore = getProductStore(product);
+        
+        console.log(`addProductToGroceryList: Comparing stores for duplicate check - List item: ${itemStore}, New item: ${newItemStore}`);
+        
+        // Check for exact match
+        if (itemStore === newItemStore) {
+          return true;
+        }
+        
+        // Also check if both are the same store with different formatting
+        const itemStoreLower = itemStore.toLowerCase();
+        const newItemStoreLower = newItemStore.toLowerCase();
+        
+        // Check for MaxiPali vs MasxMenos special case
+        if ((itemStoreLower.includes('maxi') && newItemStoreLower.includes('maxi')) ||
+            (itemStoreLower.includes('mas') && newItemStoreLower.includes('mas'))) {
+          
+          // Both MaxiPali
+          if (!itemStoreLower.includes('menos') && !newItemStoreLower.includes('menos')) {
+            console.log(`addProductToGroceryList: Both items appear to be MaxiPali products`);
+            return true;
+          }
+          
+          // Both MasxMenos
+          if (itemStoreLower.includes('menos') && newItemStoreLower.includes('menos')) {
+            console.log(`addProductToGroceryList: Both items appear to be MasxMenos products`);
+            return true;
+          }
+        }
+      }
+      
+      return false;
+    });
     
     if (existingItem) {
       console.log(`Product already exists in list (id: ${existingItem.id}), increasing quantity from ${existingItem.quantity} to ${existingItem.quantity + quantity}`);
@@ -451,10 +486,44 @@ export const addProductToGroceryList = async (
         const list = localLists[listIndex];
         
         // Check again for existing item in localStorage by product ID and store
-        const existingItemIndex = list.items.findIndex(item => 
-          item.productId === product.id && 
-          getProductStore(item.productData) === product.store
-        );
+        const existingItemIndex = list.items.findIndex((item: any) => {
+          // First check if product IDs match
+          if (item.productId === product.id) {
+            // Now check if stores match using our normalized store detection
+            const itemStore = getProductStore(item.productData);
+            const newItemStore = getProductStore(product);
+            
+            console.log(`localStorage fallback: Comparing stores - List item: ${itemStore}, New item: ${newItemStore}`);
+            
+            // Check for exact match
+            if (itemStore === newItemStore) {
+              return true;
+            }
+            
+            // Also check if both are the same store with different formatting
+            const itemStoreLower = itemStore.toLowerCase();
+            const newItemStoreLower = newItemStore.toLowerCase();
+            
+            // Check for MaxiPali vs MasxMenos special case
+            if ((itemStoreLower.includes('maxi') && newItemStoreLower.includes('maxi')) ||
+                (itemStoreLower.includes('mas') && newItemStoreLower.includes('mas'))) {
+              
+              // Both MaxiPali
+              if (!itemStoreLower.includes('menos') && !newItemStoreLower.includes('menos')) {
+                console.log(`localStorage fallback: Both items appear to be MaxiPali products`);
+                return true;
+              }
+              
+              // Both MasxMenos
+              if (itemStoreLower.includes('menos') && newItemStoreLower.includes('menos')) {
+                console.log(`localStorage fallback: Both items appear to be MasxMenos products`);
+                return true;
+              }
+            }
+          }
+          
+          return false;
+        });
         
         if (existingItemIndex >= 0) {
           // Update quantity of existing item
@@ -500,10 +569,44 @@ export const addProductToGroceryList = async (
     const list = localLists[listIndex];
     
     // Check for existing item in localStorage by product ID and store
-    const existingItemIndex = list.items.findIndex(item => 
-      item.productId === product.id && 
-      getProductStore(item.productData) === product.store
-    );
+    const existingItemIndex = list.items.findIndex((item: any) => {
+      // First check if product IDs match
+      if (item.productId === product.id) {
+        // Now check if stores match using our normalized store detection
+        const itemStore = getProductStore(item.productData);
+        const newItemStore = getProductStore(product);
+        
+        console.log(`Final localStorage update: Comparing stores - List item: ${itemStore}, New item: ${newItemStore}`);
+        
+        // Check for exact match
+        if (itemStore === newItemStore) {
+          return true;
+        }
+        
+        // Also check if both are the same store with different formatting
+        const itemStoreLower = itemStore.toLowerCase();
+        const newItemStoreLower = newItemStore.toLowerCase();
+        
+        // Check for MaxiPali vs MasxMenos special case
+        if ((itemStoreLower.includes('maxi') && newItemStoreLower.includes('maxi')) ||
+            (itemStoreLower.includes('mas') && newItemStoreLower.includes('mas'))) {
+          
+          // Both MaxiPali
+          if (!itemStoreLower.includes('menos') && !newItemStoreLower.includes('menos')) {
+            console.log(`Final localStorage update: Both items appear to be MaxiPali products`);
+            return true;
+          }
+          
+          // Both MasxMenos
+          if (itemStoreLower.includes('menos') && newItemStoreLower.includes('menos')) {
+            console.log(`Final localStorage update: Both items appear to be MasxMenos products`);
+            return true;
+          }
+        }
+      }
+      
+      return false;
+    });
     
     if (existingItemIndex >= 0) {
       // Update quantity of existing item

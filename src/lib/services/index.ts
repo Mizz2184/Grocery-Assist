@@ -148,8 +148,7 @@ export const searchMasxMenosProducts = async ({
             ? product.categories[0].split('/').filter(Boolean).pop() || 'Uncategorized'
             : 'Uncategorized',
           store: 'MasxMenos',
-          sku: item?.itemId || '',
-          ean: item?.ean || '',
+          barcode: item?.ean || '',
         };
       });
     
@@ -232,23 +231,40 @@ export const searchWalmartProducts = async ({ query, page = 1, pageSize = 30 }: 
 
     // Check if the products have all required fields and add proper store
     const validProducts = response.data.products.map(product => {
-      if (!product.store) {
-        console.warn('Walmart product missing store field, adding it');
-        product.store = 'Walmart';
-      }
+      // Important: Explicitly set the store to 'Walmart' with the exact spelling
+      // This ensures Walmart products use the EXACT same store name throughout the app
       
       // Debug log for each product
       console.log(`Processing Walmart product: id=${product.id}, name=${product.name}, price=${product.price}, store=${product.store || 'undefined'}`);
       
-      // Fix any other missing fields
-      return {
-        ...product,
-        store: 'Walmart', // Ensure this is always set
+      // Only include properties that are part of the Product type
+      const normalizedProduct: Product = {
         id: product.id || `walmart-api-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         name: product.name || 'Unknown Walmart Product',
         price: typeof product.price === 'string' ? parseFloat(product.price) : (product.price || 0),
-        imageUrl: product.imageUrl || ''
-      } as Product;
+        store: 'Walmart', // Always ensure this exact spelling
+        imageUrl: product.imageUrl || '',
+        // Optional properties - only add if present in the product
+        ...(product.description && { description: product.description }),
+        ...(product.brand && { brand: product.brand }),
+        ...(product.category && { category: product.category }),
+        ...(product.barcode && { barcode: product.barcode }),
+        ...(product.regularPrice && { regularPrice: product.regularPrice }),
+        ...(product.salePrice && { salePrice: product.salePrice }),
+        ...(product.image && { image: product.image }),
+        ...(product.largeImage && { largeImage: product.largeImage }),
+        ...(product.thumbnailImage && { thumbnailImage: product.thumbnailImage }),
+        ...(product.url && { url: product.url }),
+        ...(product.productType && { productType: product.productType }),
+        ...(product.productStatus && { productStatus: product.productStatus }),
+        ...(product.prices && { prices: product.prices }),
+        ...(product.attributes && { attributes: product.attributes })
+      };
+      
+      // Log the store value after normalization to ensure consistency 
+      console.log(`Normalized Walmart product: id=${normalizedProduct.id}, store=${normalizedProduct.store}`);
+      
+      return normalizedProduct;
     });
 
     console.log(`Processed ${validProducts.length} valid Walmart products`);

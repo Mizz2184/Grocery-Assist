@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { getProductStore } from '@/utils/storeUtils';
+import { getProductStore, STORE } from '@/utils/storeUtils';
 
 const ProductGrid = ({ products, onAddToList, isProductInList }: { 
   products: Product[], 
@@ -212,6 +212,9 @@ const Index = () => {
     // New implementation: Find the actual product in active lists
     try {
       const allLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
+      const productStore = store ? store : STORE.UNKNOWN;
+      
+      console.log(`isProductInList: Checking if product ${productId} from store ${productStore} is in any list`);
       
       // Look for both product ID and store match
       for (const list of allLists) {
@@ -221,20 +224,46 @@ const Index = () => {
           if (item.productId === productId) {
             // We found a product with matching ID, now check the store
             const itemStore = getProductStore(item.productData);
-            const inputStore = store || 'Unknown';
             
             // Log for debugging
-            console.log(`Checking product ${productId}: List item store "${itemStore}" vs input store "${inputStore}"`);
+            console.log(`isProductInList: Found item with matching ID. Item store: "${itemStore}", Input store: "${productStore}"`);
             
-            if (itemStore === inputStore) {
-              console.log(`Product ${productId} from store ${inputStore} is already in list`);
+            // Use standardized store comparison
+            if (itemStore === productStore) {
+              console.log(`isProductInList: Product ${productId} from ${productStore} is already in list`);
               return true;
+            }
+            
+            // Also check if both are the same store but with different formatting
+            if (itemStore && productStore) {
+              // Normalize both to lowercase for case-insensitive comparison
+              const normalizedItemStore = itemStore.toLowerCase();
+              const normalizedInputStore = productStore.toLowerCase();
+              
+              // If they're exactly the same after normalization, it's a match
+              if (normalizedItemStore === normalizedInputStore) {
+                console.log(`isProductInList: Store match after normalization`);
+                return true;
+              }
+              
+              // Check for MaxiPali vs MasxMenos misidentification
+              if ((normalizedItemStore.includes('maxi') && normalizedInputStore.includes('maxi')) ||
+                  (normalizedItemStore.includes('mas') && normalizedInputStore.includes('mas'))) {
+                if (!normalizedItemStore.includes('menos') && !normalizedInputStore.includes('menos')) {
+                  console.log(`isProductInList: Both stores appear to be MaxiPali`);
+                  return true;
+                }
+                if (normalizedItemStore.includes('menos') && normalizedInputStore.includes('menos')) {
+                  console.log(`isProductInList: Both stores appear to be MasxMenos`);
+                  return true;
+                }
+              }
             }
           }
         }
       }
       
-      console.log(`Product ${productId} from store ${store} is NOT in any list`);
+      console.log(`isProductInList: Product ${productId} from store ${productStore} is NOT in any list`);
       return false;
     } catch (error) {
       console.error('Error checking if product is in list:', error);
