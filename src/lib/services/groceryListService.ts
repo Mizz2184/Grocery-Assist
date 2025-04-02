@@ -279,32 +279,35 @@ export const addProductToGroceryList = async (
     // Ensure product has store information properly set
     if (product.store) {
       // Normalize store property for consistency
-      const storeName = product.store.trim().toLowerCase();
+      const storeName = String(product.store).trim().toLowerCase();
       
       // Check for Walmart first to prevent false positives
       if (storeName === 'walmart' || storeName.includes('walmart')) {
         product.store = 'Walmart';
       } else if (storeName === 'maxipali' || storeName.includes('maxipali')) {
         product.store = 'MaxiPali';
-      } else if (storeName === 'masxmenos' || storeName.includes('masxmenos')) {
+      } else if (storeName === 'masxmenos' || storeName.includes('masxmenos') || storeName.includes('mas x menos')) {
         product.store = 'MasxMenos';
       }
     } else {
       // If store is missing, try to detect from product ID or name
-      const productId = product.id?.toLowerCase() || '';
-      const productName = product.name?.toLowerCase() || '';
+      const productId = String(product.id || '').toLowerCase();
+      const productName = String(product.name || '').toLowerCase();
       
       // Check for Walmart first to prevent false positives
       if (productId.includes('walmart') || productName.includes('walmart')) {
         product.store = 'Walmart';
       } else if (productId.includes('maxipali') || productName.includes('maxipali')) {
         product.store = 'MaxiPali';
-      } else if (productId.includes('masxmenos') || productName.includes('masxmenos')) {
+      } else if (productId.includes('masxmenos') || productName.includes('masxmenos') || productName.includes('mas x menos')) {
         product.store = 'MasxMenos';
       } else {
         product.store = 'Unknown';
       }
     }
+    
+    // Log the store detection for debugging
+    console.log(`Detected store for product (${product.id}): ${product.store}`);
     
     // Check if the user already has this product in any list
     const lists = await getUserGroceryLists(userId);

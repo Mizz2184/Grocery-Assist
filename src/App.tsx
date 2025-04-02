@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from "@/hooks/useAuth";
 import { SearchProvider } from "@/context/SearchContext";
@@ -148,9 +148,9 @@ export default function App() {
                   <Route path="/" element={
                     <ProtectedRoute>
                       <PaymentRequired>
-                        <div className="min-h-screen flex flex-col pt-20">
+                        <div className="min-h-screen flex flex-col pt-20 w-full">
                           <Navbar />
-                          <main className="flex-1">
+                          <main className="flex-1 w-full">
                             <Index />
                           </main>
                         </div>
@@ -161,9 +161,9 @@ export default function App() {
                   <Route path="/product/:id" element={
                     <ProtectedRoute>
                       <PaymentRequired>
-                        <div className="min-h-screen flex flex-col pt-20">
+                        <div className="min-h-screen flex flex-col pt-20 w-full">
                           <Navbar />
-                          <main className="flex-1">
+                          <main className="flex-1 w-full">
                             <Product />
                           </main>
                         </div>
@@ -174,9 +174,9 @@ export default function App() {
                   <Route path="/grocery-list" element={
                     <ProtectedRoute>
                       <PaymentRequired>
-                        <div className="min-h-screen flex flex-col pt-20">
+                        <div className="min-h-screen flex flex-col pt-20 w-full">
                           <Navbar />
-                          <main className="flex-1">
+                          <main className="flex-1 w-full">
                             <GroceryList />
                           </main>
                         </div>
@@ -187,9 +187,9 @@ export default function App() {
                   <Route path="/profile" element={
                     <ProtectedRoute>
                       <PaymentRequired>
-                        <div className="min-h-screen flex flex-col pt-20">
+                        <div className="min-h-screen flex flex-col pt-20 w-full">
                           <Navbar />
-                          <main className="flex-1">
+                          <main className="flex-1 w-full">
                             <Profile />
                           </main>
                         </div>
@@ -200,9 +200,9 @@ export default function App() {
                   <Route path="/settings" element={
                     <ProtectedRoute>
                       <PaymentRequired>
-                        <div className="min-h-screen flex flex-col pt-20">
+                        <div className="min-h-screen flex flex-col pt-20 w-full">
                           <Navbar />
-                          <main className="flex-1">
+                          <main className="flex-1 w-full">
                             <Settings />
                           </main>
                         </div>
@@ -213,9 +213,9 @@ export default function App() {
                   <Route path="/shared-list" element={
                     <ProtectedRoute>
                       <PaymentRequired>
-                        <div className="min-h-screen flex flex-col pt-20">
+                        <div className="min-h-screen flex flex-col pt-20 w-full">
                           <Navbar />
-                          <main className="flex-1">
+                          <main className="flex-1 w-full">
                             <SharedList />
                           </main>
                         </div>
@@ -226,9 +226,9 @@ export default function App() {
                   <Route path="/shared-list/:listId" element={
                     <ProtectedRoute>
                       <PaymentRequired>
-                        <div className="min-h-screen flex flex-col pt-20">
+                        <div className="min-h-screen flex flex-col pt-20 w-full">
                           <Navbar />
-                          <main className="flex-1">
+                          <main className="flex-1 w-full">
                             <SharedList />
                           </main>
                         </div>

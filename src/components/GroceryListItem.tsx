@@ -18,6 +18,7 @@ interface GroceryListItemProps {
   onToggleCheck: (id: string, checked: boolean) => void;
   onRemove: (id: string) => void;
   readOnly?: boolean;
+  storeColor?: string;
 }
 
 // Helper function to get image URL from any product structure
@@ -90,6 +91,7 @@ export const GroceryListItem = ({
   onToggleCheck,
   onRemove,
   readOnly,
+  storeColor,
 }: GroceryListItemProps) => {
   const [isRemoving, setIsRemoving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -126,23 +128,6 @@ export const GroceryListItem = ({
   const totalPrice = itemPrice * item.quantity;
   const totalPriceUSD = convertCRCtoUSD(totalPrice);
   const storeName = getProductStore(product);
-  
-  // Ensure the store badge is correctly displayed
-  <Badge 
-    variant="outline" 
-    className={cn(
-      "text-[8px] rounded-sm py-0 h-4 font-normal",
-      storeName === 'MaxiPali' 
-        ? "text-yellow-600" 
-        : storeName === 'MasxMenos' 
-          ? "text-green-600" 
-          : storeName === 'Walmart'
-            ? "text-blue-600"
-            : "text-gray-600"
-    )}
-  >
-    {storeName}
-  </Badge>
   
   // Determine store color 
   const getStoreColor = (store: string) => {
@@ -245,11 +230,18 @@ export const GroceryListItem = ({
         {/* Store Badge */}
         <div 
           className={cn(
-            "absolute top-0 left-0 w-4 h-4 flex items-center justify-center text-[8px] text-white font-bold",
-            getStoreColor(storeName)
+            "absolute top-0 left-0 w-4 h-4 flex items-center justify-center text-[8px] font-bold",
+            storeColor ? 
+              `${storeColor.split(' ')[0]} ${storeColor.split(' ')[1]}` : 
+              `${getStoreColor(storeName)} text-white`
           )}
         >
-          {storeName.charAt(0)}
+          {storeName === 'Walmart' ? 'W' : 
+           storeName === 'MaxiPali' ? 'MP' : 
+           storeName === 'MasxMenos' ? 'MxM' :
+           storeName === 'PriceSmart' ? 'PS' :
+           storeName === 'Automercado' ? 'AM' :
+           'O'}
         </div>
       </div>
       

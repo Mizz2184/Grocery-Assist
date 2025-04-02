@@ -134,7 +134,8 @@ export const ProductCard = ({
               className={cn(
                 "font-semibold",
                 product.store === 'MasxMenos' && "bg-green-600 hover:bg-green-700",
-                product.store === 'MaxiPali' && "bg-yellow-500 hover:bg-yellow-600 text-black"
+                product.store === 'MaxiPali' && "bg-yellow-500 hover:bg-yellow-600 text-black",
+                product.store === 'Walmart' && "bg-blue-600 hover:bg-blue-700 text-white"
               )}
             >
               {isTranslated ? translateText(product.store) : product.store}

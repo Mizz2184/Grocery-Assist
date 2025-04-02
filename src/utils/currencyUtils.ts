@@ -4,7 +4,7 @@
 
 // Current exchange rate from CRC to USD (approximately 1 USD = 510 CRC)
 // In production, this would come from an API
-const CRC_TO_USD_RATE = 510;
+const CRC_TO_USD_RATE = 500;
 
 /**
  * Convert Costa Rican Colón (CRC) to US Dollars (USD)

@@ -21,83 +21,84 @@ import { TranslatedText } from "@/App";
 import { FixedSizeGrid } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 
-const VirtualizedProductGrid = ({ products, onAddToList, isProductInList }: { 
+const ProductGrid = ({ products, onAddToList, isProductInList }: { 
   products: Product[], 
   onAddToList: (id: string) => void,
   isProductInList: (id: string, store: string) => boolean 
 }) => {
-  const COLUMN_COUNT = window.innerWidth >= 1536 ? 4 : 
-                      window.innerWidth >= 1024 ? 3 : 
-                      window.innerWidth >= 640 ? 2 : 1;
-  
-  // Calculate item width based on container width
-  const getItemWidth = (containerWidth: number) => {
-    if (window.innerWidth >= 1536) return 300;
-    if (window.innerWidth >= 1024) return 320;
-    if (window.innerWidth >= 640) return 360;
-    // On mobile, make items take up full width minus padding
-    return containerWidth - 32; // 16px padding on each side
-  };
-  
-  const ITEM_HEIGHT = 400;
-  const ROW_COUNT = Math.ceil(products.length / COLUMN_COUNT);
-
   return (
-    <div className="w-full h-[calc(100vh-300px)] overflow-x-hidden">
-      <AutoSizer>
-        {({ height, width }) => {
-          const itemWidth = getItemWidth(width);
-          const columnWidth = Math.min(itemWidth, width / COLUMN_COUNT);
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 px-4">
+      {products.map((product, index) => (
+        <div 
+          key={product.id} 
+          className="w-full flex flex-col bg-card rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200"
+          style={{ height: "450px" }}
+          data-store={product.store || 'unknown'}
+        >
+          <div className="relative" style={{ height: "250px" }}>
+            <img 
+              src={product.imageUrl || 'https://placehold.co/400?text=No+Image'} 
+              alt={product.name}
+              className="w-full h-full object-contain rounded-t-lg bg-white"
+            />
+            <div className="absolute top-2 right-2">
+              <div className={`
+                px-2 py-1 rounded-full text-xs font-medium
+                ${product.store === 'Walmart' ? 'bg-blue-600 text-white hover:bg-blue-700' :
+                  product.store === 'MaxiPali' ? 'bg-yellow-500 text-black hover:bg-yellow-600' :
+                  product.store === 'MasxMenos' ? 'bg-green-600 text-white hover:bg-green-700' :
+                  'bg-gray-500 text-white'}
+              `}>
+                {product.store || 'Unknown'}
+              </div>
+            </div>
+          </div>
           
-          return (
-            <FixedSizeGrid
-              columnCount={COLUMN_COUNT}
-              columnWidth={columnWidth}
-              height={height}
-              rowCount={ROW_COUNT}
-              rowHeight={ITEM_HEIGHT}
-              width={width}
-              style={{ 
-                padding: '1rem',
-                overflowX: 'hidden',
-                width: '100%',
-                maxWidth: '100vw'
-              }}
-              itemData={products}
-              overscanColumnCount={0}
-              overscanRowCount={2}
-              className="overflow-x-hidden"
-            >
-              {({ columnIndex, rowIndex, style }) => {
-                const index = rowIndex * COLUMN_COUNT + columnIndex;
-                const product = products[index];
-                
-                if (!product) return null;
-                
-                return (
-                  <div style={{
-                    ...style,
-                    padding: '0.5rem',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    width: '100%',
-                    maxWidth: '100%',
-                    overflow: 'hidden',
-                    boxSizing: 'border-box'
-                  }}>
-                    <ProductCard
-                      product={product}
-                      isInList={isProductInList(product.id, product.store || '')}
-                      onAddToList={onAddToList}
-                      index={index}
-                    />
-                  </div>
-                );
-              }}
-            </FixedSizeGrid>
-          );
-        }}
-      </AutoSizer>
+          <div className="flex flex-col flex-1 p-4">
+            <div className="flex items-start justify-between gap-4 mb-3">
+              <h3 className="text-base font-medium leading-tight line-clamp-2">
+                {product.name}
+              </h3>
+              <button
+                onClick={() => onAddToList(product.id)}
+                disabled={isProductInList(product.id, product.store || '')}
+                className={`
+                  shrink-0 w-8 h-8 rounded-full flex items-center justify-center
+                  ${isProductInList(product.id, product.store || '') 
+                    ? 'bg-muted text-muted-foreground' 
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90'}
+                `}
+              >
+                {isProductInList(product.id, product.store || '') ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6L9 17l-5-5"/>
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 5v14M5 12h14"/>
+                  </svg>
+                )}
+              </button>
+            </div>
+            
+            <div className="mt-auto flex items-end justify-between">
+              <div>
+                <div className="text-lg font-semibold">
+                  ₡{new Intl.NumberFormat('es-CR').format(product.price)}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  ${(product.price / 510).toFixed(2)}
+                </div>
+              </div>
+              {product.brand && (
+                <div className="text-sm text-muted-foreground">
+                  {product.brand}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 };
@@ -118,6 +119,25 @@ const Index = () => {
   const navigate = useNavigate();
   const searchResultsRef = useRef<HTMLDivElement>(null);
   const { translateUI } = useTranslation();
+
+  // Handle payment success redirects
+  useEffect(() => {
+    // Check if this is a redirect after a payment was initiated
+    // In test mode, we don't get a payment_intent parameter back
+    const isPotentialPaymentRedirect = localStorage.getItem(`payment_session_${user?.id}`);
+    
+    if (isPotentialPaymentRedirect && user) {
+      // Process the successful payment
+      toast({
+        title: translateUI("Payment Successful"),
+        description: translateUI("Thank you for your payment. You now have full access to search for products."),
+      });
+      
+      // User is already marked as paid in the Payment.tsx component for test mode
+      // Clear the session ID
+      localStorage.removeItem(`payment_session_${user.id}`);
+    }
+  }, [user, toast, translateUI]);
 
   // Restore scroll position when returning to the page
   useEffect(() => {
@@ -258,10 +278,10 @@ const Index = () => {
       // Add MaxiPali results
       if (maxiPaliResults && maxiPaliResults.products && maxiPaliResults.products.length > 0) {
         console.log(`Adding ${maxiPaliResults.products.length} MaxiPali products`);
-        // Make sure store field is set correctly
+        // Make sure store field is set correctly and normalized
         const maxiPaliWithStore = maxiPaliResults.products.map(p => ({
           ...p,
-          store: 'MaxiPali' as const
+          store: 'MaxiPali' as const // Keep as const for type safety
         }));
         combinedResults = [...combinedResults, ...maxiPaliWithStore];
         totalProductCount += maxiPaliResults.products.length;
@@ -273,10 +293,10 @@ const Index = () => {
       // Add MasxMenos results
       if (masxMenosResults && masxMenosResults.products && masxMenosResults.products.length > 0) {
         console.log(`Adding ${masxMenosResults.products.length} MasxMenos products`);
-        // Make sure store field is set correctly
+        // Make sure store field is set correctly and normalized
         const masxMenosWithStore = masxMenosResults.products.map(p => ({
           ...p,
-          store: 'MasxMenos' as const
+          store: 'MasxMenos' as const // Keep as const for type safety
         }));
         combinedResults = [...combinedResults, ...masxMenosWithStore];
         totalProductCount += masxMenosResults.products.length;
@@ -288,10 +308,10 @@ const Index = () => {
       // Add Walmart results
       if (walmartResults && walmartResults.products && walmartResults.products.length > 0) {
         console.log(`Adding ${walmartResults.products.length} Walmart products`);
-        // Make sure store field is set correctly
+        // Make sure store field is set correctly and normalized
         const walmartWithStore = walmartResults.products.map(p => ({
           ...p,
-          store: 'Walmart' as const
+          store: 'Walmart' as const // Keep as const for type safety
         }));
         
         // Additional debug logging for Walmart products
@@ -526,37 +546,87 @@ const Index = () => {
     
     console.log(`Filtering search results, total: ${searchResults.length}, filter: ${storeFilter}`);
     
-    // If there are Walmart products, log them to verify
-    const walmartProducts = searchResults.filter(product => product.store === 'Walmart');
-    const maxiPaliProducts = searchResults.filter(product => product.store === 'MaxiPali');
-    const masxMenosProducts = searchResults.filter(product => product.store === 'MasxMenos');
+    // Count products by store for debugging
+    const storeGroups = {
+      Walmart: 0,
+      MaxiPali: 0,
+      MasxMenos: 0,
+      Other: 0
+    };
     
-    console.log(`Current search results by store: Walmart=${walmartProducts.length}, MaxiPali=${maxiPaliProducts.length}, MasxMenos=${masxMenosProducts.length}`);
+    // Perform store counts for debugging
+    searchResults.forEach(product => {
+      const store = String(product.store || '').trim();
+      if (store === 'Walmart') storeGroups.Walmart++;
+      else if (store === 'MaxiPali') storeGroups.MaxiPali++;
+      else if (store === 'MasxMenos') storeGroups.MasxMenos++;
+      else storeGroups.Other++;
+    });
     
-    if (walmartProducts.length > 0) {
-      console.log('First Walmart product:', walmartProducts[0]);
-    } else {
-      console.warn('No Walmart products found in search results');
-    }
+    console.log('Store distribution:', storeGroups);
     
     // Apply store filter
     let results = searchResults;
     
     if (storeFilter !== 'all') {
+      console.log(`Applying filter for store: "${storeFilter}"`);
+      
+      // Create a more robust filtering function
       results = searchResults.filter(product => {
-        // Handle undefined store or malformed data
-        if (!product.store) {
-          console.error('Product missing store property:', product);
+        // Make sure product has store property
+        if (!product || !product.store) {
+          console.warn('Product missing store property:', product?.id);
           return false;
         }
         
-        // Direct comparison
-        const storeMatches = product.store === storeFilter;
-        return storeMatches;
+        // Direct equality comparison for store names - they should be consistent
+        if (product.store === storeFilter) {
+          return true;
+        }
+        
+        // Fallback to normalized comparison if direct match fails
+        const normalizedProductStore = String(product.store)
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, '');
+          
+        const normalizedFilterStore = String(storeFilter)
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, '');
+          
+        const isMatch = normalizedProductStore === normalizedFilterStore;
+        
+        // For debugging
+        if (!isMatch && product.store === storeFilter) {
+          console.warn(`Store mismatch despite text equality: '${product.store}' vs '${storeFilter}'`, 
+            { normalizedProductStore, normalizedFilterStore });
+        }
+        
+        return isMatch;
       });
-    }
       
-    console.log(`After filtering, ${results.length} products remain, filter: ${storeFilter}`);
+      console.log(`After filtering for ${storeFilter}, ${results.length} products remain`);
+      
+      // Additional debug - examine a sampling of the filtered products
+      if (results.length > 0) {
+        console.log('Sample of filtered products:');
+        results.slice(0, 3).forEach(p => {
+          console.log(`Product ID: ${p.id}, Name: ${p.name}, Store: ${p.store}`);
+        });
+      }
+      
+      // Debug if no results match
+      if (results.length === 0) {
+        console.warn(`No products found for store filter: ${storeFilter}`);
+        console.warn('Available stores in results:', [...new Set(searchResults.map(p => p.store))]);
+        
+        // Debug the first few products to see store format
+        searchResults.slice(0, 5).forEach(p => 
+          console.log(`Product store: "${p.store}" (${typeof p.store}), id: ${p.id}`)
+        );
+      }
+    }
     
     // Sort results by relevance
     const sortedResults = sortProductsByRelevance(results, query);
@@ -565,9 +635,59 @@ const Index = () => {
     return sortedResults;
   }, [searchResults, storeFilter, query]);
 
+  // Debug effect for filtered results
+  useEffect(() => {
+    if (filteredResults && filteredResults.length > 0) {
+      console.log('Current filter:', storeFilter);
+      console.log('Product count to be displayed:', filteredResults.length);
+      console.log('Store counts in filteredResults:', {
+        'Walmart': filteredResults.filter(p => p.store === 'Walmart').length,
+        'MaxiPali': filteredResults.filter(p => p.store === 'MaxiPali').length,
+        'MasxMenos': filteredResults.filter(p => p.store === 'MasxMenos').length
+      });
+    }
+  }, [filteredResults, storeFilter]);
+
+  // Handler for changing store filter
+  const handleStoreFilterChange = (value: string) => {
+    console.log(`Changing store filter from ${storeFilter} to ${value}`);
+    
+    // Set the new filter value
+    setStoreFilter(value as 'all' | 'MaxiPali' | 'MasxMenos' | 'Walmart');
+    
+    // Debug expected count from newly selected filter
+    if (value !== 'all' && searchResults.length > 0) {
+      const expectedCount = searchResults.filter(p => 
+        String(p.store).trim().toLowerCase() === value.toLowerCase()
+      ).length;
+      
+      console.log(`Selected filter: ${value}. Expected products matching this filter: ${expectedCount}`);
+      
+      // Check case sensitivity issues
+      const exactMatches = searchResults.filter(p => p.store === value).length;
+      if (exactMatches !== expectedCount) {
+        console.warn(`Store case sensitivity issue detected. Exact matches: ${exactMatches}, 
+                     Case-insensitive matches: ${expectedCount}`);
+      }
+    }
+    
+    // Provide user feedback via toast if appropriate
+    if (value !== 'all') {
+      const storeCount = searchResults.filter(p => p.store === value).length;
+      if (storeCount === 0) {
+        toast({
+          title: translateUI("No hay productos"),
+          description: translateUI(`No hay productos de ${value} para "${query}"`),
+          variant: "default",
+        });
+      }
+    }
+  };
+
   return (
-    <div className="page-container">
-      <div className="max-w-2xl mx-auto text-center mb-8 animate-fade-up">
+    <div className="w-full">
+      {/* Header section with max-width */}
+      <div className="max-w-2xl mx-auto text-center mb-8 px-4 w-full">
         <h1 className="text-4xl font-semibold tracking-tight mb-2">
           <TranslatedText es="Comparar Precios, Ahorrar Dinero" en="Compare Prices, Save Money" />
         </h1>
@@ -576,7 +696,8 @@ const Index = () => {
         </p>
       </div>
 
-      <div className="max-w-xl mx-auto mb-12 animate-fade-up animate-delay-100">
+      {/* Search bar section with max-width */}
+      <div className="max-w-xl mx-auto mb-12 px-4 w-full">
         <div className="flex gap-2 items-center">
           <div className="flex-1">
             <SearchBar 
@@ -598,50 +719,78 @@ const Index = () => {
         </div>
       </div>
 
-      {/* Barcode Scanner Modal */}
-      <BarcodeScannerModal
-        open={isScannerOpen}
-        onOpenChange={setIsScannerOpen}
-        onAddProduct={handleAddScannedProduct}
-      />
-
+      {/* Full width search results section */}
       {query ? (
-        <div className="space-y-6" ref={searchResultsRef}>
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <h2 className="text-xl font-medium">
-              {isSearching ? (
-                <TranslatedText es="Buscando..." en="Searching..." />
-              ) : searchResults.length > 0 ? (
-                <TranslatedText 
-                  es={`Se encontraron ${searchResults.length} resultados para "${query}"`}
-                  en={`Found ${searchResults.length} results for "${query}"`}
-                />
-              ) : (
-                <TranslatedText 
-                  es={`No hay resultados para "${query}"`}
-                  en={`No results for "${query}"`}
-                />
+        <div className="w-full px-4" style={{ maxWidth: "100%" }}>
+          <div className="w-full mb-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <h2 className="text-xl font-medium">
+                {isSearching ? (
+                  <TranslatedText es="Buscando..." en="Searching..." />
+                ) : searchResults.length > 0 ? (
+                  <TranslatedText 
+                    es={`Se encontraron ${storeFilter === 'all' ? searchResults.length : filteredResults.length} resultados para "${query}" ${storeFilter !== 'all' ? `en ${storeFilter}` : ''}`}
+                    en={`Found ${storeFilter === 'all' ? searchResults.length : filteredResults.length} results for "${query}" ${storeFilter !== 'all' ? `in ${storeFilter}` : ''}`}
+                  />
+                ) : (
+                  <TranslatedText 
+                    es={`No hay resultados para "${query}"`}
+                    en={`No results for "${query}"`}
+                  />
+                )}
+              </h2>
+              
+              {searchResults.length > 0 && !isSearching && (
+                <Tabs 
+                  value={storeFilter} 
+                  onValueChange={(value) => {
+                    console.log(`Tab selection changed to: ${value}`);
+                    handleStoreFilterChange(value);
+                  }}
+                  className="w-full md:w-auto"
+                  defaultValue="all"
+                >
+                  <TabsList className="grid grid-cols-4 w-full md:w-auto">
+                    <TabsTrigger 
+                      value="all"
+                      className={storeFilter === 'all' ? 'font-semibold' : ''}
+                      onClick={() => console.log('All stores tab clicked')}
+                    >
+                      <TranslatedText es="Todas las Tiendas" en="All Stores" /> 
+                      <span className="ml-1 text-xs">({searchResults.length})</span>
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="MaxiPali"
+                      className={storeFilter === 'MaxiPali' ? 'font-semibold bg-yellow-100 dark:bg-yellow-900/20' : ''}
+                      onClick={() => console.log('MaxiPali tab clicked')}
+                    >
+                      MaxiPali
+                      <span className="ml-1 text-xs">({searchResults.filter(p => p.store === 'MaxiPali').length})</span>
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="MasxMenos"
+                      className={storeFilter === 'MasxMenos' ? 'font-semibold bg-green-100 dark:bg-green-900/20' : ''}
+                      onClick={() => console.log('MasxMenos tab clicked')}
+                    >
+                      MasxMenos
+                      <span className="ml-1 text-xs">({searchResults.filter(p => p.store === 'MasxMenos').length})</span>
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="Walmart"
+                      className={storeFilter === 'Walmart' ? 'font-semibold bg-blue-100 dark:bg-blue-900/20' : ''}
+                      onClick={() => console.log('Walmart tab clicked')}
+                    >
+                      Walmart
+                      <span className="ml-1 text-xs">({searchResults.filter(p => p.store === 'Walmart').length})</span>
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
               )}
-            </h2>
-            
-            {searchResults.length > 0 && !isSearching && (
-              <Tabs 
-                value={storeFilter} 
-                onValueChange={(value) => setStoreFilter(value as 'all' | 'MaxiPali' | 'MasxMenos' | 'Walmart')}
-                className="w-full md:w-auto"
-              >
-                <TabsList className="grid grid-cols-4 w-full md:w-auto">
-                  <TabsTrigger value="all"><TranslatedText es="Todas las Tiendas" en="All Stores" /></TabsTrigger>
-                  <TabsTrigger value="MaxiPali">MaxiPali</TabsTrigger>
-                  <TabsTrigger value="MasxMenos">MasxMenos</TabsTrigger>
-                  <TabsTrigger value="Walmart">Walmart</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            )}
+            </div>
           </div>
 
           {isSearching ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4" style={{ width: "100%", maxWidth: "100%" }}>
               {Array.from({ length: 4 }).map((_, i) => (
                 <div 
                   key={i} 
@@ -650,15 +799,44 @@ const Index = () => {
               ))}
             </div>
           ) : filteredResults && filteredResults.length > 0 ? (
-            <div className="w-full relative">
-              <VirtualizedProductGrid
+            <div style={{ width: "100%", maxWidth: "100%" }}>
+              {storeFilter !== 'all' && (
+                <div className={`mb-4 py-2 px-4 rounded-lg border flex items-center justify-between
+                  ${storeFilter === 'Walmart' ? 'bg-blue-50 text-blue-800 border-blue-300 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800' : 
+                   storeFilter === 'MaxiPali' ? 'bg-yellow-50 text-yellow-800 border-yellow-300 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800' : 
+                   storeFilter === 'MasxMenos' ? 'bg-green-50 text-green-800 border-green-300 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800' : 
+                   'bg-gray-50 text-gray-800 border-gray-300 dark:bg-gray-900/20 dark:text-gray-300 dark:border-gray-800'
+                  }`}>
+                  <div className="flex items-center">
+                    <div className={`w-4 h-4 rounded-full mr-2
+                      ${storeFilter === 'Walmart' ? 'bg-blue-600' : 
+                       storeFilter === 'MaxiPali' ? 'bg-yellow-500' : 
+                       storeFilter === 'MasxMenos' ? 'bg-green-600' : 
+                       'bg-gray-500'
+                      }`}></div>
+                    <span className="font-medium">
+                      <TranslatedText 
+                        es={`Mostrando solo productos de ${storeFilter}`}
+                        en={`Showing only ${storeFilter} products`}
+                      />
+                    </span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleStoreFilterChange('all')}
+                    className="text-xs">
+                    <TranslatedText es="Ver todas las tiendas" en="View all stores" />
+                  </Button>
+                </div>
+              )}
+              <ProductGrid
                 products={filteredResults}
                 onAddToList={handleAddToList}
                 isProductInList={isProductInList}
               />
             </div>
           ) : searchResults.length > 0 ? (
-            // Display this when there are search results but filtered results is empty
             <div className="text-center py-12">
               <div className="inline-flex justify-center items-center w-16 h-16 rounded-full bg-muted mb-4">
                 <Filter className="w-8 h-8 text-muted-foreground" />
@@ -697,7 +875,7 @@ const Index = () => {
           )}
         </div>
       ) : (
-        <div className="space-y-12 animate-fade-up animate-delay-200">
+        <div className="max-w-7xl mx-auto px-4 space-y-12">
           <section>
             <h2 className="section-title">
               <TranslatedText es="Tiendas Destacadas" en="Featured Store" />
@@ -742,6 +920,13 @@ const Index = () => {
           </section>
         </div>
       )}
+
+      {/* Barcode Scanner Modal */}
+      <BarcodeScannerModal
+        open={isScannerOpen}
+        onOpenChange={setIsScannerOpen}
+        onAddProduct={handleAddScannedProduct}
+      />
     </div>
   );
 };

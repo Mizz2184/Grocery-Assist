@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2, ArrowRight } from "lucide-react";
+import { CheckCircle2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { markUserAsPaid } from "@/lib/stripe/stripe-client";
@@ -20,39 +20,22 @@ const PaymentSuccess = () => {
       }
 
       try {
-        // Get the session ID from localStorage
-        const sessionId = localStorage.getItem(`payment_session_${user.id}`);
-        
-        if (!sessionId) {
-          toast({
-            title: "Invalid Payment Session",
-            description: "Could not verify your payment. Please try again.",
-            variant: "destructive",
-          });
-          navigate('/payment');
-          return;
-        }
-
-        // Mark the user as paid
+        // Mark the user as paid for test mode
         markUserAsPaid(user.id);
         
-        // Clear the session ID
-        localStorage.removeItem(`payment_session_${user.id}`);
-
+        // Toast message
         toast({
           title: "Payment Successful",
           description: "Thank you for subscribing! You now have full access to all features.",
         });
 
-        // Redirect to home after a short delay
-        setTimeout(() => {
-          navigate('/');
-        }, 2000);
+        // Immediately redirect to home
+        navigate('/');
       } catch (error) {
         console.error('Error processing payment:', error);
         toast({
           title: "Error",
-          description: "There was an error processing your payment. Please contact support.",
+          description: "There was an error processing your payment. Please try again.",
           variant: "destructive",
         });
         navigate('/payment');
@@ -75,12 +58,13 @@ const PaymentSuccess = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="text-center">
+          <p className="mb-4">Redirecting you to the home page to start searching for products...</p>
           <Button 
             onClick={() => navigate('/')}
             className="gap-2"
           >
-            Go to Home
-            <ArrowRight className="h-4 w-4" />
+            Go to Search
+            <Search className="h-4 w-4" />
           </Button>
         </CardContent>
       </Card>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { 
   GroceryList as GroceryListType, 
   GroceryListItem as GroceryItem,
@@ -128,6 +128,22 @@ const GroceryList = () => {
   const [collaboratorEmail, setCollaboratorEmail] = useState("");
   const [addingCollaborator, setAddingCollaborator] = useState(false);
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
+
+  // Define the order of store names for consistent display
+  const storeOrder = ['Walmart', 'MaxiPali', 'MasxMenos', 'PriceSmart', 'Automercado', 'Unknown'];
+  
+  // Create refs for store groups to avoid dependency issues with useEffect
+  const storeGroupsRef = useRef<Record<string, GroceryItem[]>>({
+    'Walmart': [],
+    'MaxiPali': [],
+    'MasxMenos': [],
+    'PriceSmart': [],
+    'Automercado': [],
+    'Unknown': []
+  });
+  
+  // Access store groups via ref
+  const storeGroups = storeGroupsRef.current;
 
   useEffect(() => {
     const fetchLists = async () => {
@@ -680,6 +696,33 @@ const GroceryList = () => {
     };
   }, [closeAllDropdowns]);
 
+  useEffect(() => {
+    // Reset store groups
+    for (const store of storeOrder) {
+      storeGroups[store] = [];
+    }
+    
+    // Group items by store
+    if (activeList && activeList.items) {
+      activeList.items.forEach(item => {
+        // Use the helper function to determine the store
+        let store = 'Unknown';
+        
+        if (item.productData) {
+          store = getProductStore(item.productData);
+        }
+        
+        // Ensure we're using one of our defined groups
+        if (!Object.keys(storeGroups).includes(store)) {
+          store = 'Unknown';
+        }
+        
+        // Add to the appropriate store group
+        storeGroups[store].push(item);
+      });
+    }
+  }, [activeList, storeOrder]);
+
   if (loading) {
     return (
       <div className="page-container">
@@ -756,9 +799,6 @@ const GroceryList = () => {
 
   const { total, currency } = calculateTotalPrice();
 
-  // Define the proper store names and their order
-  const storeOrder = ['Walmart', 'MaxiPali', 'MasxMenos', 'PriceSmart', 'Automercado', 'Unknown'];
-
   // Define store groups (for rendering section headers)
   const storeGroupNames: { [key: string]: string } = {
     'Walmart': 'Walmart',
@@ -769,14 +809,14 @@ const GroceryList = () => {
     'Unknown': 'Other Stores'
   };
   
-  // Initialize store groups for storing actual items
-  const storeGroups: Record<string, GroceryItem[]> = {
-    'Walmart': [],
-    'MaxiPali': [],
-    'MasxMenos': [],
-    'PriceSmart': [],
-    'Automercado': [],
-    'Unknown': []
+  // Define store colors for consistent UI
+  const storeColors: Record<string, string> = {
+    'Walmart': 'bg-blue-600 text-white border-blue-600',
+    'MaxiPali': 'bg-yellow-500 text-white border-yellow-500',
+    'MasxMenos': 'bg-green-600 text-white border-green-600',
+    'PriceSmart': 'bg-purple-600 text-white border-purple-600',
+    'Automercado': 'bg-pink-600 text-white border-pink-600',
+    'Unknown': 'bg-gray-500 text-white border-gray-500'
   };
 
   return (
@@ -834,43 +874,20 @@ const GroceryList = () => {
                       </div>
                     </div>
                   )}
-                
+                  
                   {activeList.items.length > 0 ? (
                     <div className="space-y-6 mt-6">
-                      {/* Group items by store */}
-                      {(() => {
-                        // Group items by store using the getProductStore helper
-                        activeList.items.forEach(item => {
-                          // Use the helper function to determine the store
-                          let store = 'Unknown';
-                          
-                          if (item.productData) {
-                            store = getProductStore(item.productData);
-                          }
-                          
-                          // Ensure we're using one of our defined groups
-                          if (!storeGroups[store]) {
-                            store = 'Unknown';
-                          }
-                          
-                          // Add to the appropriate store group
-                          storeGroups[store].push(item);
-                        });
-                        
-                        // Render store groups in specified order
-                        return storeOrder
-                          .filter(store => storeGroups[store].length > 0)
+                      {/* Display grocery items by store */}
+                      <div className="mt-4 space-y-6">
+                        {storeOrder
+                          .filter(store => storeGroups[store] && storeGroups[store].length > 0)
                           .map(store => (
-                            <div key={store} className="space-y-3">
+                            <div key={store} className="space-y-4">
                               <div className="flex items-center space-x-2">
                                 <div className={cn(
-                                  "h-6 w-6 rounded-full flex items-center justify-center text-white text-xs font-medium",
-                                  store === 'Walmart' ? "bg-blue-600" : 
-                                  store === 'MaxiPali' ? "bg-yellow-500" : 
-                                  store === 'MasxMenos' ? "bg-green-600" : 
-                                  store === 'PriceSmart' ? "bg-purple-600" : 
-                                  store === 'Automercado' ? "bg-pink-600" : 
-                                  "bg-gray-500"
+                                  "h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium",
+                                  storeColors[store].split(' ')[0],
+                                  storeColors[store].split(' ')[1]
                                 )}>
                                   {store === 'Walmart' ? 'W' : 
                                    store === 'MaxiPali' ? 'MP' : 
@@ -886,12 +903,7 @@ const GroceryList = () => {
                               
                               <div className={cn(
                                 "space-y-3 border-l-4 pl-4",
-                                store === 'Walmart' ? "border-blue-600" : 
-                                store === 'MaxiPali' ? "border-yellow-500" : 
-                                store === 'MasxMenos' ? "border-green-600" : 
-                                store === 'PriceSmart' ? "border-purple-600" : 
-                                store === 'Automercado' ? "border-pink-600" : 
-                                "border-gray-500"
+                                storeColors[store].split(' ')[2]
                               )}>
                                 {storeGroups[store].map((item) => (
                                   <GroceryListItem
@@ -906,12 +918,13 @@ const GroceryList = () => {
                                     onRemove={(id) => 
                                       removeListItem(activeList.id, id)
                                     }
+                                    storeColor={storeColors[store]}
                                   />
                                 ))}
                               </div>
                             </div>
-                          ));
-                      })()}
+                          ))}
+                      </div>
                     </div>
                   ) : (
                     <div className="text-center py-12">

@@ -213,6 +213,10 @@ export const searchWalmartProducts = async ({ query, page = 1, pageSize = 30 }: 
       productCount: response.data?.products?.length || 0
     });
 
+    if (response.status !== 200) {
+      console.error('Walmart API returned non-200 status:', response.status);
+    }
+
     // Ensure we have valid product data
     if (!response.data?.products || !Array.isArray(response.data.products)) {
       console.error('Invalid response from Walmart API:', response.data);
@@ -234,7 +238,7 @@ export const searchWalmartProducts = async ({ query, page = 1, pageSize = 30 }: 
       }
       
       // Debug log for each product
-      console.log(`Processing Walmart product: id=${product.id}, name=${product.name}, price=${product.price}`);
+      console.log(`Processing Walmart product: id=${product.id}, name=${product.name}, price=${product.price}, store=${product.store || 'undefined'}`);
       
       // Fix any other missing fields
       return {
@@ -242,7 +246,7 @@ export const searchWalmartProducts = async ({ query, page = 1, pageSize = 30 }: 
         store: 'Walmart', // Ensure this is always set
         id: product.id || `walmart-api-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         name: product.name || 'Unknown Walmart Product',
-        price: product.price || 0,
+        price: typeof product.price === 'string' ? parseFloat(product.price) : (product.price || 0),
         imageUrl: product.imageUrl || ''
       } as Product;
     });
@@ -269,6 +273,12 @@ export const searchWalmartProducts = async ({ query, page = 1, pageSize = 30 }: 
     };
   } catch (error) {
     console.error('Error searching Walmart products:', error);
+    console.error('Error details:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+      stack: error.stack
+    });
     // Return empty results instead of throwing, to prevent blocking other stores
     return {
       products: [],

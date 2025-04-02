@@ -1,9 +1,9 @@
 // Stripe client for client-side interactions
 // Publishable key is safe to use on the client side
-export const STRIPE_PUBLISHABLE_KEY = 'pk_live_51R79AbGPu5qL5mf2hM8Iou4LHV55JSSOzXFSDkP3OMDIghcufH2qWw2WRUUhNimptir1vARlpiaC8qVxbcyKIl6f00f6RVhpF2';
+export const STRIPE_PUBLISHABLE_KEY = 'pk_test_51R79AbGPu5qL5mf2VLxfcl9PgrDUHCuHm8MAMLQN9ywmprL6enkwkqx05QtiEtC1WhnSB6ePKr8DpnskU6CkrLFL008cx0nCJJ';
 
 // Direct payment link that can be used for checkout
-export const STRIPE_PAYMENT_LINK = 'https://buy.stripe.com/aEUfZTbgNgJGd0s000';
+export const STRIPE_PAYMENT_LINK = 'https://buy.stripe.com/test_dR6dTtbXa7Vv6uk5kk';
 
 // App subscription price
 export const APP_PRICE = 19.99;

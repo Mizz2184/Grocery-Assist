@@ -776,21 +776,25 @@ app.post('/api/proxy/walmart/search', async (req, res) => {
         timeout: 15000
       });
       
+      console.log(`Path-based Walmart search response status: ${pathSearchResponse.status}`);
+      
       if (pathSearchResponse.data && pathSearchResponse.data.length > 0) {
-        console.log(`Path-based search found ${pathSearchResponse.data.length} products`);
+        console.log(`Path-based search found ${pathSearchResponse.data.length} Walmart products`);
         searchData = pathSearchResponse.data;
       } else {
-        console.log('Path-based search returned no results, trying ft search');
+        console.log('Path-based Walmart search returned no results, trying ft search');
       }
     } catch (pathError) {
-      console.error('Path-based search error:', pathError.message);
+      console.error('Walmart path-based search error:', pathError.message);
+      console.error('Response status:', pathError.response?.status);
+      console.error('Response data:', pathError.response?.data);
       // Continue to next search method
     }
     
     // If path search returned no results, try ft parameter search
     if (searchData.length === 0) {
       try {
-        console.log(`Attempting ft parameter search for: ${query}`);
+        console.log(`Attempting Walmart ft parameter search for: ${query}`);
         const ftSearchResponse = await axios.get('https://www.walmart.co.cr/api/catalog_system/pub/products/search', {
           params: {
             'ft': query,
@@ -808,14 +812,78 @@ app.post('/api/proxy/walmart/search', async (req, res) => {
           timeout: 15000
         });
         
+        console.log(`ft-based Walmart search response status: ${ftSearchResponse.status}`);
+        
         if (ftSearchResponse.data && ftSearchResponse.data.length > 0) {
-          console.log(`ft parameter search found ${ftSearchResponse.data.length} products`);
+          console.log(`ft parameter search found ${ftSearchResponse.data.length} Walmart products`);
           searchData = ftSearchResponse.data;
         } else {
-          console.log('ft parameter search returned no results');
+          console.log('ft parameter Walmart search returned no results');
         }
       } catch (ftError) {
-        console.error('ft parameter search error:', ftError.message);
+        console.error('Walmart ft parameter search error:', ftError.message);
+        console.error('Response status:', ftError.response?.status);
+        console.error('Response data:', ftError.response?.data);
+      }
+    }
+    
+    // If both path and ft search failed, try an alternative approach with intelligent search
+    if (searchData.length === 0) {
+      try {
+        console.log(`Attempting intelligent search for Walmart with query: ${query}`);
+        const intelligentSearchResponse = await axios.get(`https://www.walmart.co.cr/api/io/_v/api/intelligent-search/product_search/productSearch`, {
+          params: {
+            term: query,
+            count: pageSize,
+            page: page
+          },
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Origin': 'https://www.walmart.co.cr',
+            'Referer': 'https://www.walmart.co.cr/'
+          },
+          timeout: 15000
+        });
+        
+        if (intelligentSearchResponse.data?.products && intelligentSearchResponse.data.products.length > 0) {
+          console.log(`Intelligent search found ${intelligentSearchResponse.data.products.length} Walmart products`);
+          
+          // Convert intelligent search format to catalog search format
+          const validProducts = intelligentSearchResponse.data.products.filter(p => {
+            // Only include products with valid prices
+            const hasPrice = p.price && parseFloat(p.price) > 0;
+            return hasPrice;
+          });
+          
+          console.log(`Filtered to ${validProducts.length} Walmart products with valid prices`);
+          
+          // Map valid products to the expected format
+          searchData = validProducts.map(p => ({
+            productId: p.productId,
+            productName: p.productName,
+            brand: p.brand,
+            items: [{
+              itemId: p.sku || '',
+              ean: p.ean || '',
+              images: [{imageUrl: p.image || ''}],
+              sellers: [{
+                commertialOffer: {
+                  Price: parseFloat(p.price) || 0,
+                  ListPrice: parseFloat(p.listPrice) || 0
+                }
+              }]
+            }]
+          }));
+        } else {
+          console.log('Intelligent search for Walmart returned no results');
+        }
+      } catch (intelligentError) {
+        console.error('Walmart intelligent search error:', intelligentError.message);
+        console.error('Response status:', intelligentError.response?.status);
+        console.error('Response data:', intelligentError.response?.data);
       }
     }
     
@@ -853,6 +921,8 @@ app.post('/api/proxy/walmart/search', async (req, res) => {
     console.log(`Found ${transformedData.products.length} Walmart products from API`);
     if (transformedData.products.length > 0) {
       console.log('First Walmart product:', transformedData.products[0]);
+    } else {
+      console.log('WARNING: No Walmart products were returned after all search attempts');
     }
     
     return res.json(transformedData);
@@ -958,3 +1028,39 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Export the Express app for Vercel
 export default app;
+
+// Add Stripe API integration
+const stripe = require('stripe')('sk_test_51R79AbGPu5qL5mf2yllS01MspAtL9sfwkw5eXI8w7gPi99rXb5erIyPT7SdQpyxUw8d42xSESWn3WMjCDdP26IKE00FTfNFOAm');
+
+// Stripe payment endpoint
+app.post('/api/create-payment-intent', async (req, res) => {
+  try {
+    const { amount, currency = 'usd', description } = req.body;
+    
+    if (!amount) {
+      return res.status(400).json({ error: 'Amount is required' });
+    }
+    
+    console.log(`Creating payment intent for amount: ${amount} ${currency}`);
+    
+    // Create a PaymentIntent with the order amount and currency
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount * 100), // Convert to cents
+      currency,
+      description: description || 'Grocery purchase',
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    console.log(`Payment intent created with id: ${paymentIntent.id}`);
+    
+    res.json({
+      clientSecret: paymentIntent.client_secret,
+      id: paymentIntent.id
+    });
+  } catch (error) {
+    console.error('Error creating payment intent:', error);
+    res.status(500).json({ error: error.message });
+  }
+});

@@ -100,7 +100,7 @@
   }
   
   .page-container {
-    @apply w-full max-w-7xl mx-auto px-4 sm:px-6 py-8;
+    @apply w-full px-4 sm:px-6 py-8;
   }
   
   .section-title {

@@ -185,7 +185,7 @@ export const Navbar = () => {
         isMenuOpen ? "nav-transparent" : scrolled ? "glass-nav shadow-sm" : "bg-transparent"
       )}
     >
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <div className="w-full mx-auto flex items-center justify-between">
         <Link 
           to="/" 
           className="flex items-center gap-2 font-medium text-xl" 
