@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { convertCRCtoUSD } from "@/utils/currencyUtils";
 import { deleteGroceryListItem } from "@/lib/services/groceryListService";
 import { Product as StoreProduct } from "@/lib/types/store";
+import { getProductStore, storeColors as storeColorMap } from "@/utils/storeUtils";
 
 interface GroceryListItemProps {
   item: GroceryItem;
@@ -52,38 +53,7 @@ const getProductPrice = (product: any): number => {
   return 0;
 };
 
-// Helper function to get store name from any product structure
-const getProductStore = (product: any): string => {
-  if (!product) return 'Unknown';
-  
-  // Direct store property
-  if (product.store) {
-    // Normalize store names
-    const storeName = String(product.store).trim();
-    if (storeName.includes('MaxiPali') || storeName.toLowerCase() === 'maxipali') return 'MaxiPali';
-    if (storeName.includes('MasxMenos') || storeName.toLowerCase() === 'masxmenos') return 'MasxMenos';
-    if (storeName.includes('Walmart') || storeName.toLowerCase() === 'walmart') return 'Walmart';
-    return storeName;
-  }
-  
-  // If product has prices array (mock product structure)
-  if (product.prices && Array.isArray(product.prices) && product.prices.length > 0) {
-    const storeId = String(product.prices[0].storeId).toLowerCase();
-    if (storeId === 'maxipali') return 'MaxiPali';
-    if (storeId === 'masxmenos') return 'MasxMenos';
-    if (storeId === 'walmart') return 'Walmart';
-  }
-  
-  // Check product ID for store hints
-  if (product.id) {
-    const id = String(product.id).toLowerCase();
-    if (id.includes('maxipali')) return 'MaxiPali';
-    if (id.includes('masxmenos')) return 'MasxMenos';
-    if (id.includes('walmart')) return 'Walmart';
-  }
-  
-  return 'Other';
-};
+// Use imported getProductStore from utils
 
 export const GroceryListItem = ({
   item,
@@ -133,18 +103,11 @@ export const GroceryListItem = ({
   const getStoreColor = (store: string) => {
     const normalizedStore = store.trim();
     
-    // First check for exact matches
-    if (normalizedStore === 'MaxiPali') return 'bg-yellow-500';
-    if (normalizedStore === 'MasxMenos') return 'bg-green-600';
-    if (normalizedStore === 'Walmart') return 'bg-blue-600';
-    
-    // Then check for partial matches
-    if (normalizedStore.includes('MaxiPali') || normalizedStore.toLowerCase().includes('maxipali')) 
-      return 'bg-yellow-500';
-    if (normalizedStore.includes('MasxMenos') || normalizedStore.toLowerCase().includes('masxmenos')) 
-      return 'bg-green-600';
-    if (normalizedStore.includes('Walmart') || normalizedStore.toLowerCase().includes('walmart')) 
-      return 'bg-blue-600';
+    // Use the storeColorMap from our utils
+    const colorClass = storeColorMap[normalizedStore];
+    if (colorClass) {
+      return colorClass.split(' ')[0]; // Just get the background color class
+    }
     
     // Default for unknown stores
     return 'bg-gray-500';

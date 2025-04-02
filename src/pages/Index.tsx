@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { getProductStore } from '@/utils/storeUtils';
 
 const ProductGrid = ({ products, onAddToList, isProductInList }: { 
   products: Product[], 
@@ -208,9 +209,38 @@ const Index = () => {
 
   // Check if product is in any grocery list
   const isProductInList = (productId: string, store: string) => {
-    const isInList = productsInList.has(productId);
-    console.log(`Checking if product ${productId} is in list: ${isInList}`);
-    return isInList;
+    // New implementation: Find the actual product in active lists
+    try {
+      const allLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
+      
+      // Look for both product ID and store match
+      for (const list of allLists) {
+        if (!list.items) continue;
+        
+        for (const item of list.items) {
+          if (item.productId === productId) {
+            // We found a product with matching ID, now check the store
+            const itemStore = getProductStore(item.productData);
+            const inputStore = store || 'Unknown';
+            
+            // Log for debugging
+            console.log(`Checking product ${productId}: List item store "${itemStore}" vs input store "${inputStore}"`);
+            
+            if (itemStore === inputStore) {
+              console.log(`Product ${productId} from store ${inputStore} is already in list`);
+              return true;
+            }
+          }
+        }
+      }
+      
+      console.log(`Product ${productId} from store ${store} is NOT in any list`);
+      return false;
+    } catch (error) {
+      console.error('Error checking if product is in list:', error);
+      // Fall back to previous behavior
+      return productsInList.has(productId);
+    }
   };
 
   // Helper function to sort products by relevance to search query

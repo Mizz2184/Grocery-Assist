@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { getUserGroceryLists, getOrCreateDefaultList, addCollaborator, removeCollaborator, sendCollaboratorInvite } from "@/lib/services/groceryListService";
 import { supabase } from "@/lib/supabase";
 import { convertCRCtoUSD } from "@/utils/currencyUtils";
+import { getProductStore, storeOrder, storeNames, storeColors } from "@/utils/storeUtils";
 
 // Current exchange rate (this would normally come from an API or context)
 const CRC_TO_USD_RATE = 510;
@@ -58,65 +59,6 @@ const getProductPrice = (product: any): number => {
   return 0;
 };
 
-// Helper function to get store name from any product structure
-const getProductStore = (product: any): string => {
-  if (!product) return 'Unknown';
-  
-  // Use type assertion to avoid TypeScript errors
-  const anyProduct = product as any;
-  
-  // Direct store property
-  if (anyProduct.store) {
-    // Normalize store names
-    const storeName = String(anyProduct.store).trim();
-    
-    // Handle exact matches first to avoid confusion
-    if (storeName === 'MaxiPali') return 'MaxiPali';
-    if (storeName === 'MasxMenos') return 'MasxMenos';
-    if (storeName === 'Walmart') return 'Walmart';
-    
-    // Then handle partial matches
-    if (storeName.includes('MaxiPali') || storeName.toLowerCase().includes('maxipali')) return 'MaxiPali';
-    if (storeName.includes('MasxMenos') || storeName.toLowerCase().includes('masxmenos')) return 'MasxMenos';
-    if (storeName.includes('Walmart') || storeName.toLowerCase().includes('walmart')) return 'Walmart';
-    
-    return storeName;
-  }
-  
-  // If product has prices array (mock product structure)
-  if (anyProduct.prices && Array.isArray(anyProduct.prices) && anyProduct.prices.length > 0) {
-    const storeId = String(anyProduct.prices[0].storeId || '').toLowerCase();
-    
-    if (storeId === 'maxipali') return 'MaxiPali';
-    if (storeId === 'masxmenos') return 'MasxMenos';
-    if (storeId === 'walmart') return 'Walmart';
-  }
-  
-  // Check product ID or name for store hints
-  if (anyProduct.id) {
-    const productId = String(anyProduct.id);
-    
-    if (productId.startsWith('mp-') || productId.includes('-maxipali-')) return 'MaxiPali';
-    if (productId.startsWith('mm-') || productId.includes('-masxmenos-')) return 'MasxMenos';
-    if (productId.startsWith('wm-') || productId.includes('-walmart-') || productId.includes('walmart')) {
-      return 'Walmart';
-    }
-  }
-  
-  // Try to detect from product name
-  if (anyProduct.name) {
-    const productName = String(anyProduct.name).toLowerCase();
-    
-    if (productName.includes('maxipali')) return 'MaxiPali';
-    if (productName.includes('masxmenos') || productName.includes('mas x menos')) return 'MasxMenos';
-    if (productName.includes('walmart')) {
-      return 'Walmart';
-    }
-  }
-  
-  return 'Unknown';
-};
-
 const GroceryList = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -129,18 +71,17 @@ const GroceryList = () => {
   const [addingCollaborator, setAddingCollaborator] = useState(false);
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
 
-  // Define the order of store names for consistent display
-  const storeOrder = ['Walmart', 'MaxiPali', 'MasxMenos', 'PriceSmart', 'Automercado', 'Unknown'];
-  
   // Create refs for store groups to avoid dependency issues with useEffect
-  const storeGroupsRef = useRef<Record<string, GroceryItem[]>>({
-    'Walmart': [],
-    'MaxiPali': [],
-    'MasxMenos': [],
-    'PriceSmart': [],
-    'Automercado': [],
-    'Unknown': []
-  });
+  const storeGroupsRef = useRef<Record<string, GroceryItem[]>>({});
+  
+  // Initialize store groups with all possible store values
+  useEffect(() => {
+    const groups: Record<string, GroceryItem[]> = {};
+    storeOrder.forEach(store => {
+      groups[store] = [];
+    });
+    storeGroupsRef.current = groups;
+  }, []);
   
   // Access store groups via ref
   const storeGroups = storeGroupsRef.current;
@@ -705,15 +646,10 @@ const GroceryList = () => {
     // Group items by store
     if (activeList && activeList.items) {
       activeList.items.forEach(item => {
-        // Use the helper function to determine the store
-        let store = 'Unknown';
-        
-        if (item.productData) {
-          store = getProductStore(item.productData);
-        }
+        let store = getProductStore(item.productData);
         
         // Ensure we're using one of our defined groups
-        if (!Object.keys(storeGroups).includes(store)) {
+        if (!storeOrder.includes(store)) {
           store = 'Unknown';
         }
         
@@ -721,7 +657,7 @@ const GroceryList = () => {
         storeGroups[store].push(item);
       });
     }
-  }, [activeList, storeOrder]);
+  }, [activeList]);
 
   if (loading) {
     return (
