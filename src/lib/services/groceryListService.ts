@@ -10,6 +10,7 @@ type DbGroceryList = {
   name: string;
   user_id: string;
   created_at: string;
+  updated_at?: string;
   collaborators?: string[];
 };
 
@@ -24,6 +25,7 @@ type DbGroceryItem = {
   added_by?: string;  // Optional for backward compatibility
   added_at?: string;  // Optional for backward compatibility
   created_at?: string;
+  updated_at?: string; // Add updated_at field
 };
 
 // Get user's grocery lists
@@ -284,10 +286,21 @@ export const addProductToGroceryList = async (
   try {
     // Ensure product has store information properly set using our utility function
     const originalStore = product.store;
+    
+    // Get the normalized store value (for proper grouping)
     product.store = getProductStore(product);
     
     // Log the store detection for debugging
     console.log(`addProductToGroceryList: Product ${product.id} store detection - Original: ${originalStore}, Normalized: ${product.store}`);
+    
+    // Add some store-specific validation
+    if (product.store === 'Walmart' && originalStore && originalStore.toLowerCase().includes('maxi')) {
+      console.warn(`Potential store mismatch detected! Product has Walmart attributes but MaxiPali name: ${product.id}. Will use Walmart.`);
+    }
+    
+    if (product.store === 'MaxiPali' && originalStore && originalStore.toLowerCase().includes('walmart')) {
+      console.warn(`Potential store mismatch detected! Product has MaxiPali attributes but Walmart name: ${product.id}. Will use MaxiPali.`);
+    }
     
     // Check if the user already has this product in any list
     const lists = await getUserGroceryLists(userId);
@@ -316,9 +329,10 @@ export const addProductToGroceryList = async (
         const itemStoreLower = itemStore.toLowerCase();
         const newItemStoreLower = newItemStore.toLowerCase();
         
-        // Check for MaxiPali vs MasxMenos special case
-        if ((itemStoreLower.includes('maxi') && newItemStoreLower.includes('maxi')) ||
-            (itemStoreLower.includes('mas') && newItemStoreLower.includes('mas'))) {
+        // Check for MaxiPali vs MasxMenos special case - but avoid Walmart/MaxiPali confusion
+        if (((itemStoreLower.includes('maxi') && newItemStoreLower.includes('maxi')) ||
+            (itemStoreLower.includes('mas') && newItemStoreLower.includes('mas'))) &&
+            !itemStoreLower.includes('walmart') && !newItemStoreLower.includes('walmart')) {
           
           // Both MaxiPali
           if (!itemStoreLower.includes('menos') && !newItemStoreLower.includes('menos')) {
@@ -504,9 +518,10 @@ export const addProductToGroceryList = async (
             const itemStoreLower = itemStore.toLowerCase();
             const newItemStoreLower = newItemStore.toLowerCase();
             
-            // Check for MaxiPali vs MasxMenos special case
-            if ((itemStoreLower.includes('maxi') && newItemStoreLower.includes('maxi')) ||
-                (itemStoreLower.includes('mas') && newItemStoreLower.includes('mas'))) {
+            // Check for MaxiPali vs MasxMenos special case - but avoid Walmart/MaxiPali confusion
+            if (((itemStoreLower.includes('maxi') && newItemStoreLower.includes('maxi')) ||
+                (itemStoreLower.includes('mas') && newItemStoreLower.includes('mas'))) &&
+                !itemStoreLower.includes('walmart') && !newItemStoreLower.includes('walmart')) {
               
               // Both MaxiPali
               if (!itemStoreLower.includes('menos') && !newItemStoreLower.includes('menos')) {
@@ -587,9 +602,10 @@ export const addProductToGroceryList = async (
         const itemStoreLower = itemStore.toLowerCase();
         const newItemStoreLower = newItemStore.toLowerCase();
         
-        // Check for MaxiPali vs MasxMenos special case
-        if ((itemStoreLower.includes('maxi') && newItemStoreLower.includes('maxi')) ||
-            (itemStoreLower.includes('mas') && newItemStoreLower.includes('mas'))) {
+        // Check for MaxiPali vs MasxMenos special case - but avoid Walmart/MaxiPali confusion
+        if (((itemStoreLower.includes('maxi') && newItemStoreLower.includes('maxi')) ||
+            (itemStoreLower.includes('mas') && newItemStoreLower.includes('mas'))) &&
+            !itemStoreLower.includes('walmart') && !newItemStoreLower.includes('walmart')) {
           
           // Both MaxiPali
           if (!itemStoreLower.includes('menos') && !newItemStoreLower.includes('menos')) {
@@ -640,108 +656,50 @@ export const addProductToGroceryList = async (
   }
 };
 
-// Create a new grocery list
-export const createGroceryList = async (
-  userId: string,
-  name: string = 'My Grocery List'
-): Promise<GroceryList | null> => {
-  try {
-    console.log(`Creating grocery list "${name}" for user ${userId}`);
-    
-    // If it's a mock user, just create the list in localStorage
-    if (userId.startsWith('mock-')) {
-      console.log('Creating list in localStorage for mock user');
-      const newList: GroceryList = {
-        id: uuidv4(),
-        name,
-        createdBy: userId,
-        createdAt: new Date().toISOString(),
-        collaborators: [],
-        items: []
-      };
-      
-      // Add to existing lists
-      const lists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
-      lists.push(newList);
-      localStorage.setItem('grocery_lists', JSON.stringify(lists));
-      
-      return newList;
-    }
-    
-    // Create the list in Supabase
-    const newListId = uuidv4();
-    const now = new Date().toISOString();
-    
-    // Only insert fields we know exist in the database
-    const listData = {
-      id: newListId,
-      user_id: userId,
-      name,
-      created_at: now,
-      collaborators: []
-    };
-    
-    // Try to insert into Supabase, handle errors gracefully
-    let databaseSuccess = false;
-    try {
-      const { error: insertError } = await supabase
-        .from('grocery_lists')
-        .insert(listData);
+/**
+ * Create a new grocery list
+ * @param userId 
+ * @param name 
+ * @returns 
+ */
+export const createGroceryList = async (userId: string, name: string): Promise<GroceryList> => {
+  console.log(`Creating grocery list "${name}" for user ${userId}`);
   
-      if (insertError) {
-        console.error('Error creating grocery list in Supabase:', insertError);
-      } else {
-        databaseSuccess = true;
-      }
-    } catch (dbError) {
-      console.error('Database error during list creation:', dbError);
+  // Generate a new UUID for the list
+  const listId = crypto.randomUUID();
+  
+  // Create the list object
+  const newList: DbGroceryList = {
+    id: listId,
+    name,
+    user_id: userId,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+  
+  try {
+    // Insert the list into the database
+    const { error } = await supabase
+      .from('grocery_lists')
+      .insert(newList);
+      
+    if (error) {
+      console.error('Error creating grocery list in database:', error);
+      throw error;
     }
     
-    // If database operation failed, fall back to localStorage
-    if (!databaseSuccess) {
-      console.log('Falling back to localStorage for list creation');
-    }
-    
-    // Always add to localStorage for immediate UI updates
-    const newList: GroceryList = {
-      id: newListId,
-      name,
-      createdBy: userId,
-      createdAt: now,
+    // Return the list in the proper format
+    return {
+      id: newList.id,
+      name: newList.name,
+      createdBy: newList.user_id,
+      createdAt: newList.created_at,
       collaborators: [],
       items: []
     };
-    
-    // Add to existing lists
-    const lists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
-    lists.push(newList);
-    localStorage.setItem('grocery_lists', JSON.stringify(lists));
-    
-    return newList;
   } catch (error) {
-    console.error('Error in createGroceryList:', error);
-    
-    // Attempt to create in localStorage as a fallback
-    try {
-      const newList: GroceryList = {
-        id: uuidv4(),
-        name,
-        createdBy: userId,
-        createdAt: new Date().toISOString(),
-        collaborators: [],
-        items: []
-      };
-      
-      // Add to existing lists
-      const lists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
-      lists.push(newList);
-      localStorage.setItem('grocery_lists', JSON.stringify(lists));
-      
-      return newList;
-    } catch (localError) {
-      console.error('Error creating list in localStorage:', localError);
-      return null;
-    }
+    console.error('Error creating grocery list:', error);
+    throw error;
   }
 };
 
@@ -783,6 +741,36 @@ export const getOrCreateDefaultList = async (userId: string): Promise<GroceryLis
 // Add this new function to handle item deletion
 export const deleteGroceryListItem = async (itemId: string): Promise<boolean> => {
   try {
+    // First remove from localStorage if present
+    try {
+      const localLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
+      let itemFound = false;
+      
+      // Update all lists that might contain this item
+      const updatedLists = localLists.map((list: GroceryList) => {
+        const initialLength = list.items.length;
+        list.items = list.items.filter(item => item.id !== itemId);
+        
+        // Check if we found and removed the item
+        if (list.items.length < initialLength) {
+          itemFound = true;
+        }
+        
+        return list;
+      });
+      
+      // Save updated lists back to localStorage
+      localStorage.setItem('grocery_lists', JSON.stringify(updatedLists));
+      
+      if (itemFound) {
+        console.log(`Item ${itemId} removed from localStorage`);
+      }
+    } catch (localStorageError) {
+      console.error('Error updating localStorage:', localStorageError);
+      // Continue with database deletion even if localStorage update fails
+    }
+    
+    // Then remove from database
     const { error } = await supabase
       .from('grocery_items')
       .delete()
@@ -1262,3 +1250,376 @@ export const sendCollaboratorInvite = async (
     return false;
   }
 };
+
+/**
+ * Sync a grocery list to the database
+ * @param list 
+ * @param userId 
+ * @returns 
+ */
+export const syncGroceryListToDatabase = async (list: GroceryList, userId: string): Promise<{ success: boolean, message?: string }> => {
+  console.log(`Syncing grocery list ${list.id} to database for user ${userId}`);
+  
+  try {
+    // First, ensure the list exists in the database
+    const { data: existingList, error: listCheckError } = await supabase
+      .from('grocery_lists')
+      .select('id')
+      .eq('id', list.id)
+      .single();
+      
+    if (listCheckError && listCheckError.code !== 'PGRST116') {
+      // If the error is not "row not found", it's a more serious error
+      console.error('Error checking if list exists:', listCheckError);
+      return { success: false, message: 'Database connection error' };
+    }
+    
+    // Check if we need to create the list or update it
+    const listExists = !!existingList;
+    
+    if (!listExists) {
+      // Create the list
+      const { error: createError } = await supabase
+        .from('grocery_lists')
+        .insert({
+          id: list.id,
+          name: list.name,
+          user_id: userId,
+          created_at: list.createdAt,
+          updated_at: new Date().toISOString(),
+          collaborators: list.collaborators || []
+        });
+        
+      if (createError) {
+        console.error('Error creating list in database:', createError);
+        return { success: false, message: 'Failed to create list in database' };
+      }
+    } else {
+      // Update the list
+      const { error: updateError } = await supabase
+        .from('grocery_lists')
+        .update({
+          name: list.name,
+          updated_at: new Date().toISOString(),
+          collaborators: list.collaborators || []
+        })
+        .eq('id', list.id);
+        
+      if (updateError) {
+        console.error('Error updating list in database:', updateError);
+        return { success: false, message: 'Failed to update list in database' };
+      }
+    }
+    
+    // Now sync all items
+    // First, get existing items to determine which to create/update/delete
+    const { data: existingItems, error: itemsError } = await supabase
+      .from('grocery_items')
+      .select('id')
+      .eq('list_id', list.id);
+      
+    if (itemsError) {
+      console.error('Error fetching existing items:', itemsError);
+      return { success: false, message: 'Failed to fetch existing items' };
+    }
+    
+    // Create a set of existing item IDs for quick lookup
+    const existingItemIds = new Set((existingItems || []).map(item => item.id));
+    
+    // Process each item in the list
+    for (const item of list.items) {
+      // Check if this item exists
+      const itemExists = existingItemIds.has(item.id);
+      
+      if (!itemExists) {
+        // Create the item
+        const { error: createItemError } = await supabase
+          .from('grocery_items')
+          .insert({
+            id: item.id,
+            list_id: list.id,
+            product_id: item.productId,
+            quantity: item.quantity,
+            checked: item.checked,
+            product_data: item.productData || {},
+            user_id: userId,
+            added_by: item.addedBy || userId,
+            added_at: item.addedAt || new Date().toISOString()
+          });
+          
+        if (createItemError) {
+          console.error('Error creating item in database:', createItemError);
+          // Continue with other items
+        }
+      } else {
+        // Update the item
+        const { error: updateItemError } = await supabase
+          .from('grocery_items')
+          .update({
+            quantity: item.quantity,
+            checked: item.checked,
+            product_data: item.productData || {},
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', item.id);
+          
+        if (updateItemError) {
+          console.error('Error updating item in database:', updateItemError);
+          // Continue with other items
+        }
+        
+        // Remove this ID from the set
+        existingItemIds.delete(item.id);
+      }
+    }
+    
+    // Delete any items that exist in the database but not in the list
+    if (existingItemIds.size > 0) {
+      const itemsToDelete = Array.from(existingItemIds);
+      
+      const { error: deleteError } = await supabase
+        .from('grocery_items')
+        .delete()
+        .in('id', itemsToDelete);
+        
+      if (deleteError) {
+        console.error('Error deleting items from database:', deleteError);
+        // Continue anyway
+      }
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error syncing grocery list to database:', error);
+    return { success: false, message: 'An unexpected error occurred' };
+  }
+};
+
+/**
+ * Renames a grocery list and syncs to database
+ * @param listId The ID of the list to rename
+ * @param userId The user ID who owns the list
+ * @param newName The new name for the list
+ * @returns Success status
+ */
+export const renameGroceryList = async (
+  listId: string,
+  userId: string,
+  newName: string
+): Promise<boolean> => {
+  try {
+    // Update in local state first
+    const localLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
+    const listIndex = localLists.findIndex((list: GroceryList) => list.id === listId);
+    
+    if (listIndex === -1) {
+      console.error('List not found in localStorage');
+      return false;
+    }
+    
+    // Update name
+    localLists[listIndex].name = newName;
+    localStorage.setItem('grocery_lists', JSON.stringify(localLists));
+    
+    // Skip database sync for mock users
+    if (userId.startsWith('mock-')) {
+      return true;
+    }
+    
+    // Update in database
+    const { error } = await supabase
+      .from('grocery_lists')
+      .update({ name: newName, updated_at: new Date().toISOString() })
+      .eq('id', listId);
+      
+    if (error) {
+      console.error('Error renaming list in database:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error in renameGroceryList:', error);
+    return false;
+  }
+};
+
+/**
+ * Deletes a grocery list and all its items
+ * @param listId The ID of the list to delete
+ * @param userId The user ID who owns the list
+ * @returns Success status
+ */
+export const deleteGroceryList = async (
+  listId: string,
+  userId: string
+): Promise<boolean> => {
+  try {
+    // Remove from local state first
+    const localLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
+    const updatedLists = localLists.filter((list: GroceryList) => list.id !== listId);
+    localStorage.setItem('grocery_lists', JSON.stringify(updatedLists));
+    
+    // Skip database sync for mock users
+    if (userId.startsWith('mock-')) {
+      return true;
+    }
+    
+    // Delete from database - items will be deleted automatically due to ON DELETE CASCADE
+    const { error } = await supabase
+      .from('grocery_lists')
+      .delete()
+      .eq('id', listId);
+      
+    if (error) {
+      console.error('Error deleting list from database:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error in deleteGroceryList:', error);
+    return false;
+  }
+};
+
+/**
+ * Updates a grocery list with new items and saves to database
+ * @param listId The ID of the list to update
+ * @param userId The user ID who owns the list
+ * @param items The new items for the list
+ * @returns Success status and updated list
+ */
+export const updateGroceryListItems = async (
+  listId: string,
+  userId: string,
+  items: GroceryListItem[]
+): Promise<{ success: boolean; list?: GroceryList }> => {
+  try {
+    // Update in local state first
+    const localLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
+    const listIndex = localLists.findIndex((list: GroceryList) => list.id === listId);
+    
+    if (listIndex === -1) {
+      console.error('List not found in localStorage');
+      return { success: false };
+    }
+    
+    // Update items
+    localLists[listIndex].items = items;
+    localStorage.setItem('grocery_lists', JSON.stringify(localLists));
+    
+    // Skip database sync for mock users
+    if (userId.startsWith('mock-')) {
+      return { success: true, list: localLists[listIndex] };
+    }
+    
+    // Sync to database
+    const result = await syncGroceryListToDatabase(localLists[listIndex], userId);
+    return result;
+  } catch (error) {
+    console.error('Error in updateGroceryListItems:', error);
+    return { success: false };
+  }
+};
+
+/**
+ * Updates a grocery list item with provided changes
+ * @param listId The ID of the list containing the item 
+ * @param itemId The ID of the item to update
+ * @param userId The user ID making the changes
+ * @param updates The changes to apply to the item
+ * @returns Success status and updated item
+ */
+export const updateListItem = async (
+  listId: string,
+  itemId: string,
+  userId: string,
+  updates: Partial<GroceryListItem>
+): Promise<{ success: boolean; item?: GroceryListItem }> => {
+  try {
+    console.log(`Updating list item ${itemId} in list ${listId} with:`, updates);
+    
+    // Skip database update for mock users - just update localStorage
+    if (userId.startsWith('mock-')) {
+      return updateLocalListItemAndReturn(listId, itemId, updates);
+    }
+    
+    // Format updates for database - convert from GroceryListItem to DbGroceryItem format
+    const dbUpdates: Partial<DbGroceryItem> = {};
+    
+    // Map the fields that need conversion
+    if (updates.quantity !== undefined) dbUpdates.quantity = updates.quantity;
+    if (updates.checked !== undefined) dbUpdates.checked = updates.checked;
+    if (updates.productData !== undefined) dbUpdates.product_data = updates.productData;
+    
+    // Add updated timestamp
+    dbUpdates.updated_at = new Date().toISOString();
+    
+    // Update in Supabase
+    const { error } = await supabase
+      .from('grocery_items')
+      .update(dbUpdates)
+      .eq('id', itemId);
+      
+    if (error) {
+      console.error('Error updating list item in Supabase:', error);
+      // Fall back to local update
+      return updateLocalListItemAndReturn(listId, itemId, updates);
+    }
+    
+    // Update in localStorage too for immediate UI updates
+    const result = updateLocalListItemAndReturn(listId, itemId, updates);
+    
+    return result;
+  } catch (error) {
+    console.error('Error in updateListItem:', error);
+    // Fall back to local update
+    return updateLocalListItemAndReturn(listId, itemId, updates);
+  }
+};
+
+/**
+ * Helper function to update an item in localStorage and return the updated item
+ */
+function updateLocalListItemAndReturn(
+  listId: string, 
+  itemId: string, 
+  updates: Partial<GroceryListItem>
+): { success: boolean; item?: GroceryListItem } {
+  try {
+    const localLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
+    const listIndex = localLists.findIndex((list: GroceryList) => list.id === listId);
+    
+    if (listIndex === -1) {
+      console.error('List not found in localStorage:', listId);
+      return { success: false };
+    }
+    
+    const list = localLists[listIndex];
+    const itemIndex = list.items.findIndex(item => item.id === itemId);
+    
+    if (itemIndex === -1) {
+      console.error('Item not found in list:', itemId);
+      return { success: false };
+    }
+    
+    // Apply updates
+    const updatedItem = {
+      ...list.items[itemIndex],
+      ...updates
+    };
+    
+    // Update the item in the list
+    list.items[itemIndex] = updatedItem;
+    
+    // Save back to localStorage
+    localLists[listIndex] = list;
+    localStorage.setItem('grocery_lists', JSON.stringify(localLists));
+    
+    return { success: true, item: updatedItem };
+  } catch (error) {
+    console.error('Error updating item in localStorage:', error);
+    return { success: false };
+  }
+}

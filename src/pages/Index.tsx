@@ -211,10 +211,14 @@ const Index = () => {
   const isProductInList = (productId: string, store: string) => {
     // New implementation: Find the actual product in active lists
     try {
+      // First check our local state for a faster response
+      if (productsInList.has(productId)) {
+        console.log(`isProductInList: Found product ${productId} in productsInList Set`);
+        return true;
+      }
+      
       const allLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
       const productStore = store ? store : STORE.UNKNOWN;
-      
-      console.log(`isProductInList: Checking if product ${productId} from store ${productStore} is in any list`);
       
       // Look for both product ID and store match
       for (const list of allLists) {
@@ -222,48 +226,16 @@ const Index = () => {
         
         for (const item of list.items) {
           if (item.productId === productId) {
-            // We found a product with matching ID, now check the store
-            const itemStore = getProductStore(item.productData);
+            // We found a product with matching ID
+            console.log(`isProductInList: Found product ${productId} in localStorage lists`);
             
-            // Log for debugging
-            console.log(`isProductInList: Found item with matching ID. Item store: "${itemStore}", Input store: "${productStore}"`);
-            
-            // Use standardized store comparison
-            if (itemStore === productStore) {
-              console.log(`isProductInList: Product ${productId} from ${productStore} is already in list`);
-              return true;
-            }
-            
-            // Also check if both are the same store but with different formatting
-            if (itemStore && productStore) {
-              // Normalize both to lowercase for case-insensitive comparison
-              const normalizedItemStore = itemStore.toLowerCase();
-              const normalizedInputStore = productStore.toLowerCase();
-              
-              // If they're exactly the same after normalization, it's a match
-              if (normalizedItemStore === normalizedInputStore) {
-                console.log(`isProductInList: Store match after normalization`);
-                return true;
-              }
-              
-              // Check for MaxiPali vs MasxMenos misidentification
-              if ((normalizedItemStore.includes('maxi') && normalizedInputStore.includes('maxi')) ||
-                  (normalizedItemStore.includes('mas') && normalizedInputStore.includes('mas'))) {
-                if (!normalizedItemStore.includes('menos') && !normalizedInputStore.includes('menos')) {
-                  console.log(`isProductInList: Both stores appear to be MaxiPali`);
-                  return true;
-                }
-                if (normalizedItemStore.includes('menos') && normalizedInputStore.includes('menos')) {
-                  console.log(`isProductInList: Both stores appear to be MasxMenos`);
-                  return true;
-                }
-              }
-            }
+            // Add to our Set for faster lookup next time
+            setProductsInList(prev => new Set([...prev, productId]));
+            return true;
           }
         }
       }
       
-      console.log(`isProductInList: Product ${productId} from store ${productStore} is NOT in any list`);
       return false;
     } catch (error) {
       console.error('Error checking if product is in list:', error);
@@ -543,7 +515,11 @@ const Index = () => {
       }
       
       // Update the list of products in user's lists - use the ID directly
-      setProductsInList(prev => new Set([...prev, product.id]));
+      setProductsInList(prev => {
+        const newSet = new Set([...prev, productId]);
+        console.log(`Added product ${productId} to productsInList Set. Size now: ${newSet.size}`);
+        return newSet;
+      });
       
       toast({
         title: translateUI("Agregado a la lista"),

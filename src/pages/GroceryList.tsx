@@ -29,14 +29,37 @@ import {
   Search,
   ArrowLeft,
   Clipboard,
-  Link as LinkIcon
+  Link as LinkIcon,
+  MoreVertical,
+  Trash,
+  PlusCircle,
+  Share,
+  CheckCircle,
+  Users,
+  Pencil,
+  Eye
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
-import { getUserGroceryLists, getOrCreateDefaultList, addCollaborator, removeCollaborator, sendCollaboratorInvite } from "@/lib/services/groceryListService";
+import { 
+  getUserGroceryLists,
+  getOrCreateDefaultList, 
+  createGroceryList, 
+  addCollaborator, 
+  removeCollaborator,
+  sendCollaboratorInvite,
+  updateListItem,
+  deleteGroceryList,
+  syncGroceryListToDatabase,
+  deleteGroceryListItem
+} from '@/lib/services/groceryListService';
 import { supabase } from "@/lib/supabase";
 import { convertCRCtoUSD } from "@/utils/currencyUtils";
 import { getProductStore, storeOrder, storeNames, storeColors } from "@/utils/storeUtils";
+import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
 
 // Current exchange rate (this would normally come from an API or context)
 const CRC_TO_USD_RATE = 510;
@@ -86,89 +109,90 @@ const GroceryList = () => {
   // Access store groups via ref
   const storeGroups = storeGroupsRef.current;
 
-  useEffect(() => {
-    const fetchLists = async () => {
-      setLoading(true);
+  // Fetch lists from database
+  const fetchLists = useCallback(async () => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to access your grocery lists.",
+        variant: "destructive"
+      });
+      navigate("/profile");
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      console.log('Fetching grocery lists for user:', user.id);
+      const lists = await getUserGroceryLists(user.id);
       
-      if (user) {
-        try {
-          console.log('Fetching grocery lists for user:', user.id);
-          const userLists = await getUserGroceryLists(user.id);
-          console.log('Lists fetched:', userLists.length);
-          
-          setLists(userLists);
-          
-          if (userLists.length > 0 && !activeList) {
-            console.log('Setting active list to first list:', userLists[0].id);
-            setActiveList(userLists[0]);
-          } else if (userLists.length === 0) {
-            // Create a default list if user has none
-            console.log('No lists found, creating default list');
-            try {
-              const defaultList = await getOrCreateDefaultList(user.id);
-              console.log('Default list created:', defaultList.id);
-              setLists([defaultList]);
-              setActiveList(defaultList);
-            } catch (defaultListError) {
-              console.error('Error creating default list:', defaultListError);
-              toast({
-                title: "Error",
-                description: "Failed to create a default grocery list.",
-                variant: "destructive",
-              });
-            }
+      console.log(`Fetched ${lists.length} grocery lists`);
+      
+      // Update state
+      setLists(lists);
+      
+      // Set active list to the first list or maintain current if it exists
+      if (lists.length > 0) {
+        if (activeList) {
+          // Find the updated version of the current active list
+          const updatedActiveList = lists.find(list => list.id === activeList.id);
+          if (updatedActiveList) {
+            setActiveList(updatedActiveList);
+          } else {
+            // Current active list no longer exists, set to first available
+            setActiveList(lists[0]);
           }
-        } catch (error) {
-          console.error('Error fetching grocery lists:', error);
-          
-          // Try to create a default list as a fallback
-          try {
-            console.log('Attempting to create a fallback default list');
-            const defaultList = await getOrCreateDefaultList(user.id);
-            setLists([defaultList]);
-            setActiveList(defaultList);
-            
-            toast({
-              title: "Using local storage",
-              description: "Database connection issues detected. Your lists will be saved locally.",
-            });
-          } catch (fallbackError) {
-            console.error('Fallback error:', fallbackError);
-            toast({
-              title: "Error",
-              description: "Failed to load your grocery lists.",
-              variant: "destructive",
-            });
-          }
-        } finally {
-          setLoading(false);
+        } else {
+          // No active list yet, set to first list
+          setActiveList(lists[0]);
         }
       } else {
-        setLoading(false);
+        // No lists available
+        setActiveList(null);
       }
-    };
-    
+    } catch (error) {
+      console.error('Error fetching grocery lists:', error);
+      toast({
+        title: "Error Loading Lists",
+        description: "Could not load your grocery lists. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [user, toast, navigate]);
+
+  useEffect(() => {
+    // Only fetch lists when the component mounts or user changes
     fetchLists();
-  }, [user, toast]);
+    // Adding a cleanup function
+    return () => {
+      // Cleanup function to prevent state updates after unmounting
+      setLists([]);
+      setActiveList(null);
+    };
+  }, [fetchLists]); // fetchLists depends only on user, toast, and navigate now
 
-  const updateListItem = async (listId: string, itemId: string, updates: Partial<GroceryItem>) => {
+  // Update a list item
+  const handleUpdateListItem = async (listId: string, itemId: string, updates: Partial<GroceryItem>) => {
     try {
-      // Try to update in Supabase first
-      const { error } = await supabase
-        .from('grocery_items')
-        .update({
-          quantity: updates.quantity,
-          checked: updates.checked
-        })
-        .eq('id', itemId);
-        
-      if (error) {
-        console.error('Error updating list item in Supabase:', error);
-        // Fall back to updating in localStorage
-        updateLocalListItem(listId, itemId, updates);
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to update items.",
+          variant: "destructive"
+        });
+        return;
       }
       
-      // Update local state regardless of whether Supabase update succeeded
+      // Call our updated service function with user ID
+      const { success, item } = await updateListItem(listId, itemId, user.id, updates);
+      
+      if (!success) {
+        throw new Error('Failed to update item');
+      }
+      
+      // Update local state
       setLists(prevLists => 
         prevLists.map(list => {
           if (list.id === listId) {
@@ -195,19 +219,34 @@ const GroceryList = () => {
         });
       }
     } catch (error) {
-      console.error('Error in updateListItem:', error);
-      // Fall back to updating in localStorage
-      updateLocalListItem(listId, itemId, updates);
+      console.error('Error updating list item:', error);
+      toast({
+        title: "Update Failed",
+        description: "Could not update the item. Changes saved locally.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Remove an item from the list
+  const handleRemoveListItem = async (listId: string, itemId: string) => {
+    try {
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to remove items.",
+          variant: "destructive"
+        });
+        return;
+      }
       
-      // Still update the UI
+      // Update local state immediately for responsive UI
       setLists(prevLists => 
         prevLists.map(list => {
           if (list.id === listId) {
             return {
               ...list,
-              items: list.items.map(item => 
-                item.id === itemId ? { ...item, ...updates } : item
-              )
+              items: list.items.filter(item => item.id !== itemId)
             };
           }
           return list;
@@ -219,138 +258,161 @@ const GroceryList = () => {
           if (!prevList) return null;
           return {
             ...prevList,
-            items: prevList.items.map(item => 
-              item.id === itemId ? { ...item, ...updates } : item
-            )
+            items: prevList.items.filter(item => item.id !== itemId)
           };
         });
       }
       
-      toast({
-        title: "Update saved locally",
-        description: "Changes will be synced when connection is restored.",
-      });
-    }
-  };
-  
-  // Helper function to update item in localStorage
-  const updateLocalListItem = (listId: string, itemId: string, updates: Partial<GroceryItem>) => {
-    try {
-      const localLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
-      const updatedLists = localLists.map((list: any) => {
-        if (list.id === listId) {
-          return {
-            ...list,
-            items: list.items.map((item: GroceryItem) => 
-              item.id === itemId ? { ...item, ...updates } : item
-            )
-          };
-        }
-        return list;
-      });
-      
-      localStorage.setItem('grocery_lists', JSON.stringify(updatedLists));
-    } catch (error) {
-      console.error('Error updating item in localStorage:', error);
-    }
-  };
-
-  const removeListItem = async (listId: string, itemId: string) => {
-    try {
-      // Try to remove from Supabase first
-      const { error } = await supabase
-        .from('grocery_items')
-        .delete()
-        .eq('id', itemId);
+      // Use the service function instead of direct Supabase call
+      const success = await deleteGroceryListItem(itemId);
         
-      if (error) {
-        console.error('Error removing list item from Supabase:', error);
-        // Fall back to removing from localStorage
-        removeLocalListItem(listId, itemId);
-      }
-      
-      // Update local state regardless of whether Supabase delete succeeded
-      setLists(prevLists => 
-        prevLists.map(list => {
-          if (list.id === listId) {
-            return {
-              ...list,
-              items: list.items.filter(item => item.id !== itemId)
-            };
-          }
-          return list;
-        })
-      );
-      
-      if (activeList?.id === listId) {
-        setActiveList(prevList => {
-          if (!prevList) return null;
-          return {
-            ...prevList,
-            items: prevList.items.filter(item => item.id !== itemId)
-          };
+      if (!success) {
+        console.error('Error removing list item from database');
+        // We don't revert the UI since the item is already removed locally
+        toast({
+          title: "Sync Issue",
+          description: "Item removed locally but not synced to cloud.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Item Removed",
+          description: "The item has been removed from your list."
         });
       }
-
-      // Also update localStorage
-      removeLocalListItem(listId, itemId);
-      
-      toast({
-        title: "Item removed",
-        description: "The item has been removed from your list.",
-      });
     } catch (error) {
-      console.error('Error in removeListItem:', error);
-      // Fall back to removing from localStorage
-      removeLocalListItem(listId, itemId);
-      
-      // Still update the UI
-      setLists(prevLists => 
-        prevLists.map(list => {
-          if (list.id === listId) {
-            return {
-              ...list,
-              items: list.items.filter(item => item.id !== itemId)
-            };
-          }
-          return list;
-        })
-      );
-      
-      if (activeList?.id === listId) {
-        setActiveList(prevList => {
-          if (!prevList) return null;
-          return {
-            ...prevList,
-            items: prevList.items.filter(item => item.id !== itemId)
-          };
-        });
-      }
-      
+      console.error('Error removing list item:', error);
       toast({
-        title: "Item removed locally",
-        description: "Changes will be synced when connection is restored.",
+        title: "Remove Failed",
+        description: "Could not remove the item. Please try again.",
+        variant: "destructive"
       });
     }
   };
-  
-  // Helper function to remove item from localStorage
-  const removeLocalListItem = (listId: string, itemId: string) => {
+
+  // Create a new list
+  const handleCreateList = async () => {
     try {
-      const localLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
-      const updatedLists = localLists.map((list: any) => {
-        if (list.id === listId) {
-          return {
-            ...list,
-            items: list.items.filter((item: GroceryItem) => item.id !== itemId)
-          };
-        }
-        return list;
-      });
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to create a list.",
+          variant: "destructive"
+        });
+        return;
+      }
       
-      localStorage.setItem('grocery_lists', JSON.stringify(updatedLists));
+      const newListName = prompt("Enter a name for your new grocery list:", "My Grocery List");
+      
+      if (!newListName) return; // User cancelled
+      
+      const newList = await createGroceryList(user.id, newListName);
+      
+      if (!newList) {
+        throw new Error('Failed to create list');
+      }
+      
+      // Update lists and set the new list as active
+      setLists(prevLists => [...prevLists, newList]);
+      setActiveList(newList);
+      
+      toast({
+        title: "List Created",
+        description: `Your new list "${newList.name}" has been created.`
+      });
     } catch (error) {
-      console.error('Error removing item from localStorage:', error);
+      console.error('Error creating grocery list:', error);
+      toast({
+        title: "Create Failed",
+        description: "Could not create a new list. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Delete a list
+  const handleDeleteList = async (listId: string) => {
+    try {
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to delete a list.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Confirm deletion
+      if (!confirm("Are you sure you want to delete this list? This action cannot be undone.")) {
+        return;
+      }
+      
+      const success = await deleteGroceryList(listId, user.id);
+      
+      if (!success) {
+        throw new Error('Failed to delete list');
+      }
+      
+      // Update local state
+      const updatedLists = lists.filter(list => list.id !== listId);
+      setLists(updatedLists);
+      
+      // If we deleted the active list, set another list as active
+      if (activeList?.id === listId) {
+        setActiveList(updatedLists.length > 0 ? updatedLists[0] : null);
+      }
+      
+      toast({
+        title: "List Deleted",
+        description: "The grocery list has been deleted."
+      });
+    } catch (error) {
+      console.error('Error deleting grocery list:', error);
+      toast({
+        title: "Delete Failed",
+        description: "Could not delete the list. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Sync list to database
+  const handleSyncList = async (listId: string) => {
+    try {
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to sync a list.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Find the list
+      const list = lists.find(list => list.id === listId);
+      
+      if (!list) {
+        throw new Error('List not found');
+      }
+      
+      // Sync to database
+      const { success, message } = await syncGroceryListToDatabase(list, user.id);
+      
+      if (!success) {
+        throw new Error(message || 'Failed to sync list');
+      }
+      
+      toast({
+        title: "List Synced",
+        description: "The grocery list has been synced to the cloud."
+      });
+    } catch (error) {
+      console.error('Error syncing grocery list:', error);
+      toast({
+        title: "Sync Failed",
+        description: "Could not sync the list. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -645,19 +707,56 @@ const GroceryList = () => {
     
     // Group items by store
     if (activeList && activeList.items) {
+      console.log(`Grouping ${activeList.items.length} items by store`);
+      
       activeList.items.forEach(item => {
+        // Extract product data for debugging
+        const productId = item.productId;
+        const productName = item.productData?.name || 'Unnamed Product';
+        const originalStore = item.productData ? (item.productData as any).store || 'Unknown' : 'Unknown';
+        
+        // Get normalized store using our utility
         let store = getProductStore(item.productData);
+        
+        // Log for debugging
+        console.log(`Product ${productId} (${productName}): Original store=${originalStore}, Normalized store=${store}`);
         
         // Ensure we're using one of our defined groups
         if (!storeOrder.includes(store)) {
+          console.warn(`Store '${store}' is not in defined store groups, using 'Unknown' instead`);
           store = 'Unknown';
         }
         
         // Add to the appropriate store group
         storeGroups[store].push(item);
       });
+      
+      // Log group counts for debugging
+      console.log('Store groups after processing:');
+      storeOrder.forEach(store => {
+        console.log(`${store}: ${storeGroups[store].length} items`);
+      });
     }
   }, [activeList]);
+
+  // Add other dropdown menu options
+  const renderListOptions = (list: GroceryListType) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon">
+          <MoreVertical className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => handleDeleteList(list.id)}>
+          <Trash className="h-4 w-4 mr-2" /> Delete List
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleSyncList(list.id)}>
+          <RefreshCw className="h-4 w-4 mr-2" /> Sync to Cloud
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   if (loading) {
     return (
@@ -846,13 +945,13 @@ const GroceryList = () => {
                                     key={item.id}
                                     item={item}
                                     onUpdateQuantity={(id, quantity) => 
-                                      updateListItem(activeList.id, id, { quantity })
+                                      handleUpdateListItem(activeList.id, id, { quantity })
                                     }
                                     onToggleCheck={(id, checked) => 
-                                      updateListItem(activeList.id, id, { checked })
+                                      handleUpdateListItem(activeList.id, id, { checked })
                                     }
                                     onRemove={(id) => 
-                                      removeListItem(activeList.id, id)
+                                      handleRemoveListItem(activeList.id, id)
                                     }
                                     storeColor={storeColors[store]}
                                   />

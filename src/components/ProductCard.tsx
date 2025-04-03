@@ -12,7 +12,7 @@ import { useTranslation } from "@/context/TranslationContext";
 interface ProductCardProps {
   product: Product;
   isInList?: boolean;
-  onAddToList?: (productId: string) => void;
+  onAddToList?: (productId: string) => Promise<void>;
   index?: number;
 }
 
@@ -69,13 +69,26 @@ export const ProductCard = ({
   const handleAddToList = async () => {
     if (!onAddToList) return;
     
+    // Already in list or already adding, prevent duplicate calls
+    if (isInListLocal || isAdding) return;
+    
+    console.log(`handleAddToList: Adding product ${product.id} to list`);
     setIsAdding(true);
+    
     try {
-      await onAddToList(product.id);
-      // Update local state to show check mark immediately
+      // Set local state immediately for better UX
       setIsInListLocal(true);
+      
+      // Call the parent handler
+      await onAddToList(product.id);
+      
+      console.log(`handleAddToList: Successfully added product ${product.id} to list`);
     } catch (error) {
       console.error(`Error adding product ${product.id} to list:`, error);
+      
+      // Revert the local state if there was an error
+      setIsInListLocal(false);
+      
       toast({
         title: isTranslated ? "Error" : translateText("Error"),
         description: isTranslated ? "Failed to add product to list. Please try again." : "No se pudo añadir el producto a la lista. Por favor, inténtalo de nuevo.",
@@ -104,111 +117,91 @@ export const ProductCard = ({
             ({formatCurrency(usdPrice, "USD")})
           </span>
         </span>
-        {product.pricePerUnit && (
-          <span className="text-xs text-muted-foreground">
-            {formatCurrency(product.pricePerUnit, "CRC")}/{translateText(product.unitType || "unidad")}
-          </span>
-        )}
       </div>
     );
   };
 
   return (
-    <div className="block h-full" data-product-id={product.id} data-index={index}>
-      <Card className="overflow-hidden h-full flex flex-col group hover:shadow-md transition-shadow">
-        <div className="relative aspect-square overflow-hidden bg-muted/30">
-          {product.imageUrl ? (
-            <img 
-              src={product.imageUrl} 
-              alt={isTranslated ? translateText(product.name) : product.name} 
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-              {isTranslated ? "No image" : translateText("Sin imagen")}
+    <Card className={cn(
+      "overflow-hidden h-full flex flex-col group hover:shadow-md transition-shadow",
+      "animate-scale-in animate-delay",
+      `animate-delay-${Math.min(index, 10) * 100}`
+    )}>
+      <div className="relative pt-[100%] bg-muted overflow-hidden">
+        {product.imageUrl ? (
+          <img
+            src={product.imageUrl}
+            alt={product.name}
+            className="absolute top-0 left-0 w-full h-full object-contain transition-transform group-hover:scale-105 p-2"
+            loading="lazy"
+          />
+        ) : (
+          <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center text-muted-foreground text-sm">
+            {isTranslated ? "No image" : translateText("Sin imagen")}
+          </div>
+        )}
+        
+        {/* Sale badge would go here if the Product type had an onSale property */}
+        
+        {product.store && (
+          <Badge
+            variant="outline"
+            className={cn(
+              "absolute bottom-2 left-2 text-xs font-normal",
+              product.store.toLowerCase().includes("walmart") && "bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300",
+              product.store.toLowerCase().includes("maxi") && "bg-yellow-100 text-yellow-800 hover:bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-300",
+              product.store.toLowerCase().includes("masxmenos") && "bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-300",
+              product.store.toLowerCase().includes("auto") && "bg-pink-100 text-pink-800 hover:bg-pink-100 dark:bg-pink-900/30 dark:text-pink-300",
+              product.store.toLowerCase().includes("price") && "bg-purple-100 text-purple-800 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300",
+            )}
+          >
+            {product.store}
+          </Badge>
+        )}
+      </div>
+
+      <div className="p-4 space-y-3 flex-1 flex flex-col">
+        <div className="flex justify-between items-start gap-2 flex-1">
+          <div>
+            <h3 className="font-medium text-lg leading-tight line-clamp-2">{isTranslated ? translateText(product.name) : product.name}</h3>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-muted-foreground">
+                {product.brand 
+                  ? (isTranslated ? translateText(product.brand) : product.brand) 
+                  : (isTranslated ? "Unknown brand" : translateText("Marca desconocida"))}
+              </p>
+              {/* Barcode/EAN would go here if the Product type had that property */}
             </div>
-          )}
-          <div className="absolute top-2 right-2">
-            <Badge 
-              variant={product.store === 'MasxMenos' ? 'default' : 'secondary'} 
-              className={cn(
-                "font-semibold",
-                product.store === 'MasxMenos' && "bg-green-600 hover:bg-green-700",
-                product.store === 'MaxiPali' && "bg-yellow-500 hover:bg-yellow-600 text-black",
-                product.store === 'Walmart' && "bg-blue-600 hover:bg-blue-700 text-white"
-              )}
-            >
-              {isTranslated ? translateText(product.store) : product.store}
-            </Badge>
           </div>
           
-          {/* Source Badge */}
-          {product.source && (
-            <div className="absolute bottom-2 left-2 bg-primary/80 text-white text-xs px-2 py-1 rounded-md">
-              {isTranslated ? translateText(product.source) : product.source}
-            </div>
+          {onAddToList && (
+            <Button
+              size="icon"
+              variant={isInListLocal ? "secondary" : "default"}
+              className={cn(
+                "rounded-full flex-shrink-0",
+                isInListLocal && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+              )}
+              onClick={handleAddToList}
+              disabled={isAdding}
+              aria-label={isTranslated ? (isInListLocal ? "Added to list" : "Add to list") : translateText(isInListLocal ? "Añadido a la lista" : "Añadir a la lista")}
+              data-product-id={product.id}
+            >
+              {isInListLocal ? (
+                <Check className="h-4 w-4" />
+              ) : isAdding ? (
+                <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
+            </Button>
           )}
         </div>
-
-        <div className="p-4 space-y-3 flex-1 flex flex-col">
-          <div className="flex justify-between items-start gap-2 flex-1">
-            <div>
-              <h3 className="font-medium text-lg leading-tight line-clamp-2">{isTranslated ? translateText(product.name) : product.name}</h3>
-              <div className="flex items-center gap-2">
-                <p className="text-sm text-muted-foreground">
-                  {product.brand 
-                    ? (isTranslated ? translateText(product.brand) : product.brand) 
-                    : (isTranslated ? "Unknown brand" : translateText("Marca desconocida"))}
-                </p>
-                {product.ean && (
-                  <span className="text-xs text-muted-foreground">
-                    EAN: {product.ean}
-                  </span>
-                )}
-              </div>
-            </div>
-            
-            {onAddToList && (
-              <Button
-                size="icon"
-                variant={isInListLocal ? "secondary" : "default"}
-                className={cn(
-                  "rounded-full flex-shrink-0",
-                  isInListLocal && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                )}
-                onClick={handleAddToList}
-                disabled={isAdding || isInListLocal}
-                aria-label={isTranslated ? (isInListLocal ? "Added to list" : "Add to list") : translateText(isInListLocal ? "Añadido a la lista" : "Añadir a la lista")}
-                data-product-id={product.id}
-              >
-                {isInListLocal ? (
-                  <Check className="h-4 w-4" />
-                ) : isAdding ? (
-                  <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                ) : (
-                  <Plus className="h-4 w-4" />
-                )}
-              </Button>
-            )}
-          </div>
-
-          <div className="space-y-1">
-            <div className="flex justify-between items-baseline">
-              {renderPrice()}
-              {product.inStock !== undefined && (
-                <Badge variant={product.inStock ? "outline" : "secondary"}>
-                  {product.inStock 
-                    ? (isTranslated ? "In Stock" : translateText("En existencia")) 
-                    : (isTranslated ? "Out of Stock" : translateText("Agotado"))}
-                </Badge>
-              )}
-            </div>
-            {product.category && (
-              <p className="text-sm text-muted-foreground">{isTranslated ? translateText(product.category) : product.category}</p>
-            )}
-          </div>
+        
+        <div className="mt-auto">
+          {renderPrice()}
         </div>
-      </Card>
-    </div>
+      </div>
+    </Card>
   );
 };
