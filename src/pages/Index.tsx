@@ -10,7 +10,12 @@ import { ShoppingCart, Search as SearchIcon, Scan, Filter } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import { searchMaxiPaliProducts, searchMasxMenosProducts, searchWalmartProducts } from "@/lib/services";
-import { addProductToGroceryList, getOrCreateDefaultList, getUserGroceryLists } from "@/lib/services/groceryListService";
+import { 
+  getOrCreateDefaultList, 
+  addProductToGroceryList,
+  syncGroceryListToDatabase,
+  getUserGroceryLists 
+} from '@/lib/services/groceryListService';
 import { Product } from "@/lib/types/store";
 import { Button } from "@/components/ui/button";
 import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
@@ -460,58 +465,19 @@ const Index = () => {
         throw new Error('Could not create or retrieve default list');
       }
       
-      let result: { success: boolean; message?: string; list?: any } = { success: false };
-      
-      try {
-        // Add the product to the list via the database
-        result = await addProductToGroceryList(defaultList.id, user.id, product);
-      } catch (dbError) {
-        console.error('Database error when adding product to list:', dbError);
-        
-        // Fallback to local storage only if database operation fails
-        console.log('Using localStorage fallback for adding product');
-        
-        // Create a "fake" success result for local storage
-        result = { 
-          success: true,
-          message: 'Added to list using local storage (database unavailable)' 
-        };
-        
-        // Update local storage directly
-        const localLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
-        const listIndex = localLists.findIndex((list: any) => list.id === defaultList.id);
-        
-        if (listIndex >= 0) {
-          const list = localLists[listIndex];
-          const existingItemIndex = list.items.findIndex((item: any) => item.productId === product.id);
-          
-          if (existingItemIndex >= 0) {
-            // Update quantity
-            list.items[existingItemIndex].quantity += 1;
-          } else {
-            // Add new item
-            list.items.push({
-              id: uuidv4(),
-              productId: product.id,
-              quantity: 1,
-              addedBy: user.id,
-              addedAt: new Date().toISOString(),
-              checked: false,
-              productData: product
-            });
-          }
-          
-          localStorage.setItem('grocery_lists', JSON.stringify(localLists));
-        }
-      }
+      // Add the product to the list via the database
+      const result = await addProductToGroceryList(defaultList.id, user.id, product);
       
       if (!result.success) {
+        console.error('Database operation failed when adding product to list:', result.message);
         toast({
           title: translateUI("Error"),
           description: result.message ? translateUI(result.message) : translateUI("No se pudo agregar el producto a la lista"),
           variant: "destructive",
         });
         return Promise.reject(new Error(result.message));
+      } else {
+        console.log('Successfully added product to database:', result);
       }
       
       // Update the list of products in user's lists - use the ID directly
@@ -525,6 +491,17 @@ const Index = () => {
         title: translateUI("Agregado a la lista"),
         description: translateUI(`${product.name || 'Producto'} agregado a ${defaultList.name}`),
       });
+      
+      // Add a sync after successful addition to ensure database consistency
+      if (user && user.id) {
+        try {
+          console.log('Syncing list after adding product');
+          await syncGroceryListToDatabase(result.list || defaultList, user.id);
+        } catch (syncError) {
+          console.error('Error syncing list after adding product:', syncError);
+          // Don't reject the promise here as the product was already added
+        }
+      }
       
       return Promise.resolve();
     } catch (error) {

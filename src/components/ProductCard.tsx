@@ -65,6 +65,19 @@ export const ProductCard = ({
   useEffect(() => {
     verifyProduct();
   }, [product]);
+  
+  // Check localStorage for added products on mount
+  useEffect(() => {
+    try {
+      const addedProducts = JSON.parse(localStorage.getItem('added_products') || '[]');
+      if (addedProducts.includes(product.id) && !isInListLocal) {
+        setIsInListLocal(true);
+        console.log(`Product ${product.id} found in localStorage added_products, updating UI`);
+      }
+    } catch (error) {
+      console.warn('Error checking localStorage for added products:', error);
+    }
+  }, [product.id, isInListLocal]);
 
   const handleAddToList = async () => {
     if (!onAddToList) return;
@@ -83,6 +96,19 @@ export const ProductCard = ({
       await onAddToList(product.id);
       
       console.log(`handleAddToList: Successfully added product ${product.id} to list`);
+      
+      // Ensure state persists even after reloads by adding to localStorage
+      try {
+        // Store this product as added in localStorage for UI persistence
+        const addedProducts = JSON.parse(localStorage.getItem('added_products') || '[]');
+        if (!addedProducts.includes(product.id)) {
+          addedProducts.push(product.id);
+          localStorage.setItem('added_products', JSON.stringify(addedProducts));
+          console.log(`Product ${product.id} added to localStorage added_products`);
+        }
+      } catch (localStorageError) {
+        console.warn('Could not update localStorage added_products:', localStorageError);
+      }
     } catch (error) {
       console.error(`Error adding product ${product.id} to list:`, error);
       
