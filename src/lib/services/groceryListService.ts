@@ -21,11 +21,8 @@ type DbGroceryItem = {
   quantity: number;
   checked: boolean;
   product_data?: Product;
-  user_id: string;    // Required for RLS policy
-  added_by?: string;  // Optional for backward compatibility
-  added_at?: string;  // Optional for backward compatibility
-  created_at?: string;
-  updated_at?: string; // Add updated_at field
+  created_at: string;
+  updated_at?: string;
 };
 
 // Get user's grocery lists
@@ -423,7 +420,7 @@ export const addProductToGroceryList = async (
       quantity: quantity || 1,
       checked: false,
       product_data: productData,
-      user_id: userId // Required for RLS policy
+      created_at: now
     };
 
     console.log('Inserting item with data:', itemData);
@@ -1181,8 +1178,7 @@ export const syncGroceryListToDatabase = async (list: GroceryList, userId: strin
             checked: item.checked,
             product_data: item.productData || {},
             user_id: userId,
-            added_by: item.addedBy || userId,
-            added_at: item.addedAt || new Date().toISOString()
+            created_at: item.addedAt || new Date().toISOString()
           });
           
         if (createItemError) {
