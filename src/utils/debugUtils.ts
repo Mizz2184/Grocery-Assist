@@ -14,15 +14,25 @@ export const diagnoseSharedList = async (listId: string, userEmail?: string) => 
       .from('grocery_lists')
       .select('*')
       .eq('id', listId)
-      .single();
+      .maybeSingle();
       
     if (listError) {
-      console.error('❌ List not found:', listError.message);
+      console.error('❌ Database error:', listError.message);
+      console.groupEnd();
+      return {
+        success: false,
+        error: 'Database error',
+        details: listError
+      };
+    }
+    
+    if (!list) {
+      console.error('❌ List not found - ID:', listId);
       console.groupEnd();
       return {
         success: false,
         error: 'List not found',
-        details: listError
+        details: 'No matching list found in the database'
       };
     }
     
@@ -104,15 +114,25 @@ export const fixCollaboratorArray = async (listId: string) => {
       .from('grocery_lists')
       .select('collaborators, user_id')
       .eq('id', listId)
-      .single();
+      .maybeSingle();
       
     if (listError) {
-      console.error('❌ List not found:', listError.message);
+      console.error('❌ Database error:', listError.message);
+      console.groupEnd();
+      return {
+        success: false,
+        error: 'Database error',
+        details: listError
+      };
+    }
+    
+    if (!list) {
+      console.error('❌ List not found:', listId);
       console.groupEnd();
       return {
         success: false,
         error: 'List not found',
-        details: listError
+        details: 'No list with this ID exists in the database'
       };
     }
     

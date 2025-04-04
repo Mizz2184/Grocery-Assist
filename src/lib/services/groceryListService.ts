@@ -646,11 +646,16 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
       .from('grocery_lists')
       .select('*')
       .eq('id', listId)
-      .single();
+      .maybeSingle();
 
     if (listError) {
       console.error('Error fetching grocery list:', listError, listId);
       throw new Error('The shared list could not be found.');
+    }
+    
+    if (!list) {
+      console.error('List not found:', listId);
+      throw new Error('The grocery list does not exist or may have been deleted.');
     }
     
     // Debug logging for collaborators
@@ -829,10 +834,15 @@ export const addCollaborator = async (userId: string, listId: string, collaborat
         .from('grocery_lists')
         .select('id, user_id, name, collaborators')
         .eq('id', listId)
-        .single();
+        .maybeSingle();
       
-      if (listError || !listData) {
+      if (listError) {
         console.error('Error fetching list:', listError);
+        return handleCollaboratorWithLocalStorage(listId, normalizedEmail);
+      }
+      
+      if (!listData) {
+        console.error('List not found:', listId);
         return handleCollaboratorWithLocalStorage(listId, normalizedEmail);
       }
       
@@ -892,7 +902,7 @@ export const addCollaborator = async (userId: string, listId: string, collaborat
         .from('grocery_lists')
         .select('collaborators')
         .eq('id', listId)
-        .single();
+        .maybeSingle();
         
       if (!verifyError && verifyData) {
         console.log('Verified updated collaborators in database:', verifyData.collaborators);
@@ -957,18 +967,20 @@ export const addCollaborator = async (userId: string, listId: string, collaborat
     }
   } catch (error) {
     console.error('Error in addCollaborator:', error);
-    return handleCollaboratorWithLocalStorage(listId, normalizedEmail);
+    // Make sure we capture the normalized email from the outer scope
+    const emailToUse = collaboratorEmail.trim().toLowerCase();
+    return handleCollaboratorWithLocalStorage(listId, emailToUse);
   }
 };
 
 // Helper function to handle collaborator updates in localStorage
 function handleCollaboratorWithLocalStorage(listId: string, email: string): boolean {
   try {
-    console.log('Using localStorage fallback for collaborator update');
-    // Update localStorage for immediate UI updates
-    return updateLocalStorageCollaborators(listId, email);
+    console.log('Using localStorage for collaborator update:', { listId, email });
+    updateLocalStorageCollaborators(listId, email);
+    return true;
   } catch (error) {
-    console.error('Error updating collaborators in localStorage:', error);
+    console.error('Error updating localStorage:', error);
     return false;
   }
 }
@@ -1042,63 +1054,69 @@ export const removeCollaborator = async (userId: string, listId: string, collabo
         .from('grocery_lists')
         .select('id, user_id, collaborators')
         .eq('id', listId)
-        .single();
+        .maybeSingle();
         
       if (fetchError) {
         console.error('===> Error fetching list:', fetchError);
+        return false;
+      }
+      
+      if (!list) {
+        console.error('===> List not found:', listId);
+        return false;
+      }
+      
+      console.log('===> List fetched successfully:', list);
+      
+      // Check if the user is the owner
+      const isOwner = list.user_id === userId;
+      console.log(`===> Is user the owner? ${isOwner}, list.user_id=${list.user_id}, userId=${userId}`);
+      
+      if (!isOwner) {
+        console.error('===> User does not have permission to remove collaborators');
+        return false;
+      }
+      
+      // Current collaborators
+      console.log('===> Current collaborators:', list.collaborators);
+      
+      // Clean up the collaborators array 
+      if (!Array.isArray(list.collaborators)) {
+        console.log('===> Collaborators is not an array, initializing empty array');
+        list.collaborators = [];
+      }
+      
+      // Clean and normalize all existing collaborators
+      const collaborators = list.collaborators
+        .filter(item => item !== null && item !== undefined && item !== '')
+        .map(item => String(item).toLowerCase().trim());
+      
+      // Check if the email exists in the collaborators list 
+      const emailExists = collaborators.includes(normalizedEmail);
+      
+      if (!emailExists) {
+        console.log(`===> Email ${normalizedEmail} not found in collaborators list`);
+        return true; // Consider it "removed" since it's not there
+      }
+      
+      // Remove the email - use normalized comparison
+      const updatedCollaborators = collaborators.filter(email => 
+        email !== normalizedEmail
+      );
+      
+      console.log('===> New collaborators array after removal:', updatedCollaborators);
+      
+      // Update the list with new collaborators
+      const { error: updateError } = await supabase
+        .from('grocery_lists')
+        .update({ collaborators: updatedCollaborators })
+        .eq('id', listId);
+        
+      if (updateError) {
+        console.error('===> Error updating collaborators in database:', updateError);
       } else {
-        console.log('===> List fetched successfully:', list);
-        
-        // Check if the user is the owner
-        const isOwner = list.user_id === userId;
-        console.log(`===> Is user the owner? ${isOwner}, list.user_id=${list.user_id}, userId=${userId}`);
-        
-        if (!isOwner) {
-          console.error('===> User does not have permission to remove collaborators');
-          return false;
-        }
-        
-        // Current collaborators
-        console.log('===> Current collaborators:', list.collaborators);
-        
-        // Clean up the collaborators array 
-        if (!Array.isArray(list.collaborators)) {
-          console.log('===> Collaborators is not an array, initializing empty array');
-          list.collaborators = [];
-        }
-        
-        // Clean and normalize all existing collaborators
-        const collaborators = list.collaborators
-          .filter(item => item !== null && item !== undefined && item !== '')
-          .map(item => String(item).toLowerCase().trim());
-        
-        // Check if the email exists in the collaborators list 
-        const emailExists = collaborators.includes(normalizedEmail);
-        
-        if (!emailExists) {
-          console.log(`===> Email ${normalizedEmail} not found in collaborators list`);
-          return true; // Consider it "removed" since it's not there
-        }
-        
-        // Remove the email - use normalized comparison
-        const updatedCollaborators = collaborators.filter(email => 
-          email !== normalizedEmail
-        );
-        
-        console.log('===> New collaborators array after removal:', updatedCollaborators);
-        
-        // Update the list with new collaborators
-        const { error: updateError } = await supabase
-          .from('grocery_lists')
-          .update({ collaborators: updatedCollaborators })
-          .eq('id', listId);
-          
-        if (updateError) {
-          console.error('===> Error updating collaborators in database:', updateError);
-        } else {
-          console.log('===> Successfully removed collaborator in database');
-          databaseSuccess = true;
-        }
+        console.log('===> Successfully removed collaborator in database');
+        databaseSuccess = true;
       }
     } catch (dbError) {
       console.error('===> Database error in removeCollaborator:', dbError);

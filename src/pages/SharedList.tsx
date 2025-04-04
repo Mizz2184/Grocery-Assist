@@ -222,11 +222,19 @@ const SharedList = () => {
           .from('grocery_lists')
           .select('id, name, user_id, collaborators')
           .eq('id', listId)
-          .single();
+          .maybeSingle(); // Use maybeSingle instead of single to avoid error when no row is found
           
         if (directListError) {
           console.error('❌ Direct database check failed:', directListError);
           setError('The shared list could not be found.');
+          setLoading(false);
+          return;
+        }
+        
+        // If no list was found
+        if (!directListCheck) {
+          console.error('❌ List not found in database - listId:', listId);
+          setError('The grocery list does not exist or may have been deleted.');
           setLoading(false);
           return;
         }
@@ -253,12 +261,12 @@ const SharedList = () => {
             .filter(c => c !== null && c !== undefined && c !== '')
             .map(c => String(c).toLowerCase());
             
-          console.log('🔍 Cleaned collaborators for manual check:', cleanedCollaborators);
-          
-          // Check if user's email is in the collaborators list
-          isManuallyVerifiedCollaborator = cleanedCollaborators.includes(userEmail);
-          
-          console.log(`👤 Manual access check: isOwner=${isOwner}, isCollaborator=${isManuallyVerifiedCollaborator}, userEmail=${userEmail}`);
+            console.log('🔍 Cleaned collaborators for manual check:', cleanedCollaborators);
+            
+            // Check if user's email is in the collaborators list
+            isManuallyVerifiedCollaborator = cleanedCollaborators.includes(userEmail);
+            
+            console.log(`👤 Manual access check: isOwner=${isOwner}, isCollaborator=${isManuallyVerifiedCollaborator}, userEmail=${userEmail}`);
         } else {
           console.warn('⚠️ Collaborators data is not an array or is missing');
         }
