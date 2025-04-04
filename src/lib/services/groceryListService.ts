@@ -630,11 +630,16 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError) {
       console.error('Error getting user data:', userError);
-      return undefined;
+      throw new Error('Cannot verify your identity. Please check your login status.');
     }
     
     const userEmail = userData?.user?.email?.toLowerCase();
     console.log(`User email for collaborator check: ${userEmail}`);
+    
+    if (!userEmail) {
+      console.error('User email is missing, cannot check collaboration permissions');
+      throw new Error('Cannot verify your identity. Please make sure you are logged in with an email address.');
+    }
     
     // Fetch list
     const { data: list, error: listError } = await supabase
@@ -645,32 +650,70 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
 
     if (listError) {
       console.error('Error fetching grocery list:', listError, listId);
-      return undefined;
+      throw new Error('The shared list could not be found.');
     }
     
+    // Debug logging for collaborators
     console.log('List data retrieved:', {
       id: list.id,
       name: list.name,
       owner: list.user_id,
-      collaborators: list.collaborators
+      collaborators: list.collaborators,
+      collaboratorsType: list.collaborators ? typeof list.collaborators : 'undefined'
     });
+    
+    if (list.collaborators) {
+      console.log('Collaborators array content:', JSON.stringify(list.collaborators));
+    }
     
     // Check if user has access to this list (owner or collaborator)
     const isOwner = list.user_id === userId;
     
     // Check if user's email is in the collaborators list
-    const isCollaborator = list.collaborators && 
-      Array.isArray(list.collaborators) && 
-      userEmail && 
-      list.collaborators.some((email: string) => 
-        typeof email === 'string' && email.toLowerCase() === userEmail
-      );
+    let isCollaborator = false;
     
-    console.log(`Access check: isOwner=${isOwner}, isCollaborator=${isCollaborator}`);
+    if (Array.isArray(list.collaborators) && userEmail) {
+      console.log(`Starting collaborator email check for ${userEmail}`);
+      
+      // First try exact string match
+      if (list.collaborators.includes(userEmail)) {
+        console.log(`Found exact email match for ${userEmail}`);
+        isCollaborator = true;
+      } else {
+        // Try case-insensitive check of all string collaborators
+        isCollaborator = list.collaborators.some((collaborator) => {
+          // Check if the collaborator is a string 
+          if (typeof collaborator !== 'string') {
+            console.log(`Skipping non-string collaborator: ${typeof collaborator}`);
+            return false;
+          }
+          
+          // Case-insensitive comparison
+          const emailMatches = collaborator.toLowerCase() === userEmail;
+          if (emailMatches) {
+            console.log(`Found case-insensitive match: ${collaborator} matches ${userEmail}`);
+          }
+          
+          return emailMatches;
+        });
+      }
+      
+      console.log('Collaborator check details:', {
+        userEmail,
+        collaborators: list.collaborators,
+        matches: list.collaborators.filter((email) => 
+          typeof email === 'string' && email.toLowerCase() === userEmail
+        )
+      });
+    } else {
+      console.log(`Cannot perform collaborator check: collaborators array is ${Array.isArray(list.collaborators) ? 'valid' : 'invalid'}, userEmail is ${userEmail ? 'valid' : 'invalid'}`);
+    }
+    
+    console.log(`Access check results: isOwner=${isOwner}, isCollaborator=${isCollaborator}, userEmail=${userEmail}`);
     
     if (!isOwner && !isCollaborator) {
-      console.error('User does not have access to this list');
-      return undefined;
+      console.error(`User does not have access to this list. Owner: ${list.user_id}, Collaborators: ${JSON.stringify(list.collaborators)}`);
+      throw new Error('You do not have permission to view this grocery list.');
     }
 
     // Fetch items for the list
@@ -681,7 +724,7 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
 
     if (itemsError) {
       console.error('Error fetching grocery items:', itemsError);
-      return undefined;
+      throw new Error('Could not load grocery list items. Please try again.');
     }
     
     console.log(`Retrieved ${items?.length || 0} items for the grocery list`);
@@ -758,7 +801,7 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
     return result;
   } catch (error) {
     console.error('Error in getSharedGroceryListById:', error);
-    return undefined;
+    throw error; // Re-throw the error to be handled by the caller
   }
 };
 
@@ -799,42 +842,25 @@ export const addCollaborator = async (userId: string, listId: string, collaborat
         return false;
       }
       
-      // Step 3: Handle collaborators
-      let collaborators = Array.isArray(listData.collaborators) ? 
-        [...listData.collaborators] : [];
+      // Step 3: Handle collaborators - ensure collaborators is a string array
+      let collaborators: string[] = [];
       
-      console.log('Current collaborators:', collaborators);
+      if (Array.isArray(listData.collaborators)) {
+        // Convert all collaborators to string and normalize to lowercase
+        collaborators = listData.collaborators
+          .filter(item => item !== null && item !== undefined)
+          .map(item => String(item).toLowerCase());
+      }
       
-      // Don't add if already present
+      console.log('Current collaborators (normalized):', collaborators);
+      
+      // Don't add if already present (case insensitive check)
       if (collaborators.includes(normalizedEmail)) {
-        console.log('Email already in collaborators list');
+        console.log('Email already in collaborators list, no need to add');
         return true;
       }
       
-      // Step 4: Try to find the user by email to ensure they exist
-      // Even if we don't find them, we'll still add the email to the collaborators array
-      // but this will help us know if we need to send an invitation
-      let collaboratorExists = false;
-      let collaboratorId = null;
-      try {
-        // Check in the public users table
-        const { data: users, error: usersError } = await supabase
-          .from('users')
-          .select('id, email')
-          .eq('email', normalizedEmail)
-          .limit(1);
-          
-        collaboratorExists = !usersError && users && users.length > 0;
-        if (collaboratorExists && users && users.length > 0) {
-          collaboratorId = users[0].id;
-        }
-        console.log(`User with email ${normalizedEmail} found in public.users: ${collaboratorExists}, id: ${collaboratorId}`);
-      } catch (userError) {
-        console.error('Error checking if user exists:', userError);
-        // Continue anyway, we'll still add the email
-      }
-      
-      // Add the new collaborator
+      // Step 4: Add the new collaborator to our array
       collaborators.push(normalizedEmail);
       console.log('New collaborators array:', collaborators);
       
@@ -845,9 +871,11 @@ export const addCollaborator = async (userId: string, listId: string, collaborat
         .eq('id', listId);
         
       if (updateError) {
-        console.error('Error updating collaborators:', updateError);
+        console.error('Error updating collaborators in database:', updateError);
         return handleCollaboratorWithLocalStorage(listId, normalizedEmail);
       }
+      
+      console.log(`Successfully updated collaborators in the database for list ${listId}`);
       
       // Step 6: Create a notification for the new collaborator
       try {
@@ -936,14 +964,24 @@ function updateLocalStorageCollaborators(listId: string, email: string): boolean
       return false;
     }
     
+    // Initialize collaborators array if needed
     if (!list.collaborators) {
       list.collaborators = [];
     }
     
+    // Ensure collaborators is an array of strings
+    if (!Array.isArray(list.collaborators)) {
+      console.warn('Collaborators was not an array, resetting to empty array');
+      list.collaborators = [];
+    }
+    
+    // Normalize existing collaborators
+    list.collaborators = list.collaborators
+      .filter(item => item !== null && item !== undefined)
+      .map(item => String(item).toLowerCase());
+    
     // Check if email already exists (case insensitive)
-    const emailExists = list.collaborators.some((e: string) => 
-      typeof e === 'string' && e.toLowerCase() === normalizedEmail
-    );
+    const emailExists = list.collaborators.includes(normalizedEmail);
     
     console.log('Current collaborators:', list.collaborators);
     console.log('Email already exists:', emailExists);

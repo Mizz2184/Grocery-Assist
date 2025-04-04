@@ -212,64 +212,64 @@ const SharedList = () => {
       }
       
       try {
-        console.log(`Fetching shared list: listId=${listId}, userId=${user.id}`);
+        console.log(`⏳ Fetching shared list: listId=${listId}, userId=${user.id}, userEmail=${user.email}`);
         
-        // First check if the list exists
-        const { data: listCheck, error: listCheckError } = await supabase
-          .from('grocery_lists')
-          .select('id, name, user_id, collaborators')
-          .eq('id', listId)
-          .single();
+        try {
+          // Try to get the full list with items using our service
+          console.log(`🔎 Attempting to fetch list via getSharedGroceryListById`);
+          const fullList = await getSharedGroceryListById(user.id, listId);
           
-        if (listCheckError) {
-          console.error('Error checking if list exists:', listCheckError);
+          console.log(`✅ Successfully loaded shared list with ${fullList?.items?.length || 0} items`);
+          setSharedList(fullList);
           setLoading(false);
-          setError('The shared list could not be found.');
-          return;
-        }
-        
-        console.log('List exists, checking access permissions:', listCheck);
-        
-        // Check if user has access (owner or collaborator)
-        const isOwner = listCheck.user_id === user.id;
-        const isCollaborator = Array.isArray(listCheck.collaborators) && 
-          listCheck.collaborators.includes(user.email?.toLowerCase());
-        
-        console.log(`Access check: isOwner=${isOwner}, isCollaborator=${isCollaborator}, user.email=${user.email}`);
-        
-        if (!isOwner && !isCollaborator) {
-          console.log('User does not have access to this list');
+        } catch (accessError: any) {
+          console.error('❌ Access error:', accessError);
+          
+          // Check the database directly to see if list exists, for better error messages
+          const { data: listCheck, error: listCheckError } = await supabase
+            .from('grocery_lists')
+            .select('id, name, user_id, collaborators')
+            .eq('id', listId)
+            .single();
+            
+          if (listCheckError) {
+            console.error('❌ Error checking if list exists:', listCheckError);
+            setError('The shared list could not be found.');
+            setLoading(false);
+            return;
+          }
+          
+          console.log('📋 List exists, checking details:', listCheck);
+          console.log('👥 Collaborators:', Array.isArray(listCheck.collaborators) 
+            ? JSON.stringify(listCheck.collaborators)
+            : listCheck.collaborators);
+          
+          // Set not authorized and allow user to request access
           setNotAuthorized(true);
           setRequestingAccessInfo({
             listId: listCheck.id,
             listName: listCheck.name,
             listOwner: listCheck.user_id
           });
+          
+          // Also set a helpful error message
+          if (accessError.message?.includes('permission') || 
+              accessError.message?.includes('access')) {
+            setError(`You don't have access to this list. You can request access from the owner.`);
+          } else {
+            setError(accessError.message || 'Failed to load the shared list. Please try again.');
+          }
+          
           setLoading(false);
-          return;
         }
-        
-        // User has access, get the full list with items
-        const fullList = await getSharedGroceryListById(user.id, listId);
-        
-        if (!fullList) {
-          console.error('Failed to fetch full list details');
-          setError('There was a problem loading the list details.');
-          setLoading(false);
-          return;
-        }
-        
-        console.log(`Successfully loaded shared list with ${fullList.items.length} items`);
-        setSharedList(fullList);
-      } catch (error) {
-        console.error('Error fetching shared list:', error);
-        setError("Failed to load the shared list. Please try again.");
+      } catch (error: any) {
+        console.error('❌ Error fetching shared list:', error);
+        setError(error.message || "Failed to load the shared list. Please try again.");
         toast({
           title: "Error",
-          description: "Failed to load the shared list. Please try again.",
+          description: error.message || "Failed to load the shared list. Please try again.",
           variant: "destructive",
         });
-      } finally {
         setLoading(false);
       }
     };
@@ -606,6 +606,65 @@ const SharedList = () => {
 
   const { total, currency } = calculateTotalPrice();
   
+  if (notAuthorized) {
+    return (
+      <div className="page-container">
+        <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto gap-6">
+          <div className="rounded-full bg-muted p-4">
+            <ShoppingCart className="w-12 h-12 text-muted-foreground" />
+          </div>
+          <h1 className="text-3xl font-bold">Access Denied</h1>
+          <p className="text-muted-foreground">
+            {error || "The shared list could not be found or you don't have permission to view it."}
+          </p>
+          
+          {user && requestingAccessInfo && !accessRequested && (
+            <Button 
+              className="rounded-full h-12 px-8 flex items-center gap-2"
+              onClick={handleRequestAccess}
+              disabled={requestingAccess}
+            >
+              {requestingAccess ? (
+                <>
+                  <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                  Requesting Access...
+                </>
+              ) : (
+                <>
+                  <User className="h-5 w-5" />
+                  Request Access
+                </>
+              )}
+            </Button>
+          )}
+          
+          {accessRequested && (
+            <div className="bg-muted px-4 py-3 rounded-lg text-sm">
+              Access request sent. The list owner will review your request.
+            </div>
+          )}
+          
+          <Button 
+            className="rounded-full"
+            onClick={handleBackToLists}
+          >
+            Back to My Lists
+          </Button>
+          
+          {import.meta.env.DEV && requestingAccessInfo && (
+            <div className="mt-4 p-3 bg-muted rounded text-left text-xs text-muted-foreground overflow-auto w-full">
+              <div className="font-semibold mb-1">Debug Info:</div>
+              <div>List ID: {requestingAccessInfo.listId}</div>
+              <div>List Name: {requestingAccessInfo.listName}</div>
+              <div>Owner ID: {requestingAccessInfo.listOwner}</div>
+              <div>Your Email: {user?.email}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page-container">
       <div className="max-w-4xl mx-auto">
