@@ -62,7 +62,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Badge } from '@/components/ui/badge';
 
 // Current exchange rate (this would normally come from an API or context)
-const CRC_TO_USD_RATE = 510;
+const CRC_TO_USD_RATE = 501;
 
 // Helper function to get price from any product structure
 const getProductPrice = (product: any): number => {
@@ -94,23 +94,203 @@ const GroceryList = () => {
   const [addingCollaborator, setAddingCollaborator] = useState(false);
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
 
-  // Create refs for store groups to avoid dependency issues with useEffect
-  const storeGroupsRef = useRef<Record<string, GroceryItem[]>>({});
-  
-  // Initialize store groups with all possible store values
-  useEffect(() => {
-    const groups: Record<string, GroceryItem[]> = {};
-    storeOrder.forEach(store => {
-      groups[store] = [];
-    });
-    storeGroupsRef.current = groups;
-  }, []);
-  
-  // Access store groups via ref
-  const storeGroups = storeGroupsRef.current;
+  // Define store groups for rendering section headers
+  const storeGroupNames: { [key: string]: string } = {
+    'Walmart': 'Walmart',
+    'MaxiPali': 'MaxiPali',
+    'MasxMenos': 'MasxMenos',
+    'PriceSmart': 'PriceSmart',
+    'Automercado': 'Automercado',
+    'Unknown': 'Other Stores'
+  };
 
-  // Fetch lists from database
-  const fetchLists = useCallback(async () => {
+  // Formatting functions
+  const formatCurrency = (amount: number) => {
+    return amount.toLocaleString('es-CR', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+  };
+
+  const formatUSD = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount);
+  };
+
+  // Share list function
+  const handleShare = () => {
+    if (!activeList) return;
+    
+    const shareUrl = `${window.location.origin}/shared-list/${activeList.id}`;
+    
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      toast({
+        title: "Link copied",
+        description: "The list sharing link has been copied to your clipboard. Share it with people you've invited.",
+      });
+    });
+  };
+
+  // Invite collaborator function
+  const handleInviteCollaborator = async () => {
+    if (!activeList || !collaboratorEmail.trim() || !user) {
+      toast({
+        title: "Missing information",
+        description: "Please enter a valid email address to invite.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Normalize and validate the email
+    const normalizedEmail = collaboratorEmail.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      toast({
+        title: "Invalid email format",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setAddingCollaborator(true);
+    
+    try {
+      // Show initial feedback
+      toast({
+        title: "Sending invitation...",
+        description: `Inviting ${normalizedEmail} to collaborate on "${activeList.name}"`,
+      });
+      
+      // Call the service function to add collaborator
+      const success = await addCollaborator(user.id, activeList.id, normalizedEmail);
+      
+      if (success) {
+        // Update UI with the new collaborator
+        const updatedCollaborators = [...(activeList.collaborators || []), normalizedEmail];
+        
+        // Update lists state to include the new collaborator
+        setLists(prevLists => 
+          prevLists.map(list => {
+            if (list.id === activeList.id) {
+              return {
+                ...list,
+                collaborators: updatedCollaborators
+              };
+            }
+            return list;
+          })
+        );
+        
+        // Update active list
+        setActiveList(prevList => {
+          if (!prevList) return null;
+          return {
+            ...prevList,
+            collaborators: updatedCollaborators
+          };
+        });
+        
+        toast({
+          title: "Invitation sent",
+          description: `${normalizedEmail} has been invited to collaborate on "${activeList.name}".`,
+        });
+        
+        // Clear input field
+        setCollaboratorEmail("");
+      } else {
+        toast({
+          title: "Invitation failed",
+          description: "We couldn't add this collaborator. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error inviting collaborator:', error);
+      toast({
+        title: "Error",
+        description: "Failed to invite collaborator. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setAddingCollaborator(false);
+    }
+  };
+
+  // Remove collaborator function
+  const handleRemoveCollaborator = async (email: string) => {
+    if (!activeList || !user) {
+      toast({
+        title: "Error",
+        description: "Cannot remove collaborator at this time.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      // Show immediate feedback
+      toast({
+        title: "Removing collaborator...",
+        description: `Removing ${email} from this list.`,
+      });
+      
+      // Update the state immediately for responsive UI
+      const updatedCollaborators = activeList.collaborators.filter(e => e !== email);
+      
+      // Update lists
+      setLists(prevLists => 
+        prevLists.map(list => {
+          if (list.id === activeList.id) {
+            return {
+              ...list,
+              collaborators: updatedCollaborators
+            };
+          }
+          return list;
+        })
+      );
+      
+      // Update active list
+      setActiveList(prevList => {
+        if (!prevList) return null;
+        return {
+          ...prevList,
+          collaborators: updatedCollaborators
+        };
+      });
+      
+      // Call the service function
+      const success = await removeCollaborator(user.id, activeList.id, email);
+      
+      if (success) {
+        toast({
+          title: "Collaborator removed",
+          description: `${email} has been removed from this list.`,
+        });
+      } else {
+        toast({
+          title: "Warning",
+          description: "Collaborator removed locally, but server sync may have failed.",
+        });
+      }
+    } catch (error) {
+      console.error('Error removing collaborator:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove collaborator. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Simple fetch without complex dependencies
+  const fetchLists = async () => {
     if (!user) {
       toast({
         title: "Authentication Required",
@@ -131,23 +311,10 @@ const GroceryList = () => {
       // Update state
       setLists(lists);
       
-      // Set active list to the first list or maintain current if it exists
+      // Set active list to the first list
       if (lists.length > 0) {
-        if (activeList) {
-          // Find the updated version of the current active list
-          const updatedActiveList = lists.find(list => list.id === activeList.id);
-          if (updatedActiveList) {
-            setActiveList(updatedActiveList);
-          } else {
-            // Current active list no longer exists, set to first available
-            setActiveList(lists[0]);
-          }
-        } else {
-          // No active list yet, set to first list
-          setActiveList(lists[0]);
-        }
+        setActiveList(lists[0]);
       } else {
-        // No lists available
         setActiveList(null);
       }
     } catch (error) {
@@ -160,18 +327,18 @@ const GroceryList = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, toast, navigate]);
+  };
 
+  // Fetch once on mount
   useEffect(() => {
-    // Only fetch lists when the component mounts or user changes
     fetchLists();
-    // Adding a cleanup function
+    
     return () => {
-      // Cleanup function to prevent state updates after unmounting
+      // Cleanup
       setLists([]);
       setActiveList(null);
     };
-  }, [fetchLists]); // fetchLists depends only on user, toast, and navigate now
+  }, [user, toast, navigate]);
 
   // Update a list item
   const handleUpdateListItem = async (listId: string, itemId: string, updates: Partial<GroceryItem>) => {
@@ -185,7 +352,7 @@ const GroceryList = () => {
         return;
       }
       
-      // Call our updated service function with user ID
+      // Call our service function with user ID
       const { success, item } = await updateListItem(listId, itemId, user.id, updates);
       
       if (!success) {
@@ -222,7 +389,7 @@ const GroceryList = () => {
       console.error('Error updating list item:', error);
       toast({
         title: "Update Failed",
-        description: "Could not update the item. Changes saved locally.",
+        description: "Could not update the item. Please try again.",
         variant: "destructive"
       });
     }
@@ -263,12 +430,11 @@ const GroceryList = () => {
         });
       }
       
-      // Use the service function instead of direct Supabase call
+      // Use the service function
       const success = await deleteGroceryListItem(itemId);
         
       if (!success) {
         console.error('Error removing list item from database');
-        // We don't revert the UI since the item is already removed locally
         toast({
           title: "Sync Issue",
           description: "Item removed locally but not synced to cloud.",
@@ -290,285 +456,36 @@ const GroceryList = () => {
     }
   };
 
-  // Create a new list
-  const handleCreateList = async () => {
-    try {
-      if (!user) {
-        toast({
-          title: "Authentication Required",
-          description: "Please sign in to create a list.",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      const newListName = prompt("Enter a name for your new grocery list:", "My Grocery List");
-      
-      if (!newListName) return; // User cancelled
-      
-      const newList = await createGroceryList(user.id, newListName);
-      
-      if (!newList) {
-        throw new Error('Failed to create list');
-      }
-      
-      // Update lists and set the new list as active
-      setLists(prevLists => [...prevLists, newList]);
-      setActiveList(newList);
-      
-      toast({
-        title: "List Created",
-        description: `Your new list "${newList.name}" has been created.`
-      });
-    } catch (error) {
-      console.error('Error creating grocery list:', error);
-      toast({
-        title: "Create Failed",
-        description: "Could not create a new list. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Delete a list
-  const handleDeleteList = async (listId: string) => {
-    try {
-      if (!user) {
-        toast({
-          title: "Authentication Required",
-          description: "Please sign in to delete a list.",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Confirm deletion
-      if (!confirm("Are you sure you want to delete this list? This action cannot be undone.")) {
-        return;
-      }
-      
-      const success = await deleteGroceryList(listId, user.id);
-      
-      if (!success) {
-        throw new Error('Failed to delete list');
-      }
-      
-      // Update local state
-      const updatedLists = lists.filter(list => list.id !== listId);
-      setLists(updatedLists);
-      
-      // If we deleted the active list, set another list as active
-      if (activeList?.id === listId) {
-        setActiveList(updatedLists.length > 0 ? updatedLists[0] : null);
-      }
-      
-      toast({
-        title: "List Deleted",
-        description: "The grocery list has been deleted."
-      });
-    } catch (error) {
-      console.error('Error deleting grocery list:', error);
-      toast({
-        title: "Delete Failed",
-        description: "Could not delete the list. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Sync list to database
-  const handleSyncList = async (listId: string) => {
-    try {
-      if (!user) {
-        toast({
-          title: "Authentication Required",
-          description: "Please sign in to sync a list.",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Find the list
-      const list = lists.find(list => list.id === listId);
-      
-      if (!list) {
-        throw new Error('List not found');
-      }
-      
-      // Sync to database
-      const { success, message } = await syncGroceryListToDatabase(list, user.id);
-      
-      if (!success) {
-        throw new Error(message || 'Failed to sync list');
-      }
-      
-      toast({
-        title: "List Synced",
-        description: "The grocery list has been synced to the cloud."
-      });
-    } catch (error) {
-      console.error('Error syncing grocery list:', error);
-      toast({
-        title: "Sync Failed",
-        description: "Could not sync the list. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleInviteCollaborator = async () => {
-    if (!activeList || !collaboratorEmail.trim() || !user) {
-      console.log('Missing required values:', { 
-        hasActiveList: !!activeList, 
-        email: collaboratorEmail.trim(), 
-        hasUser: !!user 
-      });
-      toast({
-        title: "Missing information",
-        description: "Please enter a valid email address to invite.",
-        variant: "destructive",
-      });
-      return;
-    }
+  // Helper function to group items by store
+  const getItemsByStore = (items: GroceryItem[]) => {
+    const result: Record<string, GroceryItem[]> = {};
     
-    // Normalize and validate the email
-    const normalizedEmail = collaboratorEmail.trim().toLowerCase();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(normalizedEmail)) {
-      toast({
-        title: "Invalid email format",
-        description: "Please enter a valid email address.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Don't allow inviting yourself
-    if (user.email && normalizedEmail === user.email.toLowerCase()) {
-      toast({
-        title: "Invalid invitation",
-        description: "You cannot invite yourself to your own list.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Check if already a collaborator
-    if (activeList.collaborators && activeList.collaborators.includes(normalizedEmail)) {
-      toast({
-        title: "Already a collaborator",
-        description: `${normalizedEmail} is already invited to this list.`,
-      });
-      return;
-    }
-    
-    setAddingCollaborator(true);
-    
-    try {
-      // Show initial feedback
-      toast({
-        title: "Sending invitation...",
-        description: `Inviting ${normalizedEmail} to collaborate on "${activeList.name}"`,
-      });
-      
-      console.log('Inviting collaborator:', { 
-        userId: user.id, 
-        listId: activeList.id, 
-        email: normalizedEmail
-      });
-      
-      // Call the service function to add collaborator
-      const success = await addCollaborator(user.id, activeList.id, normalizedEmail);
-      
-      if (success) {
-        // Update UI with the new collaborator
-        const updatedCollaborators = [...(activeList.collaborators || []), normalizedEmail];
-        updateUI(updatedCollaborators);
-        
-        toast({
-          title: "Invitation sent",
-          description: `${normalizedEmail} has been invited to collaborate on "${activeList.name}".`,
-        });
-        
-        // Clear input field
-        setCollaboratorEmail("");
-      } else {
-        toast({
-          title: "Invitation failed",
-          description: "We couldn't add this collaborator. Please try again.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error('Error inviting collaborator:', error);
-      
-      toast({
-        title: "Error",
-        description: "Failed to invite collaborator. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setAddingCollaborator(false);
-    }
-  };
-  
-  // Helper function to update collaborators in localStorage
-  const updateLocalCollaborators = (listId: string, collaborators: string[]) => {
-    try {
-      const localLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
-      const updatedLists = localLists.map((list: any) => {
-        if (list.id === listId) {
-          return {
-            ...list,
-            collaborators
-          };
-        }
-        return list;
-      });
-      
-      localStorage.setItem('grocery_lists', JSON.stringify(updatedLists));
-    } catch (error) {
-      console.error('Error updating collaborators in localStorage:', error);
-    }
-  };
-  
-  // Helper function to update UI
-  const updateUI = (collaborators: string[]) => {
-    // Update local state
-    setLists(prevLists => 
-      prevLists.map(list => {
-        if (list.id === activeList?.id) {
-          return {
-            ...list,
-            collaborators
-          };
-        }
-        return list;
-      })
-    );
-    
-    setActiveList(prevList => {
-      if (!prevList) return null;
-      return {
-        ...prevList,
-        collaborators
-      };
+    // Initialize all store groups
+    storeOrder.forEach(store => {
+      result[store] = [];
     });
-  };
-
-  const handleShare = () => {
-    if (!activeList) return;
     
-    const shareUrl = `${window.location.origin}/shared-list/${activeList.id}`;
+    // Add Unknown store
+    result['Unknown'] = [];
     
-    navigator.clipboard.writeText(shareUrl).then(() => {
-      toast({
-        title: "Link copied",
-        description: "The list sharing link has been copied to your clipboard. Share it with people you've invited.",
-      });
+    // Group items by store
+    items.forEach(item => {
+      try {
+        const store = getProductStore(item.productData);
+        if (storeOrder.includes(store)) {
+          result[store].push(item);
+        } else {
+          result['Unknown'].push(item);
+        }
+      } catch (err) {
+        result['Unknown'].push(item);
+      }
     });
+    
+    return result;
   };
 
+  // Calculate total price
   const calculateTotalPrice = () => {
     if (!activeList) return { total: 0, currency: '₡' };
     
@@ -596,186 +513,24 @@ const GroceryList = () => {
     return { total, currency };
   };
 
-  const formatCurrency = (amount: number) => {
-    return amount.toLocaleString('es-CR', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    });
-  };
-
-  // Format USD currency
-  const formatUSD = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(amount);
-  };
-
-  // Handle navigation back to search results
-  const handleBackToSearch = () => {
-    // Just navigate to the home page
-    // The search context will take care of restoring search results and scroll position
-    navigate('/');
-  };
-
-  // Add this new function to handle removing a collaborator
-  const handleRemoveCollaborator = async (email: string) => {
-    if (!activeList || !user) {
-      console.log('Cannot remove collaborator: missing activeList or user');
-      toast({
-        title: "Error",
-        description: "Cannot remove collaborator at this time.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    try {
-      // Show immediate feedback
-      toast({
-        title: "Removing collaborator...",
-        description: `Removing ${email} from this list.`,
-      });
-      
-      console.log(`Removing collaborator: ${email} from list ${activeList.id}`);
-      console.log('User ID:', user.id);
-      console.log('Active list:', activeList);
-      
-      // First update the UI optimistically
-      const updatedCollaborators = activeList.collaborators.filter(e => e !== email);
-      
-      // Update UI state immediately for responsive feel
-      updateUI(updatedCollaborators);
-      
-      // Also update localStorage
-      updateLocalCollaborators(activeList.id, updatedCollaborators);
-      
-      // Then try the service function
-      const success = await removeCollaborator(user.id, activeList.id, email);
-      console.log('Service function result:', success);
-      
-      if (success) {
-        toast({
-          title: "Collaborator removed",
-          description: `${email} has been removed from this list.`,
-        });
-      } else {
-        console.error('Error from removeCollaborator service');
-        toast({
-          title: "Warning",
-          description: "Collaborator removed locally, but server sync may have failed.",
-        });
-      }
-    } catch (error) {
-      console.error('Error removing collaborator:', error);
-      
-      toast({
-        title: "Error",
-        description: "Failed to remove collaborator. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-  
-  // Add a toggle function for the dropdown
-  const toggleDropdown = (email: string) => {
-    setOpenDropdowns(prev => ({
-      ...prev,
-      [email]: !prev[email]
-    }));
-  };
-  
-  // Close all dropdowns when clicking outside
-  const closeAllDropdowns = useCallback(() => {
-    setOpenDropdowns({});
-  }, []);
-  
-  useEffect(() => {
-    document.addEventListener('click', closeAllDropdowns);
-    return () => {
-      document.removeEventListener('click', closeAllDropdowns);
-    };
-  }, [closeAllDropdowns]);
-
-  useEffect(() => {
-    // Reset store groups
-    for (const store of storeOrder) {
-      storeGroups[store] = [];
-    }
-    
-    // Group items by store
-    if (activeList && activeList.items) {
-      console.log(`Grouping ${activeList.items.length} items by store`);
-      
-      activeList.items.forEach(item => {
-        // Extract product data for debugging
-        const productId = item.productId;
-        const productName = item.productData?.name || 'Unnamed Product';
-        const originalStore = item.productData ? (item.productData as any).store || 'Unknown' : 'Unknown';
-        
-        // Get normalized store using our utility
-        let store = getProductStore(item.productData);
-        
-        // Log for debugging
-        console.log(`Product ${productId} (${productName}): Original store=${originalStore}, Normalized store=${store}`);
-        
-        // Ensure we're using one of our defined groups
-        if (!storeOrder.includes(store)) {
-          console.warn(`Store '${store}' is not in defined store groups, using 'Unknown' instead`);
-          store = 'Unknown';
-        }
-        
-        // Add to the appropriate store group
-        storeGroups[store].push(item);
-      });
-      
-      // Log group counts for debugging
-      console.log('Store groups after processing:');
-      storeOrder.forEach(store => {
-        console.log(`${store}: ${storeGroups[store].length} items`);
-      });
-    }
-  }, [activeList]);
-
-  // Add other dropdown menu options
-  const renderListOptions = (list: GroceryListType) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon">
-          <MoreVertical className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => handleDeleteList(list.id)}>
-          <Trash className="h-4 w-4 mr-2" /> Delete List
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleSyncList(list.id)}>
-          <RefreshCw className="h-4 w-4 mr-2" /> Sync to Cloud
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-
+  // Loading state
   if (loading) {
     return (
       <div className="page-container">
         <div className="max-w-4xl mx-auto">
-          <div className="h-8 w-48 bg-muted animate-pulse rounded mb-8" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-2">
-              <Card className="animate-pulse bg-muted h-96" />
+          <Skeleton className="h-12 w-48 mb-6" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <Skeleton className="h-[400px] w-full rounded-xl" />
             </div>
-            <div>
-              <Card className="animate-pulse bg-muted h-64" />
-            </div>
+            <Skeleton className="h-[300px] w-full rounded-xl" />
           </div>
         </div>
       </div>
     );
   }
 
+  // Authentication check
   if (!user) {
     return (
       <div className="page-container">
@@ -796,6 +551,7 @@ const GroceryList = () => {
     );
   }
 
+  // No lists
   if (lists.length === 0) {
     return (
       <div className="page-container">
@@ -834,25 +590,8 @@ const GroceryList = () => {
 
   const { total, currency } = calculateTotalPrice();
 
-  // Define store groups (for rendering section headers)
-  const storeGroupNames: { [key: string]: string } = {
-    'Walmart': 'Walmart',
-    'MaxiPali': 'MaxiPali',
-    'MasxMenos': 'MasxMenos',
-    'PriceSmart': 'PriceSmart',
-    'Automercado': 'Automercado',
-    'Unknown': 'Other Stores'
-  };
-  
-  // Define store colors for consistent UI
-  const storeColors: Record<string, string> = {
-    'Walmart': 'bg-blue-600 text-white border-blue-600',
-    'MaxiPali': 'bg-yellow-500 text-white border-yellow-500',
-    'MasxMenos': 'bg-green-600 text-white border-green-600',
-    'PriceSmart': 'bg-purple-600 text-white border-purple-600',
-    'Automercado': 'bg-pink-600 text-white border-pink-600',
-    'Unknown': 'bg-gray-500 text-white border-gray-500'
-  };
+  // Get grouped items by store if we have an active list
+  const groupedItems = activeList ? getItemsByStore(activeList.items) : {};
 
   return (
     <div className="page-container">
@@ -862,7 +601,7 @@ const GroceryList = () => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={handleBackToSearch}
+              onClick={() => navigate('/')}
               className="hover:bg-accent"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -874,7 +613,7 @@ const GroceryList = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             {activeList && (
-              <Card className="animate-scale-in">
+              <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
                     <CardTitle>{activeList.name}</CardTitle>
@@ -914,9 +653,11 @@ const GroceryList = () => {
                     <div className="space-y-6 mt-6">
                       {/* Display grocery items by store */}
                       <div className="mt-4 space-y-6">
-                        {storeOrder
-                          .filter(store => storeGroups[store] && storeGroups[store].length > 0)
-                          .map(store => (
+                        {storeOrder.map(store => {
+                          const items = groupedItems[store] || [];
+                          if (items.length === 0) return null;
+                          
+                          return (
                             <div key={store} className="space-y-4">
                               <div className="flex items-center space-x-2">
                                 <div className={cn(
@@ -932,7 +673,7 @@ const GroceryList = () => {
                                    'O'}
                                 </div>
                                 <span className="font-semibold text-sm">
-                                  {storeGroupNames[store]} ({storeGroups[store].length})
+                                  {storeGroupNames[store]} ({items.length})
                                 </span>
                               </div>
                               
@@ -940,7 +681,7 @@ const GroceryList = () => {
                                 "space-y-3 border-l-4 pl-4",
                                 storeColors[store].split(' ')[2]
                               )}>
-                                {storeGroups[store].map((item) => (
+                                {items.map((item) => (
                                   <GroceryListItem
                                     key={item.id}
                                     item={item}
@@ -958,7 +699,53 @@ const GroceryList = () => {
                                 ))}
                               </div>
                             </div>
-                          ))}
+                          );
+                        })}
+                        
+                        {/* Show Unknown store items */}
+                        {(() => {
+                          const items = groupedItems['Unknown'] || [];
+                          if (items.length === 0) return null;
+                          
+                          return (
+                            <div key="Unknown" className="space-y-4">
+                              <div className="flex items-center space-x-2">
+                                <div className={cn(
+                                  "h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium",
+                                  storeColors['Unknown'].split(' ')[0],
+                                  storeColors['Unknown'].split(' ')[1]
+                                )}>
+                                  O
+                                </div>
+                                <span className="font-semibold text-sm">
+                                  {storeGroupNames['Unknown']} ({items.length})
+                                </span>
+                              </div>
+                              
+                              <div className={cn(
+                                "space-y-3 border-l-4 pl-4",
+                                storeColors['Unknown'].split(' ')[2]
+                              )}>
+                                {items.map((item) => (
+                                  <GroceryListItem
+                                    key={item.id}
+                                    item={item}
+                                    onUpdateQuantity={(id, quantity) => 
+                                      handleUpdateListItem(activeList.id, id, { quantity })
+                                    }
+                                    onToggleCheck={(id, checked) => 
+                                      handleUpdateListItem(activeList.id, id, { checked })
+                                    }
+                                    onRemove={(id) => 
+                                      handleRemoveListItem(activeList.id, id)
+                                    }
+                                    storeColor={storeColors['Unknown']}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   ) : (

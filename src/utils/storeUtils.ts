@@ -15,98 +15,112 @@ export const STORE = {
 // Define type based on the STORE constant
 export type STORE = typeof STORE[keyof typeof STORE];
 
-// Helper function to get store name from any product structure
+// Enable for debugging store detection issues
+const DEBUG = true;
+
 export function getProductStore(product: any): STORE {
-  // Skip if no product provided
-  if (!product) return 'Unknown';
+  if (!product) {
+    if (DEBUG) console.log('getProductStore: No product provided');
+    return STORE.UNKNOWN;
+  }
 
-  // For debugging - enable this only when needed
-  const DEBUG = false;
+  // Normalize store name to handle case differences, extra spaces, etc.
+  let storeName = (product.store || '').toString().toLowerCase().trim();
   
-  if (DEBUG) console.log(`getProductStore: Identifying store for product ${product.id || 'unknown'} (${product.name || 'Unnamed Product'})`);
+  if (DEBUG) {
+    console.log(`getProductStore for product ${product.id || 'unknown'} (${product.name || 'unnamed'})`);
+    console.log(`Original store property: "${product.store || 'none'}"`);
+    console.log(`Normalized store: "${storeName}"`);
+  }
 
-  // Handle different product object structures
-  let storeValue: string = 'Unknown';
+  // Check for exact store matches first - this has highest priority
+  if (storeName === 'walmart') return STORE.WALMART;
+  if (storeName === 'maxipali') return STORE.MAXIPALI;
+  if (storeName === 'pali') return STORE.MAXIPALI;
+  if (storeName === 'masxmenos' || storeName === 'mas x menos') return STORE.MASXMENOS;
+  if (storeName === 'pricesmart') return STORE.PRICESMART;
+  if (storeName === 'automercado') return STORE.AUTOMERCADO;
 
-  // Direct store property
-  if (product.store) {
-    storeValue = product.store;
-    if (DEBUG) console.log(`getProductStore: Raw store value is "${storeValue}"`);
-  } 
-  // Store in prices array
-  else if (product.prices && Array.isArray(product.prices) && product.prices.length > 0) {
-    const storeId = product.prices[0].storeId;
-    storeValue = storeId || 'Unknown';
-    if (DEBUG) console.log(`getProductStore: Store from prices array: "${storeValue}"`);
+  // Check URL for store indicators
+  const url = (product.url || '').toString().toLowerCase();
+  if (url.includes('walmart.')) {
+    if (DEBUG) console.log(`Store detected from URL as Walmart: ${url}`);
+    return STORE.WALMART;
   }
-  
-  // Normalize the store name
-  const normalizedStore = storeValue.trim().toLowerCase();
-  
-  // Exact matches for specific store names (case-insensitive)
-  // This first check guarantees exact store name matches take precedence
-  if (normalizedStore === 'walmart') {
-    if (DEBUG) console.log(`getProductStore: Exact match for Walmart`);
-    return 'Walmart';
+  if (url.includes('maxipali.')) {
+    if (DEBUG) console.log(`Store detected from URL as MaxiPali: ${url}`);
+    return STORE.MAXIPALI;
   }
-  
-  if (normalizedStore === 'maxipali' || normalizedStore === 'maxi pali') {
-    if (DEBUG) console.log(`getProductStore: Exact match for MaxiPali`);
-    return 'MaxiPali';
+  if (url.includes('masxmenos.')) {
+    if (DEBUG) console.log(`Store detected from URL as MasxMenos: ${url}`);
+    return STORE.MASXMENOS;
   }
-  
-  if (normalizedStore === 'masxmenos' || normalizedStore === 'mas x menos') {
-    if (DEBUG) console.log(`getProductStore: Exact match for MasxMenos`);
-    return 'MasxMenos';
+  if (url.includes('pricesmart.')) {
+    if (DEBUG) console.log(`Store detected from URL as PriceSmart: ${url}`);
+    return STORE.PRICESMART;
   }
-  
-  if (normalizedStore === 'pricesmart' || normalizedStore === 'price smart') {
-    if (DEBUG) console.log(`getProductStore: Exact match for PriceSmart`);
-    return 'PriceSmart';
+  if (url.includes('automercado.')) {
+    if (DEBUG) console.log(`Store detected from URL as Automercado: ${url}`);
+    return STORE.AUTOMERCADO;
   }
-  
-  if (normalizedStore === 'automercado' || normalizedStore === 'auto mercado') {
-    if (DEBUG) console.log(`getProductStore: Exact match for Automercado`);
-    return 'Automercado';
+
+  // Check productType for Walmart indicators
+  const productType = (product.productType || '').toString().toLowerCase();
+  if (productType.includes('walmart')) {
+    if (DEBUG) console.log(`Store detected from productType as Walmart: ${productType}`);
+    return STORE.WALMART;
   }
-  
-  // Check for partial matches using includes, in priority order
-  // Order matters here: More specific matches (like 'walmart') should come before 
-  // less specific ones (like 'maxi' which could match many strings)
-  
-  // 1. Walmart check (highest priority to avoid misclassification)
-  if (normalizedStore.includes('walmart') || normalizedStore.includes('wal-mart')) {
-    if (DEBUG) console.log('getProductStore: Matched Walmart via partial match');
-    return 'Walmart';
+
+  // Check product attributes for Walmart indicators
+  if (product.attributes) {
+    if (product.attributes.seller && product.attributes.seller.toLowerCase().includes('walmart')) {
+      if (DEBUG) console.log(`Store detected from seller attribute as Walmart`);
+      return STORE.WALMART;
+    }
   }
-  
-  // 2. MasxMenos check (must include both parts to be specific)
-  if (normalizedStore.includes('mas') && (normalizedStore.includes('menos') || normalizedStore.includes('x menos'))) {
-    if (DEBUG) console.log('getProductStore: Matched MasxMenos via partial match');
-    return 'MasxMenos';
+
+  // Broader checks for partial matches, with specific rules to avoid confusion
+  if (storeName.includes('walmart')) {
+    if (DEBUG) console.log(`Store detected as Walmart from partial match in store name`);
+    return STORE.WALMART;
   }
-  
-  // 3. Other specific store checks
-  if (normalizedStore.includes('price') && normalizedStore.includes('smart')) {
-    if (DEBUG) console.log('getProductStore: Matched PriceSmart via partial match');
-    return 'PriceSmart';
+
+  // Only check for masxmenos if not already identified as Walmart
+  if (storeName.includes('mas x menos') || storeName.includes('masxmenos')) {
+    if (DEBUG) console.log(`Store detected as MasxMenos from partial match in store name`);
+    return STORE.MASXMENOS;
   }
-  
-  if (normalizedStore.includes('auto') && normalizedStore.includes('mercado')) {
-    if (DEBUG) console.log('getProductStore: Matched Automercado via partial match');
-    return 'Automercado';
+
+  // Only check for maxipali if not already identified as Walmart
+  // This avoids the common issue where Walmart products are misidentified as MaxiPali
+  if ((storeName.includes('maxi') || storeName.includes('pali')) && 
+      !storeName.includes('walmart')) {
+    if (DEBUG) console.log(`Store detected as MaxiPali from partial match in store name`);
+    return STORE.MAXIPALI;
   }
-  
-  // 4. MaxiPali check after others to avoid mismatches
-  // Must contain 'maxi' or 'pali' but NOT 'walmart' to avoid misclassification
-  if ((normalizedStore.includes('maxi') || normalizedStore.includes('pali')) && !normalizedStore.includes('walmart')) {
-    if (DEBUG) console.log('getProductStore: Matched MaxiPali via partial match');
-    return 'MaxiPali';
+
+  // Check if the product is from Automercado
+  if (storeName.includes('auto') || storeName.includes('mercado')) {
+    if (DEBUG) console.log(`Store detected as Automercado from partial match in store name`);
+    return STORE.AUTOMERCADO;
   }
-  
-  // Default to Unknown if no match
-  if (DEBUG) console.log(`getProductStore: No match found for "${storeValue}", using Unknown`);
-  return 'Unknown';
+
+  // Check if the product is from PriceSmart
+  if (storeName.includes('price') || storeName.includes('smart')) {
+    if (DEBUG) console.log(`Store detected as PriceSmart from partial match in store name`);
+    return STORE.PRICESMART;
+  }
+
+  // Check the product's source, description or other properties for store indicators
+  const description = (product.description || '').toString().toLowerCase();
+  if (description.includes('walmart')) {
+    if (DEBUG) console.log(`Store detected as Walmart from description`);
+    return STORE.WALMART;
+  }
+
+  // Final fallback
+  if (DEBUG) console.log(`Store could not be determined, using UNKNOWN`);
+  return STORE.UNKNOWN;
 }
 
 // Define store names and their display names

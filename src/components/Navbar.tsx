@@ -191,12 +191,6 @@ export const Navbar = () => {
           className="flex items-center gap-2 font-medium text-xl" 
           aria-label="Cost Comrade"
         >
-          <div className="relative w-8 h-8">
-            <ShoppingCart className="w-7 h-7 absolute" />
-            <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-              ₡
-            </span>
-          </div>
           <span className="font-semibold text-lg">
             {isTranslated ? "Fam-Assist" : translateText("Asistente de Compras")}
           </span>

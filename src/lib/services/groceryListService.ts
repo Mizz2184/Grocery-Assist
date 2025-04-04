@@ -10,7 +10,6 @@ type DbGroceryList = {
   name: string;
   user_id: string;
   created_at: string;
-  updated_at?: string;
   collaborators?: string[];
 };
 
@@ -22,7 +21,6 @@ type DbGroceryItem = {
   checked: boolean;
   product_data?: Product;
   created_at: string;
-  updated_at?: string;
 };
 
 // Get user's grocery lists
@@ -1086,17 +1084,10 @@ export const sendCollaboratorInvite = async (
   }
 };
 
-/**
- * Sync a grocery list to the database
- * @param list 
- * @param userId 
- * @returns 
- */
-export const syncGroceryListToDatabase = async (list: GroceryList, userId: string): Promise<{ success: boolean, message?: string }> => {
-  console.log(`Syncing grocery list ${list.id} to database for user ${userId}`);
-  
+// Helper function to update a list in the database
+const updateListInDatabase = async (list: GroceryList, userId: string) => {
   try {
-    // First, ensure the list exists in the database
+    // Check if the list exists
     const { data: existingList, error: listCheckError } = await supabase
       .from('grocery_lists')
       .select('id')
@@ -1113,7 +1104,7 @@ export const syncGroceryListToDatabase = async (list: GroceryList, userId: strin
     const listExists = !!existingList;
     
     if (!listExists) {
-      // Create the list
+      // Create the list - without updated_at since it doesn't exist in schema
       const { error: createError } = await supabase
         .from('grocery_lists')
         .insert({
@@ -1121,7 +1112,6 @@ export const syncGroceryListToDatabase = async (list: GroceryList, userId: strin
           name: list.name,
           user_id: userId,
           created_at: list.createdAt,
-          updated_at: new Date().toISOString(),
           collaborators: list.collaborators || []
         });
         
@@ -1130,12 +1120,11 @@ export const syncGroceryListToDatabase = async (list: GroceryList, userId: strin
         return { success: false, message: 'Failed to create list in database' };
       }
     } else {
-      // Update the list
+      // Update the list - without updated_at since it doesn't exist in schema
       const { error: updateError } = await supabase
         .from('grocery_lists')
         .update({
           name: list.name,
-          updated_at: new Date().toISOString(),
           collaborators: list.collaborators || []
         })
         .eq('id', list.id);
@@ -1144,6 +1133,29 @@ export const syncGroceryListToDatabase = async (list: GroceryList, userId: strin
         console.error('Error updating list in database:', updateError);
         return { success: false, message: 'Failed to update list in database' };
       }
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating list in database:', error);
+    return { success: false, message: 'An error occurred while updating the list' };
+  }
+};
+
+/**
+ * Sync a grocery list to the database
+ * @param list 
+ * @param userId 
+ * @returns 
+ */
+export const syncGroceryListToDatabase = async (list: GroceryList, userId: string): Promise<{ success: boolean; message?: string }> => {
+  console.log(`Syncing grocery list "${list.name}" to database for user ${userId}`);
+  
+  try {
+    // Update the list in the database
+    const updateResult = await updateListInDatabase(list, userId);
+    if (!updateResult.success) {
+      return updateResult;
     }
     
     // Now sync all items
@@ -1263,7 +1275,7 @@ export const renameGroceryList = async (
     // Update in database
     const { error } = await supabase
       .from('grocery_lists')
-      .update({ name: newName, updated_at: new Date().toISOString() })
+      .update({ name: newName })
       .eq('id', listId);
       
     if (error) {
@@ -1370,90 +1382,35 @@ export const updateListItem = async (
   itemId: string,
   userId: string,
   updates: Partial<GroceryListItem>
-): Promise<{ success: boolean; item?: GroceryListItem }> => {
+): Promise<{ success: boolean; item?: any; message?: string }> => {
+  console.log(`Updating item ${itemId} in list ${listId} for user ${userId}`, updates);
+
   try {
-    console.log(`Updating list item ${itemId} in list ${listId} with:`, updates);
+    // Convert from GroceryListItem format to database format
+    const dbUpdates: any = {};
     
-    // Skip database update for mock users - just update localStorage
-    if (userId.startsWith('mock-')) {
-      return updateLocalListItemAndReturn(listId, itemId, updates);
-    }
-    
-    // Format updates for database - convert from GroceryListItem to DbGroceryItem format
-    const dbUpdates: Partial<DbGroceryItem> = {};
-    
-    // Map the fields that need conversion
     if (updates.quantity !== undefined) dbUpdates.quantity = updates.quantity;
     if (updates.checked !== undefined) dbUpdates.checked = updates.checked;
     if (updates.productData !== undefined) dbUpdates.product_data = updates.productData;
+
+    console.log('Database updates:', dbUpdates);
     
-    // Add updated timestamp
-    dbUpdates.updated_at = new Date().toISOString();
-    
-    // Update in Supabase
-    const { error } = await supabase
+    // Update the item in the database
+    const { data, error } = await supabase
       .from('grocery_items')
       .update(dbUpdates)
-      .eq('id', itemId);
-      
+      .eq('id', itemId)
+      .select()
+      .single();
+    
     if (error) {
-      console.error('Error updating list item in Supabase:', error);
-      // Fall back to local update
-      return updateLocalListItemAndReturn(listId, itemId, updates);
+      console.error('Error updating item in database:', error);
+      throw new Error(`Database error: ${error.message}`);
     }
     
-    // Update in localStorage too for immediate UI updates
-    const result = updateLocalListItemAndReturn(listId, itemId, updates);
-    
-    return result;
+    return { success: true, item: data };
   } catch (error) {
     console.error('Error in updateListItem:', error);
-    // Fall back to local update
-    return updateLocalListItemAndReturn(listId, itemId, updates);
+    return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
   }
 };
-
-/**
- * Helper function to update an item in localStorage and return the updated item
- */
-function updateLocalListItemAndReturn(
-  listId: string, 
-  itemId: string, 
-  updates: Partial<GroceryListItem>
-): { success: boolean; item?: GroceryListItem } {
-  try {
-    const localLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
-    const listIndex = localLists.findIndex((list: GroceryList) => list.id === listId);
-    
-    if (listIndex === -1) {
-      console.error('List not found in localStorage:', listId);
-      return { success: false };
-    }
-    
-    const list = localLists[listIndex];
-    const itemIndex = list.items.findIndex(item => item.id === itemId);
-    
-    if (itemIndex === -1) {
-      console.error('Item not found in list:', itemId);
-      return { success: false };
-    }
-    
-    // Apply updates
-    const updatedItem = {
-      ...list.items[itemIndex],
-      ...updates
-    };
-    
-    // Update the item in the list
-    list.items[itemIndex] = updatedItem;
-    
-    // Save back to localStorage
-    localLists[listIndex] = list;
-    localStorage.setItem('grocery_lists', JSON.stringify(localLists));
-    
-    return { success: true, item: updatedItem };
-  } catch (error) {
-    console.error('Error updating item in localStorage:', error);
-    return { success: false };
-  }
-}

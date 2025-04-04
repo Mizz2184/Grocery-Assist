@@ -104,7 +104,7 @@ const ProductGrid = ({ products, onAddToList, isProductInList }: {
                     ₡{new Intl.NumberFormat('es-CR').format(product.price)}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    ${(product.price / 510).toFixed(2)}
+                    ${(product.price / 501).toFixed(2)}
                   </div>
                 </div>
                 {product.brand && (
