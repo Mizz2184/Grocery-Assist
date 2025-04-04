@@ -626,6 +626,12 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
   try {
     console.log(`Getting shared grocery list: listId=${listId}, userId=${userId}`);
     
+    // Validate listId format
+    if (!listId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      console.error('Invalid list ID format:', listId);
+      throw new Error('Invalid list ID format');
+    }
+    
     // First get user email for checking collaborator access
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError) {
@@ -641,7 +647,26 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
       throw new Error('Cannot verify your identity. Please make sure you are logged in with an email address.');
     }
     
-    // Fetch list
+    // Fetch list with minimal fields first to check if it exists
+    const { data: listExistsCheck, error: listExistsError } = await supabase
+      .from('grocery_lists')
+      .select('id')
+      .eq('id', listId)
+      .maybeSingle();
+      
+    if (listExistsError) {
+      console.error('Error checking if list exists:', listExistsError);
+      throw new Error('The shared list could not be found.');
+    }
+    
+    if (!listExistsCheck) {
+      console.error('List does not exist:', listId);
+      throw new Error('The grocery list does not exist or may have been deleted.');
+    }
+    
+    console.log('List exists, proceeding to fetch full details...');
+    
+    // Fetch full list details
     const { data: list, error: listError } = await supabase
       .from('grocery_lists')
       .select('*')
@@ -704,21 +729,11 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
       } else {
         console.warn('Collaborators is not an array:', typeof list.collaborators);
       }
+    } else {
+      console.log(`Cannot perform collaborator check: collaborators array is ${Array.isArray(list.collaborators) ? 'valid' : 'invalid'}, userEmail is ${userEmail ? 'valid' : 'invalid'}`);
     }
     
     console.log(`Access check results: isOwner=${isOwner}, isCollaborator=${isCollaborator}, userEmail=${userEmail}`);
-    
-    // Direct access to database to verify what's stored
-    try {
-      const { data, error } = await supabase.rpc('check_email_collaborator', { 
-        list_id: listId,
-        email: userEmail
-      });
-      
-      console.log(`RPC check for collaborator: result=${data}, error=${error ? JSON.stringify(error) : 'none'}`);
-    } catch (rpcError) {
-      console.error('Failed to perform RPC check:', rpcError);
-    }
     
     if (!isOwner && !isCollaborator) {
       console.error(`User does not have access to this list. Owner: ${list.user_id}, Collaborators:`, list.collaborators);
@@ -726,6 +741,7 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
     }
 
     // Fetch items for the list
+    console.log(`Fetching items for list ${listId}...`);
     const { data: items, error: itemsError } = await supabase
       .from('grocery_items')
       .select('*')
@@ -814,164 +830,79 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
   }
 };
 
-// Add a collaborator to a grocery list
-export const addCollaborator = async (userId: string, listId: string, collaboratorEmail: string): Promise<boolean> => {
+// Update the addCollaborator function with a better verification step
+export async function addCollaborator(
+  userId: string,
+  listId: string,
+  email: string
+): Promise<boolean> {
   try {
-    console.log(`Starting addCollaborator: userId=${userId}, listId=${listId}, email=${collaboratorEmail}`);
+    console.log(`Adding collaborator ${email} to list ${listId}...`);
     
-    // Normalize the email address
-    const normalizedEmail = collaboratorEmail.trim().toLowerCase();
-    console.log(`Normalized email: ${normalizedEmail}`);
-    
-    if (!normalizedEmail) {
-      console.error('Invalid email provided');
+    // First verify the list exists
+    const { data: listCheck, error: listCheckError } = await supabase
+      .from('grocery_lists')
+      .select('id, name, user_id, collaborators')
+      .eq('id', listId)
+      .maybeSingle();
+      
+    if (listCheckError) {
+      console.error('Database error checking list:', listCheckError);
       return false;
     }
     
-    // Step 1: Get the list data with minimal fields
-    try {
-      const { data: listData, error: listError } = await supabase
+    if (!listCheck) {
+      console.error(`List not found in database: ${listId}`);
+      return false;
+    }
+    
+    // Ensure collaborators is always an array
+    const collaborators = Array.isArray(listCheck.collaborators) 
+      ? listCheck.collaborators
+      : [];
+      
+    // Only add if not already in the array
+    if (!collaborators.includes(email)) {
+      // Get current list data
+      const { data, error } = await supabase
         .from('grocery_lists')
-        .select('id, user_id, name, collaborators')
+        .update({
+          collaborators: [...collaborators, email],
+        })
         .eq('id', listId)
-        .maybeSingle();
-      
-      if (listError) {
-        console.error('Error fetching list:', listError);
-        return handleCollaboratorWithLocalStorage(listId, normalizedEmail);
-      }
-      
-      if (!listData) {
-        console.error('List not found:', listId);
-        return handleCollaboratorWithLocalStorage(listId, normalizedEmail);
-      }
-      
-      console.log('List data retrieved:', {
-        id: listData.id,
-        createdBy: listData.user_id,
-        collaborators: listData.collaborators
-      });
-      
-      // Step 2: Check permission
-      const isOwner = listData.user_id === userId;
-      console.log(`Is user the owner? ${isOwner}, list.user_id=${listData.user_id}, userId=${userId}`);
-      
-      if (!isOwner) {
-        console.error('User does not have permission to modify this list');
+        .eq('user_id', userId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error adding collaborator to grocery list:', error);
         return false;
       }
-      
-      // Step 3: Handle collaborators - ensure we have a proper string array
-      let collaborators: string[] = [];
-      
-      if (Array.isArray(listData.collaborators)) {
-        // Only include valid string entries, clean them, and normalize to lowercase
-        collaborators = listData.collaborators
-          .filter(item => item !== null && item !== undefined && item !== '')
-          .map(item => String(item).toLowerCase().trim());
-      }
-      
-      console.log('Current collaborators (normalized):', collaborators);
-      
-      // Don't add if already present (case insensitive check)
-      if (collaborators.includes(normalizedEmail)) {
-        console.log('Email already in collaborators list, no need to add');
-        return true;
-      }
-      
-      // Step 4: Add the new collaborator to our array
-      collaborators.push(normalizedEmail);
-      console.log('New collaborators array:', collaborators);
-      
-      // Step 5: Update the list with the new collaborators
-      // CRITICAL: Make sure it's stored as a plain string array
-      const { error: updateError } = await supabase
-        .from('grocery_lists')
-        .update({ 
-          collaborators: collaborators 
-        })
-        .eq('id', listId);
-        
-      if (updateError) {
-        console.error('Error updating collaborators in database:', updateError);
-        return handleCollaboratorWithLocalStorage(listId, normalizedEmail);
-      }
-      
-      // Verify the update was successful by retrieving the updated list
-      const { data: verifyData, error: verifyError } = await supabase
-        .from('grocery_lists')
-        .select('collaborators')
-        .eq('id', listId)
-        .maybeSingle();
-        
-      if (!verifyError && verifyData) {
-        console.log('Verified updated collaborators in database:', verifyData.collaborators);
-      } else {
-        console.warn('Could not verify collaborator update success:', verifyError);
-      }
-      
-      console.log(`Successfully updated collaborators in the database for list ${listId}`);
-      
-      // Step 6: Create a notification for the new collaborator
+
+      // Send an invitation email to the collaborator
       try {
-        // Get current user's profile to include in notification
-        const { data: { user } } = await supabase.auth.getUser();
-        const senderName = user?.user_metadata?.full_name || user?.email || 'Someone';
-        
-        console.log('Creating notification with sender:', senderName);
-        
-        // Create notification in the database
-        const { error: notificationError } = await supabase
-          .from('notifications')
-          .insert({
-            user_email: normalizedEmail,
-            type: 'share_invitation',
-            content: `${senderName} shared a grocery list with you: "${listData.name}"`,
-            metadata: {
-              listId: listId,
-              listName: listData.name,
-              senderId: userId,
-              senderName: senderName
-            },
-            is_read: false,
-            created_at: new Date().toISOString()
-          });
-          
-        if (notificationError) {
-          console.error('Error creating notification:', notificationError);
-        } else {
-          console.log('Created notification for collaborator');
-        }
-      } catch (notificationError) {
-        console.error('Error creating notification:', notificationError);
-        // Continue anyway, the collaborator was already added
+        await sendCollaboratorInvite(
+          userId,
+          listId, 
+          listCheck.name, 
+          email
+        );
+      } catch (err) {
+        console.error('Error sending invitation email:', err);
+        // Continue even if email fails
       }
-      
-      // Step 7: Try to send an invitation email
-      try {
-        await sendCollaboratorInvite(userId, listId, listData.name, normalizedEmail);
-        console.log('Sent invitation email');
-      } catch (emailError) {
-        console.error('Error sending invitation email:', emailError);
-        // Continue anyway, the collaborator was already added
-      }
-      
-      // Update localStorage for immediate UI updates
-      updateLocalStorageCollaborators(listId, normalizedEmail);
-      
-      console.log('Successfully added collaborator');
+
+      console.log('Successfully added collaborator:', email);
       return true;
-    } catch (error) {
-      console.error('Error in database operations:', error);
-      return handleCollaboratorWithLocalStorage(listId, normalizedEmail);
+    } else {
+      console.log('Collaborator already exists in list:', email);
+      return true; // Consider this a success since the end state is what was requested
     }
   } catch (error) {
     console.error('Error in addCollaborator:', error);
-    // Make sure we capture the normalized email from the outer scope
-    const emailToUse = collaboratorEmail.trim().toLowerCase();
-    return handleCollaboratorWithLocalStorage(listId, emailToUse);
+    return false;
   }
-};
+}
 
 // Helper function to handle collaborator updates in localStorage
 function handleCollaboratorWithLocalStorage(listId: string, email: string): boolean {

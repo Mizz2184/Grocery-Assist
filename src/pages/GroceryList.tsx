@@ -37,7 +37,8 @@ import {
   CheckCircle,
   Users,
   Pencil,
-  Eye
+  Eye,
+  Trash2
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
@@ -60,6 +61,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { ShareGroceryList } from "@/components/ShareGroceryList";
 
 // Current exchange rate (this would normally come from an API or context)
 const CRC_TO_USD_RATE = 501;
@@ -542,6 +544,47 @@ const GroceryList = () => {
     return { total, currency };
   };
 
+  // Handle deleting a grocery list
+  const handleDeleteList = async () => {
+    if (!activeList || !user) return;
+    
+    try {
+      // Confirm deletion with user
+      if (!window.confirm(`Are you sure you want to delete "${activeList.name}" list?`)) {
+        return;
+      }
+      
+      const success = await deleteGroceryList(activeList.id);
+      
+      if (success) {
+        toast({
+          title: "List Deleted",
+          description: `"${activeList.name}" has been deleted.`,
+        });
+        
+        // Remove from local state
+        setLists(prevLists => prevLists.filter(list => list.id !== activeList.id));
+        setActiveList(null);
+        
+        // Refresh lists to get a new active list if available
+        fetchLists();
+      } else {
+        toast({
+          title: "Delete Failed",
+          description: "Could not delete the list. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting list:', error);
+      toast({
+        title: "Delete Failed",
+        description: "An error occurred while deleting the list.",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -650,14 +693,22 @@ const GroceryList = () => {
                       {activeList.items.length} items
                     </CardDescription>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    className="rounded-full flex items-center gap-2"
-                    onClick={handleShare}
-                  >
-                    <Share2 className="h-4 w-4" />
-                    Share List
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <ShareGroceryList 
+                      listId={activeList.id} 
+                      userId={user?.id || ''} 
+                      listName={activeList.name} 
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-full flex items-center gap-2"
+                      onClick={handleDeleteList}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </Button>
+                  </div>
                 </CardHeader>
                 
                 <CardContent className="space-y-4">
@@ -846,7 +897,13 @@ const GroceryList = () => {
                       variant="outline"
                       size="icon"
                       className="flex-shrink-0"
-                      onClick={handleShare}
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/shared-list/${activeList?.id}`);
+                        toast({
+                          title: "Link Copied",
+                          description: "The sharing link has been copied to your clipboard.",
+                        });
+                      }}
                       title="Copy to clipboard"
                     >
                       <Clipboard className="h-4 w-4" />

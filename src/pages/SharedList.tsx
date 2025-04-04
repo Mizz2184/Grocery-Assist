@@ -209,13 +209,27 @@ const SharedList = () => {
   useEffect(() => {
     const fetchSharedList = async () => {
       if (!user || !listId) {
+        console.error('❌ Missing user or listId:', { userId: user?.id, listId });
         setLoading(false);
+        setError('Unable to load the shared list. Missing required information.');
         return;
       }
       
+      // Validate listId format
+      const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(listId);
+      if (!isValidUUID) {
+        console.error('❌ Invalid list ID format:', listId);
+        setLoading(false);
+        setError('The list ID format is invalid.');
+        return;
+      }
+
+      console.log(`⏳ Starting shared list fetch: listId=${listId}, userId=${user.id}, userEmail=${user.email}`);
+
+      // Before database check, log that we're about to check the database
+      console.log(`🔍 Checking database for list with ID: ${listId}`);
+      
       try {
-        console.log(`⏳ Starting shared list fetch: listId=${listId}, userId=${user.id}, userEmail=${user.email}`);
-        
         // DIRECT DATABASE CHECK FIRST
         // This helps us diagnose access issues by directly checking the database record
         const { data: directListCheck, error: directListError } = await supabase
@@ -226,7 +240,7 @@ const SharedList = () => {
           
         if (directListError) {
           console.error('❌ Direct database check failed:', directListError);
-          setError('The shared list could not be found.');
+          setError('The shared list could not be found due to a database error.');
           setLoading(false);
           return;
         }
@@ -234,9 +248,33 @@ const SharedList = () => {
         // If no list was found
         if (!directListCheck) {
           console.error('❌ List not found in database - listId:', listId);
-          setError('The grocery list does not exist or may have been deleted.');
-          setLoading(false);
-          return;
+          
+          // Try fallback lookup with a slight delay
+          try {
+            console.log('🔄 Attempting fallback lookup after short delay...');
+            await new Promise(r => setTimeout(r, 1000)); // Short delay
+            
+            const { data: retryCheck, error: retryError } = await supabase
+              .from('grocery_lists')
+              .select('id')
+              .eq('id', listId)
+              .maybeSingle();
+              
+            if (retryError || !retryCheck) {
+              console.error('❌ Fallback lookup failed:', retryError || 'List not found');
+              setError('The grocery list does not exist or may have been deleted.');
+              setLoading(false);
+              return;
+            } else {
+              console.log('✅ Fallback lookup successful, list exists');
+              // We found the list ID but not the full details, proceed with caution
+            }
+          } catch (fallbackError) {
+            console.error('❌ Fallback check error:', fallbackError);
+            setError('The grocery list does not exist or may have been deleted.');
+            setLoading(false);
+            return;
+          }
         }
         
         // Log the raw collaborators data for debugging
