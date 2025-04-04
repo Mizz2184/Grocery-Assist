@@ -23,7 +23,7 @@ import {
   Copy
 } from "lucide-react";
 import { GroceryList as GroceryListType } from "@/utils/productData";
-import { getSharedGroceryListById, addCollaborator } from "@/lib/services/groceryListService";
+import { getSharedGroceryListById, addCollaborator, updateListItem, deleteGroceryListItem } from "@/lib/services/groceryListService";
 import { convertCRCtoUSD } from "@/utils/currencyUtils";
 import { supabase } from "@/lib/supabase";
 
@@ -67,6 +67,117 @@ const getProductStore = (product: any): string => {
   return 'Unknown';
 };
 
+// Define the store order for displaying store groups
+const storeOrder = ['Walmart', 'MaxiPali', 'MasxMenos', 'PriceSmart', 'Automercado', 'Unknown'];
+
+// Define store groups for rendering section headers
+const storeGroupNames: { [key: string]: string } = {
+  'Walmart': 'Walmart',
+  'MaxiPali': 'MaxiPali',
+  'MasxMenos': 'MasxMenos',
+  'PriceSmart': 'PriceSmart',
+  'Automercado': 'Automercado',
+  'Unknown': 'Other Stores'
+};
+
+// Helper function to update a list item
+const handleUpdateListItem = async (sharedList: GroceryListType, user: any, toast: any, setSharedList: React.Dispatch<React.SetStateAction<GroceryListType | null>>, itemId: string, updates: any) => {
+  if (!user || !sharedList) {
+    toast({
+      title: "Error",
+      description: "You must be logged in to update items.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  try {
+    // Optimistically update local state first for responsive UI
+    setSharedList(prev => {
+      if (!prev) return null;
+
+      return {
+        ...prev,
+        items: prev.items.map(item => 
+          item.id === itemId ? { ...item, ...updates } : item
+        )
+      };
+    });
+
+    // Call the API to update the item
+    const { success, message } = await updateListItem(
+      sharedList.id,
+      itemId,
+      user.id,
+      updates
+    );
+
+    if (!success) {
+      console.error('Error updating item:', message);
+      toast({
+        title: "Update Failed",
+        description: "Failed to update the item on the server.",
+        variant: "destructive",
+      });
+    }
+  } catch (error) {
+    console.error('Error updating list item:', error);
+    toast({
+      title: "Error",
+      description: "An error occurred while updating the item.",
+      variant: "destructive",
+    });
+  }
+};
+
+// Helper function to remove a list item
+const handleRemoveListItem = async (sharedList: GroceryListType, user: any, toast: any, setSharedList: React.Dispatch<React.SetStateAction<GroceryListType | null>>, itemId: string) => {
+  if (!user || !sharedList) {
+    toast({
+      title: "Error",
+      description: "You must be logged in to remove items.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  try {
+    // Optimistically update local state first for responsive UI
+    setSharedList(prev => {
+      if (!prev) return null;
+
+      return {
+        ...prev,
+        items: prev.items.filter(item => item.id !== itemId)
+      };
+    });
+
+    // Call the API to delete the item
+    const success = await deleteGroceryListItem(itemId);
+
+    if (!success) {
+      console.error('Error removing item from database');
+      toast({
+        title: "Delete Failed",
+        description: "Failed to remove the item from the server.",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Item Removed",
+        description: "The item has been removed from the list.",
+      });
+    }
+  } catch (error) {
+    console.error('Error removing list item:', error);
+    toast({
+      title: "Error",
+      description: "An error occurred while removing the item.",
+      variant: "destructive",
+    });
+  }
+};
+
 const SharedList = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -80,6 +191,18 @@ const SharedList = () => {
   const [requestingAccess, setRequestingAccess] = useState(false);
   const [notAuthorized, setNotAuthorized] = useState(false);
   const [requestingAccessInfo, setRequestingAccessInfo] = useState<{ listId: string; listName: string; listOwner: string } | null>(null);
+  const [editMode, setEditMode] = useState(false);
+
+  // Toggle edit mode
+  const toggleEditMode = () => {
+    setEditMode(!editMode);
+    toast({
+      title: editMode ? "View Mode" : "Edit Mode",
+      description: editMode 
+        ? "You are now viewing the shared list." 
+        : "You can now edit items in this shared list.",
+    });
+  };
 
   useEffect(() => {
     const fetchSharedList = async () => {
@@ -89,47 +212,55 @@ const SharedList = () => {
       }
       
       try {
-        const { data: listData, error: listError } = await supabase
+        console.log(`Fetching shared list: listId=${listId}, userId=${user.id}`);
+        
+        // First check if the list exists
+        const { data: listCheck, error: listCheckError } = await supabase
           .from('grocery_lists')
-          .select('*')
+          .select('id, name, user_id, collaborators')
           .eq('id', listId)
           .single();
           
-        if (listError) {
-          // Try to get the list without permission check to see if it exists
-          const { data: listData, error: listError } = await supabase
-            .from('grocery_lists')
-            .select('*')
-            .eq('id', listId)
-            .single();
-            
-          if (listError) {
-            setLoading(false);
-            setError('The shared list could not be found or you do not have access to it.');
-            console.error('Error fetching list:', listError);
-            return;
-          } else {
-            // List exists but user doesn't have access
-            setNotAuthorized(true);
-            setRequestingAccessInfo({
-              listId: listData.id,
-              listName: listData.name,
-              listOwner: listData.user_id
-            });
-          }
-        } else {
-          // Transform the listData to match the GroceryList type
-          const transformedList: GroceryListType = {
-            id: listData.id,
-            name: listData.name,
-            createdBy: listData.user_id,
-            createdAt: listData.created_at || new Date().toISOString(),
-            collaborators: listData.collaborators || [],
-            items: [],
-            isShared: true
-          };
-          setSharedList(transformedList);
+        if (listCheckError) {
+          console.error('Error checking if list exists:', listCheckError);
+          setLoading(false);
+          setError('The shared list could not be found.');
+          return;
         }
+        
+        console.log('List exists, checking access permissions:', listCheck);
+        
+        // Check if user has access (owner or collaborator)
+        const isOwner = listCheck.user_id === user.id;
+        const isCollaborator = Array.isArray(listCheck.collaborators) && 
+          listCheck.collaborators.includes(user.email?.toLowerCase());
+        
+        console.log(`Access check: isOwner=${isOwner}, isCollaborator=${isCollaborator}, user.email=${user.email}`);
+        
+        if (!isOwner && !isCollaborator) {
+          console.log('User does not have access to this list');
+          setNotAuthorized(true);
+          setRequestingAccessInfo({
+            listId: listCheck.id,
+            listName: listCheck.name,
+            listOwner: listCheck.user_id
+          });
+          setLoading(false);
+          return;
+        }
+        
+        // User has access, get the full list with items
+        const fullList = await getSharedGroceryListById(user.id, listId);
+        
+        if (!fullList) {
+          console.error('Failed to fetch full list details');
+          setError('There was a problem loading the list details.');
+          setLoading(false);
+          return;
+        }
+        
+        console.log(`Successfully loaded shared list with ${fullList.items.length} items`);
+        setSharedList(fullList);
       } catch (error) {
         console.error('Error fetching shared list:', error);
         setError("Failed to load the shared list. Please try again.");
@@ -334,6 +465,15 @@ const SharedList = () => {
     }
   };
 
+  // Regular component methods
+  const handleUpdateItem = (itemId: string, updates: any) => {
+    handleUpdateListItem(sharedList!, user!, toast, setSharedList, itemId, updates);
+  };
+
+  const handleRemoveItem = (itemId: string) => {
+    handleRemoveListItem(sharedList!, user!, toast, setSharedList, itemId);
+  };
+
   if (loading) {
     return (
       <div className="page-container">
@@ -466,19 +606,6 @@ const SharedList = () => {
 
   const { total, currency } = calculateTotalPrice();
   
-  // Define the proper store names and their order
-  const storeOrder = ['Walmart', 'MaxiPali', 'MasxMenos', 'PriceSmart', 'Automercado', 'Unknown'];
-
-  // Define store groups (for rendering section headers)
-  const storeGroupNames: { [key: string]: string } = {
-    'Walmart': 'Walmart',
-    'MaxiPali': 'MaxiPali',
-    'MasxMenos': 'MasxMenos',
-    'PriceSmart': 'PriceSmart',
-    'Automercado': 'Automercado',
-    'Unknown': 'Other Stores'
-  };
-
   return (
     <div className="page-container">
       <div className="max-w-4xl mx-auto">
@@ -502,15 +629,25 @@ const SharedList = () => {
             </div>
           </div>
           
-          <Button
-            variant="outline"
-            size="sm"
-            className="rounded-full flex items-center gap-2"
-            onClick={handleCopyLink}
-          >
-            <Copy className="h-4 w-4" />
-            Share Link
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              onClick={toggleEditMode}
+            >
+              {editMode ? "View Mode" : "Edit Mode"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full flex items-center gap-2"
+              onClick={handleCopyLink}
+            >
+              <Copy className="h-4 w-4" />
+              Share Link
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6">
@@ -610,16 +747,16 @@ const SharedList = () => {
                             <GroceryListItem
                               key={item.id}
                               item={item}
-                              onUpdateQuantity={(id, quantity) => {
-                                // View-only - don't update
-                              }}
-                              onToggleCheck={(id, checked) => {
-                                // View-only - don't update
-                              }}
-                              onRemove={(id) => {
-                                // View-only - don't remove
-                              }}
-                              readOnly={true}
+                              onUpdateQuantity={(id, quantity) => 
+                                editMode ? handleUpdateItem(id, { quantity }) : null
+                              }
+                              onToggleCheck={(id, checked) => 
+                                editMode ? handleUpdateItem(id, { checked }) : null
+                              }
+                              onRemove={(id) => 
+                                editMode ? handleRemoveItem(id) : null
+                              }
+                              readOnly={!editMode}
                             />
                           ))}
                         </div>

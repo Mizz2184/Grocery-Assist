@@ -158,6 +158,17 @@ const GroceryList = () => {
       return;
     }
     
+    // Check if email is already a collaborator
+    if (activeList.collaborators && 
+        activeList.collaborators.some(email => email.toLowerCase() === normalizedEmail)) {
+      toast({
+        title: "Already a collaborator",
+        description: `${normalizedEmail} is already a collaborator on this list.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setAddingCollaborator(true);
     
     try {
@@ -233,15 +244,33 @@ const GroceryList = () => {
       return;
     }
     
+    // Normalize email for comparison
+    const normalizedEmail = email.trim().toLowerCase();
+    
+    // Check if email is actually a collaborator
+    const isCollaborator = activeList.collaborators && 
+      activeList.collaborators.some(e => typeof e === 'string' && e.toLowerCase() === normalizedEmail);
+      
+    if (!isCollaborator) {
+      toast({
+        title: "Not a collaborator",
+        description: `${normalizedEmail} is not a collaborator on this list.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       // Show immediate feedback
       toast({
         title: "Removing collaborator...",
-        description: `Removing ${email} from this list.`,
+        description: `Removing ${normalizedEmail} from this list.`,
       });
       
       // Update the state immediately for responsive UI
-      const updatedCollaborators = activeList.collaborators.filter(e => e !== email);
+      const updatedCollaborators = activeList.collaborators.filter(e => 
+        typeof e !== 'string' || e.toLowerCase() !== normalizedEmail
+      );
       
       // Update lists
       setLists(prevLists => 
@@ -266,12 +295,12 @@ const GroceryList = () => {
       });
       
       // Call the service function
-      const success = await removeCollaborator(user.id, activeList.id, email);
+      const success = await removeCollaborator(user.id, activeList.id, normalizedEmail);
       
       if (success) {
         toast({
           title: "Collaborator removed",
-          description: `${email} has been removed from this list.`,
+          description: `${normalizedEmail} has been removed from this list.`,
         });
       } else {
         toast({
