@@ -662,57 +662,61 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
       collaboratorsType: list.collaborators ? typeof list.collaborators : 'undefined'
     });
     
-    if (list.collaborators) {
-      console.log('Collaborators array content:', JSON.stringify(list.collaborators));
-    }
-    
     // Check if user has access to this list (owner or collaborator)
     const isOwner = list.user_id === userId;
     
-    // Check if user's email is in the collaborators list
+    // Enhanced collaborator check - fixing the critical issue with email access
     let isCollaborator = false;
     
-    if (Array.isArray(list.collaborators) && userEmail) {
-      console.log(`Starting collaborator email check for ${userEmail}`);
+    // Perform a more detailed check on the collaborators array
+    if (list.collaborators && userEmail) {
+      console.log('Raw collaborators data:', JSON.stringify(list.collaborators));
       
-      // First try exact string match
-      if (list.collaborators.includes(userEmail)) {
-        console.log(`Found exact email match for ${userEmail}`);
-        isCollaborator = true;
+      // Check if collaborators is a properly formatted array
+      if (Array.isArray(list.collaborators)) {
+        // Sometimes the array might contain empty values, nulls, or non-string values
+        const validCollaborators = list.collaborators
+          .filter(item => item !== null && item !== undefined && item !== '')
+          .map(item => String(item).toLowerCase());
+          
+        console.log('Cleaned collaborators array:', validCollaborators);
+        
+        // Direct comparison with normalized email
+        isCollaborator = validCollaborators.includes(userEmail);
+        console.log(`Email lookup result (${userEmail}): ${isCollaborator ? 'Found' : 'Not found'}`);
+        
+        // If not found by direct lookup, try more thorough comparison
+        if (!isCollaborator) {
+          // Additional check with case-insensitive compare for each entry
+          isCollaborator = validCollaborators.some(email => {
+            const matches = email.toLowerCase() === userEmail.toLowerCase();
+            if (matches) {
+              console.log(`Found collaborator match: ${email} matches ${userEmail}`);
+            }
+            return matches;
+          });
+        }
       } else {
-        // Try case-insensitive check of all string collaborators
-        isCollaborator = list.collaborators.some((collaborator) => {
-          // Check if the collaborator is a string 
-          if (typeof collaborator !== 'string') {
-            console.log(`Skipping non-string collaborator: ${typeof collaborator}`);
-            return false;
-          }
-          
-          // Case-insensitive comparison
-          const emailMatches = collaborator.toLowerCase() === userEmail;
-          if (emailMatches) {
-            console.log(`Found case-insensitive match: ${collaborator} matches ${userEmail}`);
-          }
-          
-          return emailMatches;
-        });
+        console.warn('Collaborators is not an array:', typeof list.collaborators);
       }
-      
-      console.log('Collaborator check details:', {
-        userEmail,
-        collaborators: list.collaborators,
-        matches: list.collaborators.filter((email) => 
-          typeof email === 'string' && email.toLowerCase() === userEmail
-        )
-      });
-    } else {
-      console.log(`Cannot perform collaborator check: collaborators array is ${Array.isArray(list.collaborators) ? 'valid' : 'invalid'}, userEmail is ${userEmail ? 'valid' : 'invalid'}`);
     }
     
     console.log(`Access check results: isOwner=${isOwner}, isCollaborator=${isCollaborator}, userEmail=${userEmail}`);
     
+    // Direct access to database to verify what's stored
+    try {
+      const { data, error } = await supabase.rpc('check_email_collaborator', { 
+        list_id: listId,
+        email: userEmail
+      });
+      
+      console.log(`RPC check for collaborator: result=${data}, error=${error ? JSON.stringify(error) : 'none'}`);
+    } catch (rpcError) {
+      console.error('Failed to perform RPC check:', rpcError);
+    }
+    
     if (!isOwner && !isCollaborator) {
-      console.error(`User does not have access to this list. Owner: ${list.user_id}, Collaborators: ${JSON.stringify(list.collaborators)}`);
+      console.error(`User does not have access to this list. Owner: ${list.user_id}, Collaborators:`, list.collaborators);
       throw new Error('You do not have permission to view this grocery list.');
     }
 
@@ -814,6 +818,11 @@ export const addCollaborator = async (userId: string, listId: string, collaborat
     const normalizedEmail = collaboratorEmail.trim().toLowerCase();
     console.log(`Normalized email: ${normalizedEmail}`);
     
+    if (!normalizedEmail) {
+      console.error('Invalid email provided');
+      return false;
+    }
+    
     // Step 1: Get the list data with minimal fields
     try {
       const { data: listData, error: listError } = await supabase
@@ -842,14 +851,14 @@ export const addCollaborator = async (userId: string, listId: string, collaborat
         return false;
       }
       
-      // Step 3: Handle collaborators - ensure collaborators is a string array
+      // Step 3: Handle collaborators - ensure we have a proper string array
       let collaborators: string[] = [];
       
       if (Array.isArray(listData.collaborators)) {
-        // Convert all collaborators to string and normalize to lowercase
+        // Only include valid string entries, clean them, and normalize to lowercase
         collaborators = listData.collaborators
-          .filter(item => item !== null && item !== undefined)
-          .map(item => String(item).toLowerCase());
+          .filter(item => item !== null && item !== undefined && item !== '')
+          .map(item => String(item).toLowerCase().trim());
       }
       
       console.log('Current collaborators (normalized):', collaborators);
@@ -865,14 +874,30 @@ export const addCollaborator = async (userId: string, listId: string, collaborat
       console.log('New collaborators array:', collaborators);
       
       // Step 5: Update the list with the new collaborators
+      // CRITICAL: Make sure it's stored as a plain string array
       const { error: updateError } = await supabase
         .from('grocery_lists')
-        .update({ collaborators })
+        .update({ 
+          collaborators: collaborators 
+        })
         .eq('id', listId);
         
       if (updateError) {
         console.error('Error updating collaborators in database:', updateError);
         return handleCollaboratorWithLocalStorage(listId, normalizedEmail);
+      }
+      
+      // Verify the update was successful by retrieving the updated list
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('grocery_lists')
+        .select('collaborators')
+        .eq('id', listId)
+        .single();
+        
+      if (!verifyError && verifyData) {
+        console.log('Verified updated collaborators in database:', verifyData.collaborators);
+      } else {
+        console.warn('Could not verify collaborator update success:', verifyError);
       }
       
       console.log(`Successfully updated collaborators in the database for list ${listId}`);
@@ -932,7 +957,7 @@ export const addCollaborator = async (userId: string, listId: string, collaborat
     }
   } catch (error) {
     console.error('Error in addCollaborator:', error);
-    return handleCollaboratorWithLocalStorage(listId, collaboratorEmail.trim().toLowerCase());
+    return handleCollaboratorWithLocalStorage(listId, normalizedEmail);
   }
 };
 
@@ -1036,33 +1061,36 @@ export const removeCollaborator = async (userId: string, listId: string, collabo
         // Current collaborators
         console.log('===> Current collaborators:', list.collaborators);
         
-        // Ensure we have a valid collaborators array
+        // Clean up the collaborators array 
         if (!Array.isArray(list.collaborators)) {
           console.log('===> Collaborators is not an array, initializing empty array');
           list.collaborators = [];
         }
         
-        // Check if the email exists in the collaborators list
-        const emailExists = list.collaborators.some(email => 
-          typeof email === 'string' && email.toLowerCase() === normalizedEmail
-        );
+        // Clean and normalize all existing collaborators
+        const collaborators = list.collaborators
+          .filter(item => item !== null && item !== undefined && item !== '')
+          .map(item => String(item).toLowerCase().trim());
+        
+        // Check if the email exists in the collaborators list 
+        const emailExists = collaborators.includes(normalizedEmail);
         
         if (!emailExists) {
           console.log(`===> Email ${normalizedEmail} not found in collaborators list`);
           return true; // Consider it "removed" since it's not there
         }
         
-        // Get current collaborators and remove the email - use case-insensitive comparison
-        const collaborators = list.collaborators.filter(email => 
-          typeof email !== 'string' || email.toLowerCase() !== normalizedEmail
+        // Remove the email - use normalized comparison
+        const updatedCollaborators = collaborators.filter(email => 
+          email !== normalizedEmail
         );
         
-        console.log('===> New collaborators array after removal:', collaborators);
+        console.log('===> New collaborators array after removal:', updatedCollaborators);
         
         // Update the list with new collaborators
         const { error: updateError } = await supabase
           .from('grocery_lists')
-          .update({ collaborators })
+          .update({ collaborators: updatedCollaborators })
           .eq('id', listId);
           
         if (updateError) {

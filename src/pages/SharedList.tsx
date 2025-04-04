@@ -20,12 +20,14 @@ import {
   Share2,
   Plus,
   User,
-  Copy
+  Copy,
+  Terminal
 } from "lucide-react";
 import { GroceryList as GroceryListType } from "@/utils/productData";
 import { getSharedGroceryListById, addCollaborator, updateListItem, deleteGroceryListItem } from "@/lib/services/groceryListService";
 import { convertCRCtoUSD } from "@/utils/currencyUtils";
 import { supabase } from "@/lib/supabase";
+import { diagnoseSharedList, fixCollaboratorArray } from "@/utils/debugUtils";
 
 // Helper functions
 const getProductPrice = (product: any): number => {
@@ -212,44 +214,116 @@ const SharedList = () => {
       }
       
       try {
-        console.log(`⏳ Fetching shared list: listId=${listId}, userId=${user.id}, userEmail=${user.email}`);
+        console.log(`⏳ Starting shared list fetch: listId=${listId}, userId=${user.id}, userEmail=${user.email}`);
+        
+        // DIRECT DATABASE CHECK FIRST
+        // This helps us diagnose access issues by directly checking the database record
+        const { data: directListCheck, error: directListError } = await supabase
+          .from('grocery_lists')
+          .select('id, name, user_id, collaborators')
+          .eq('id', listId)
+          .single();
+          
+        if (directListError) {
+          console.error('❌ Direct database check failed:', directListError);
+          setError('The shared list could not be found.');
+          setLoading(false);
+          return;
+        }
+        
+        // Log the raw collaborators data for debugging
+        console.log('📋 Direct list check results:', {
+          listId: directListCheck.id,
+          listName: directListCheck.name,
+          ownerId: directListCheck.user_id,
+          collaborators: directListCheck.collaborators,
+          collaboratorsType: directListCheck.collaborators ? typeof directListCheck.collaborators : 'undefined'
+        });
+        
+        // Manually check if user has access before even trying the service function
+        const isOwner = directListCheck.user_id === user.id;
+        const userEmail = user.email?.toLowerCase();
+        
+        // Manual collaborator check
+        let isManuallyVerifiedCollaborator = false;
+        
+        if (Array.isArray(directListCheck.collaborators) && userEmail) {
+          // Clean collaborator data
+          const cleanedCollaborators = directListCheck.collaborators
+            .filter(c => c !== null && c !== undefined && c !== '')
+            .map(c => String(c).toLowerCase());
+            
+          console.log('🔍 Cleaned collaborators for manual check:', cleanedCollaborators);
+          
+          // Check if user's email is in the collaborators list
+          isManuallyVerifiedCollaborator = cleanedCollaborators.includes(userEmail);
+          
+          console.log(`👤 Manual access check: isOwner=${isOwner}, isCollaborator=${isManuallyVerifiedCollaborator}, userEmail=${userEmail}`);
+        } else {
+          console.warn('⚠️ Collaborators data is not an array or is missing');
+        }
         
         try {
-          // Try to get the full list with items using our service
-          console.log(`🔎 Attempting to fetch list via getSharedGroceryListById`);
+          // Now try to get the full list with items using our service
+          console.log(`🔎 Attempting to fetch complete list via getSharedGroceryListById service`);
           const fullList = await getSharedGroceryListById(user.id, listId);
           
           console.log(`✅ Successfully loaded shared list with ${fullList?.items?.length || 0} items`);
           setSharedList(fullList);
           setLoading(false);
         } catch (accessError: any) {
-          console.error('❌ Access error:', accessError);
+          console.error('❌ Service access error:', accessError);
           
-          // Check the database directly to see if list exists, for better error messages
-          const { data: listCheck, error: listCheckError } = await supabase
-            .from('grocery_lists')
-            .select('id, name, user_id, collaborators')
-            .eq('id', listId)
-            .single();
+          // If we manually verified the user has access but the service function failed,
+          // we'll try a fallback approach to fetch the list directly
+          if (isOwner || isManuallyVerifiedCollaborator) {
+            console.log('🔄 User should have access based on manual check - attempting fallback fetch');
             
-          if (listCheckError) {
-            console.error('❌ Error checking if list exists:', listCheckError);
-            setError('The shared list could not be found.');
-            setLoading(false);
-            return;
+            try {
+              // Fetch items directly
+              const { data: items, error: itemsError } = await supabase
+                .from('grocery_items')
+                .select('*')
+                .eq('list_id', listId);
+                
+              if (itemsError) {
+                throw new Error('Could not fetch list items');
+              }
+              
+              // Construct a minimal list object
+              const fallbackList = {
+                id: directListCheck.id,
+                name: directListCheck.name,
+                createdBy: directListCheck.user_id,
+                createdAt: new Date().toISOString(),
+                collaborators: directListCheck.collaborators || [],
+                isShared: !isOwner,
+                items: items.map((item: any) => ({
+                  id: item.id,
+                  productId: item.product_id,
+                  quantity: item.quantity || 1,
+                  addedBy: user.id,
+                  addedAt: new Date().toISOString(),
+                  checked: item.checked || false,
+                  productData: item.product_data || {}
+                }))
+              };
+              
+              console.log(`✅ Fallback successful! Loaded list with ${fallbackList.items.length} items`);
+              setSharedList(fallbackList);
+              setLoading(false);
+              return;
+            } catch (fallbackError) {
+              console.error('❌ Fallback fetch failed:', fallbackError);
+            }
           }
-          
-          console.log('📋 List exists, checking details:', listCheck);
-          console.log('👥 Collaborators:', Array.isArray(listCheck.collaborators) 
-            ? JSON.stringify(listCheck.collaborators)
-            : listCheck.collaborators);
           
           // Set not authorized and allow user to request access
           setNotAuthorized(true);
           setRequestingAccessInfo({
-            listId: listCheck.id,
-            listName: listCheck.name,
-            listOwner: listCheck.user_id
+            listId: directListCheck.id,
+            listName: directListCheck.name,
+            listOwner: directListCheck.user_id
           });
           
           // Also set a helpful error message
@@ -618,6 +692,15 @@ const SharedList = () => {
             {error || "The shared list could not be found or you don't have permission to view it."}
           </p>
           
+          <div className="bg-muted p-4 rounded-lg text-sm text-left w-full">
+            <p className="font-medium mb-2">Why am I seeing this?</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>You're not on the collaborators list for this grocery list</li>
+              <li>You might be signed in with a different email than the one invited</li>
+              <li>The list owner needs to add your email: <strong>{user?.email}</strong></li>
+            </ul>
+          </div>
+          
           {user && requestingAccessInfo && !accessRequested && (
             <Button 
               className="rounded-full h-12 px-8 flex items-center gap-2"
@@ -639,7 +722,7 @@ const SharedList = () => {
           )}
           
           {accessRequested && (
-            <div className="bg-muted px-4 py-3 rounded-lg text-sm">
+            <div className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-4 py-3 rounded-lg text-sm">
               Access request sent. The list owner will review your request.
             </div>
           )}
@@ -658,6 +741,28 @@ const SharedList = () => {
               <div>List Name: {requestingAccessInfo.listName}</div>
               <div>Owner ID: {requestingAccessInfo.listOwner}</div>
               <div>Your Email: {user?.email}</div>
+              
+              <div className="mt-3 flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => diagnoseSharedList(requestingAccessInfo.listId, user?.email || '')}
+                >
+                  <Terminal className="w-3 h-3 mr-1" />
+                  Diagnose Access
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => fixCollaboratorArray(requestingAccessInfo.listId)}
+                >
+                  <Terminal className="w-3 h-3 mr-1" />
+                  Fix Collaborators
+                </Button>
+              </div>
             </div>
           )}
         </div>
