@@ -135,12 +135,15 @@ export const Navbar = () => {
   // Toggle dropdown visibility
   const toggleDropdown = () => {
     const dropdown = document.getElementById('profile-dropdown');
-    dropdown?.classList.toggle('hidden');
+    if (!dropdown) return;
     
-    // If we just showed the dropdown, focus the first link
-    if (!dropdown?.classList.contains('hidden')) {
-      const firstLink = dropdown?.querySelector('a, button') as HTMLElement;
+    if (dropdown.classList.contains('hidden')) {
+      dropdown.classList.remove('hidden');
+      // If we just showed the dropdown, focus the first link
+      const firstLink = dropdown.querySelector('a, button') as HTMLElement;
       firstLink?.focus();
+    } else {
+      dropdown.classList.add('hidden');
     }
   };
   
@@ -253,10 +256,9 @@ export const Navbar = () => {
               
               <div 
                 id="profile-dropdown" 
-                className="hidden absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-popover border border-border p-1 z-[999] max-h-[60vh] overflow-y-auto mobile-friendly-dropdown"
+                className="hidden"
                 onKeyDown={handleDropdownKeyDown}
                 role="menu"
-                style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
               >
                 <div className="px-2 py-1.5 text-sm font-semibold">
                   {isTranslated ? "My Account" : translateText("Mi Cuenta")}
