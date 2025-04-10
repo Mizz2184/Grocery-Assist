@@ -6,18 +6,26 @@ import { useEffect, useState } from "react";
 
 interface SignOutDropdownMenuItemProps {
   onSignOut?: () => void;
+  className?: string;
 }
 
-export const SignOutDropdownMenuItem = ({ onSignOut }: SignOutDropdownMenuItemProps) => {
+export const SignOutDropdownMenuItem = ({ 
+  onSignOut,
+  className
+}: SignOutDropdownMenuItemProps) => {
   const { signOut } = useAuth();
   const { translateText, isTranslated } = useTranslation();
   const [isIOS, setIsIOS] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // Detect iOS
+  // Detect iOS and mobile
   useEffect(() => {
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     setIsIOS(iOS);
+    
+    const mobileCheck = window.innerWidth < 768;
+    setIsMobile(mobileCheck);
   }, []);
 
   const handleSignOut = async () => {
@@ -30,15 +38,17 @@ export const SignOutDropdownMenuItem = ({ onSignOut }: SignOutDropdownMenuItemPr
   return (
     <div 
       data-signout-item="true" 
-      className={isIOS ? "ios-signout-item" : ""}
+      className={`${isIOS ? "ios-signout-item" : ""} ${className || ""} ${isMobile ? "mt-6" : ""}`}
     >
       <DropdownMenuSeparator />
       <DropdownMenuItem 
-        className="text-red-500 cursor-pointer"
+        className="text-red-500 cursor-pointer w-full"
         onClick={handleSignOut}
       >
         <LogOut className="w-4 h-4 mr-2" />
-        {isTranslated ? "Sign Out" : translateText("Cerrar Sesión")}
+        <span className="flex-1 text-center">
+          {isTranslated ? "Sign Out" : translateText("Cerrar Sesión")}
+        </span>
       </DropdownMenuItem>
     </div>
   );

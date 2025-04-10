@@ -265,8 +265,8 @@ export const Navbar = () => {
       
       {/* Mobile Menu */}
       {isMenuOpen && (
-        <div className="fixed inset-0 w-full h-full bg-background z-40 flex flex-col pt-20 pb-6 px-6 md:hidden">
-          <div className="flex flex-col gap-4 mt-4 h-full">
+        <div className="fixed inset-0 w-full h-full bg-background z-40 flex flex-col pt-20 pb-6 px-6 md:hidden overflow-y-auto">
+          <div className="flex flex-col gap-4 mt-4 h-full pb-24">
             {/* Exchange rate in mobile menu */}
             <div className="flex items-center justify-between mb-4">
               <TranslationToggle />
@@ -287,92 +287,94 @@ export const Navbar = () => {
             )}
             
             {/* Navigation items for mobile */}
-            {navItems.map((item, index) => {
-              // Special styling for currency converter item
-              if (item.path === '/exchange-rate') {
-                return (
-                  <div key={item.path}>
-                    <div className="text-sm text-muted-foreground mt-2 mb-1 px-1">
-                      {isTranslated ? "Currency Tools" : translateText("Herramientas de Moneda")}
-                    </div>
-                    <Link
-                      to={item.path}
-                      className={cn(
-                        "flex items-center gap-3 text-xl px-6 py-3 rounded-full animate-fade-up w-full justify-center",
-                        isActive(item.path)
-                          ? "bg-secondary text-primary font-medium"
-                          : "text-muted-foreground hover:bg-secondary/80",
-                        `animate-delay-${index * 100}`
-                      )}
-                    >
-                      {item.icon}
-                      <span>
-                        {isTranslated ? item.labelEN : translateText(item.labelES)}
-                      </span>
-                    </Link>
-                    
-                    {/* Mini currency converter in mobile menu */}
-                    <div className="mt-2 rounded-lg bg-accent/50 p-3 animate-fade-up">
-                      <div className="mb-1 text-xs font-medium text-muted-foreground text-center">
-                        {isTranslated ? 
-                          "Quick Currency Converter" : 
-                          translateText("Conversor Rápido de Moneda")
-                        }
+            <div className="mobile-dropdown-content overflow-y-auto flex-1">
+              {navItems.map((item, index) => {
+                // Special styling for currency converter item
+                if (item.path === '/exchange-rate') {
+                  return (
+                    <div key={item.path} className="mb-8">
+                      <div className="text-sm text-muted-foreground mt-2 mb-1 px-1">
+                        {isTranslated ? "Currency Tools" : translateText("Herramientas de Moneda")}
                       </div>
-                      <div className="flex justify-center">
-                        <div className="w-full max-w-xs">
-                          <div className="bg-background rounded-md p-3">
-                            <MobileCurrencyConverter />
+                      <Link
+                        to={item.path}
+                        className={cn(
+                          "flex items-center gap-3 text-xl px-6 py-3 rounded-full animate-fade-up w-full justify-center",
+                          isActive(item.path)
+                            ? "bg-secondary text-primary font-medium"
+                            : "text-muted-foreground hover:bg-secondary/80",
+                          `animate-delay-${index * 100}`
+                        )}
+                      >
+                        {item.icon}
+                        <span>
+                          {isTranslated ? item.labelEN : translateText(item.labelES)}
+                        </span>
+                      </Link>
+                      
+                      {/* Mini currency converter in mobile menu */}
+                      <div className="mt-2 rounded-lg bg-accent/50 p-3 animate-fade-up">
+                        <div className="mb-1 text-xs font-medium text-muted-foreground text-center">
+                          {isTranslated ? 
+                            "Quick Currency Converter" : 
+                            translateText("Conversor Rápido de Moneda")
+                          }
+                        </div>
+                        <div className="flex justify-center">
+                          <div className="w-full max-w-xs">
+                            <div className="bg-background rounded-md p-3">
+                              <MobileCurrencyConverter />
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  );
+                }
+                
+                // Regular nav items
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={cn(
+                      "flex items-center gap-3 text-xl px-6 py-3 rounded-full animate-fade-up w-full justify-center mb-3",
+                      isActive(item.path)
+                        ? "bg-secondary text-primary font-medium"
+                        : "text-muted-foreground hover:bg-secondary/80",
+                      `animate-delay-${index * 100}`
+                    )}
+                  >
+                    {item.icon}
+                    <span>
+                      {isTranslated ? item.labelEN : translateText(item.labelES)}
+                    </span>
+                  </Link>
                 );
-              }
+              })}
               
-              // Regular nav items
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={cn(
-                    "flex items-center gap-3 text-xl px-6 py-3 rounded-full animate-fade-up w-full justify-center",
-                    isActive(item.path)
-                      ? "bg-secondary text-primary font-medium"
-                      : "text-muted-foreground hover:bg-secondary/80",
-                    `animate-delay-${index * 100}`
-                  )}
-                >
-                  {item.icon}
-                  <span>
-                    {isTranslated ? item.labelEN : translateText(item.labelES)}
-                  </span>
-                </Link>
-              );
-            })}
-            
-            {/* Profile link for mobile */}
-            <Link
-              to="/profile"
-              className={cn(
-                "flex items-center gap-3 text-xl px-6 py-3 rounded-full animate-fade-up w-full justify-center",
-                isActive("/profile")
-                  ? "bg-secondary text-primary font-medium"
-                  : "text-muted-foreground hover:bg-secondary/80",
-                `animate-delay-${navItems.length * 100}`
-              )}
-            >
-              <User className="w-5 h-5" />
-              <span>
-                {isTranslated ? "Profile" : translateText("Perfil")}
-              </span>
-            </Link>
+              {/* Profile link for mobile */}
+              <Link
+                to="/profile"
+                className={cn(
+                  "flex items-center gap-3 text-xl px-6 py-3 rounded-full animate-fade-up w-full justify-center mb-3",
+                  isActive("/profile")
+                    ? "bg-secondary text-primary font-medium"
+                    : "text-muted-foreground hover:bg-secondary/80",
+                  `animate-delay-${navItems.length * 100}`
+                )}
+              >
+                <User className="w-5 h-5" />
+                <span>
+                  {isTranslated ? "Profile" : translateText("Perfil")}
+                </span>
+              </Link>
+            </div>
             
             {/* Sign out button for mobile - fixed at bottom */}
             {user && (
               <MobileSignOutButton 
-                className="animate-fade-up mt-6" 
+                className="animate-fade-up mt-auto" 
                 onSignOut={() => setIsMenuOpen(false)}
               />
             )}

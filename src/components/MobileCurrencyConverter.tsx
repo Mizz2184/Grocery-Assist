@@ -42,7 +42,7 @@ export const MobileCurrencyConverter: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 conversor-rapido-container">
       <div className="space-y-1">
         <label htmlFor="mobile-crc" className="text-xs font-medium">
           {isTranslated ? "Costa Rican Colones (CRC)" : "Colones (CRC)"}

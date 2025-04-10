@@ -11,37 +11,65 @@ export const IPhoneDropdownFix = () => {
       'only screen and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)'
     ).matches;
     
-    if (!isIPhone11ProMax) return;
+    // Check if any iOS device
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                 
+    if (!isIOS && !isIPhone11ProMax) return;
     
-    // Add specific fixes for iPhone 11 Pro Max
+    // Add specific fixes for iOS devices
     const styleEl = document.createElement('style');
     styleEl.innerHTML = `
-      /* Dropdown scroll fixes for iPhone 11 Pro Max */
+      /* Prevent background content from scrolling when dropdown is open */
       body.has-open-dropdown {
         position: fixed;
         width: 100%;
         overflow: hidden;
       }
 
-      /* Content scroll styles */
+      /* Dropdown content styles with proper scrolling */
       [data-radix-popper-content] {
-        max-height: 58vh !important;
-        overflow-y: scroll !important;
+        overflow-y: auto !important;
         -webkit-overflow-scrolling: touch !important;
         overscroll-behavior: contain !important;
-        padding-bottom: 80px !important;
+        padding-bottom: 100px !important; /* Add padding for the sign out button */
+        max-height: 75vh !important;
       }
       
-      /* Sign out button positioning */
+      /* Make dropdown wrapper taller */
+      [data-radix-popper-content-wrapper] {
+        max-height: 80vh !important;
+      }
+      
+      /* Fix signout button positioning - keeping it in the scroll flow but visible */
       [data-signout-item="true"] {
-        position: fixed !important;
+        position: sticky !important;
         bottom: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        padding: 10px !important;
         background-color: var(--popover) !important;
-        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1) !important;
-        z-index: 9999 !important;
+        box-shadow: 0 -4px 8px rgba(0, 0, 0, 0.1) !important;
+        margin-top: 16px !important;
+        padding: 8px !important;
+        z-index: 50 !important;
+      }
+      
+      /* Ensure mobile currency converter doesn't get hidden */
+      .mobile-dropdown-content {
+        padding-bottom: 80px !important;
+      }
+
+      /* Additional fixes for iPhone 11 Pro Max */
+      @media only screen 
+        and (device-width: 414px) 
+        and (device-height: 896px) 
+        and (-webkit-device-pixel-ratio: 3) {
+        [data-radix-popper-content] {
+          max-height: 70vh !important;
+        }
+        
+        /* Ensure mobile menu has proper padding */
+        .mobile-menu-overlay .flex-col {
+          padding-bottom: 100px !important;
+        }
       }
     `;
     document.head.appendChild(styleEl);
