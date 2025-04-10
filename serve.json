@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    { "source": "/api/**", "destination": "http://localhost:8080/api/**" }
+  ],
+  "headers": [
+    {
+      "source": "**",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    }
+  ]
+} 

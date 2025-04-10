@@ -1,0 +1,1 @@
+export type { GroceryList, GroceryListItem } from '@/utils/productData'; 
