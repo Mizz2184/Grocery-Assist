@@ -294,138 +294,46 @@ html {
 
 /* Mobile dropdown specific styles */
 .mobile-friendly-dropdown {
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  scroll-padding-bottom: 70px;
-  scrollbar-width: thin;
-  display: flex;
-  flex-direction: column;
-  /* iOS-specific fixes */
-  max-height: 70vh !important;
-  padding-bottom: 60px !important;
-}
-
-/* Allow content to be scrollable */
-.dropdown-content-scrollable {
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  max-height: calc(70vh - 50px);
-  padding-bottom: 60px;
-}
-
-/* iOS specific fixes */
-@supports (-webkit-touch-callout: none) {
-  .mobile-friendly-dropdown {
-    /* iOS-specific scrolling properties */
-    -webkit-overflow-scrolling: touch !important;
-    touch-action: pan-y !important;
-    overflow-y: auto !important;
-    max-height: 70vh !important;
-    padding-bottom: 80px !important;
-  }
-  
-  [data-radix-popper-content-wrapper] {
-    max-height: 80vh !important;
-    overflow: visible !important;
-  }
-  
-  [data-radix-popper-content] {
-    overflow-y: auto !important;
-    max-height: 70vh !important;
-    padding-bottom: 80px !important;
-  }
-  
-  /* Prevent content behind the dropdown from scrolling */
-  body:has([data-state="open"]) {
-    overflow: hidden !important;
-    position: fixed !important;
-    width: 100% !important;
-  }
-}
-
-/* iOS dropdown specific styles */
-.ios-dropdown {
   -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  scroll-padding-bottom: 20px !important;
+  scrollbar-width: thin !important;
+  max-height: 75vh !important;
+  position: relative !important;
   overflow-y: auto !important;
-  max-height: 70vh !important;
-  padding-bottom: 80px !important;
-  /* Fix for bouncing effect */
-  overscroll-behavior-y: none !important;
+  touch-action: pan-y !important;
 }
 
-/* Sign out button styling - make it sticky, not fixed */
-.mobile-friendly-dropdown [data-signout-item="true"] {
-  margin-top: auto;
-  position: sticky;
-  bottom: 0;
-  background-color: var(--popover);
-  z-index: 50;
-  padding-top: 8px;
-  padding-bottom: 8px;
-  width: 100%;
-}
-
-/* iOS sign out button styles */
-.ios-signout-item {
-  position: sticky !important;
-  bottom: 0 !important;
-  z-index: 50 !important;
-  margin-top: 20px !important;
-  padding-top: 10px !important;
-  padding-bottom: 10px !important;
-  padding-left: 8px !important;
-  padding-right: 8px !important;
-  background-color: var(--popover) !important;
-  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1) !important;
-  width: 100% !important;
-}
-
-/* For iPhone 11 Pro Max specifically - adjust content areas to prevent overlap */
-@media only screen 
-  and (device-width: 414px) 
-  and (device-height: 896px) 
-  and (-webkit-device-pixel-ratio: 3) {
-  .ios-dropdown {
-    max-height: 60vh !important;
-    padding-bottom: 80px !important;
-  }
-  
-  /* Currency converter area fix */
-  .conversor-rapido-container {
-    padding-bottom: 90px !important;
-    margin-bottom: 30px !important;
-  }
-  
-  /* Mobile menu specific fixes */
-  .mobile-dropdown-content {
+/* Add proper dropdown positioning for mobile-specific devices */
+@media (max-width: 450px) {
+  #profile-dropdown {
+    position: fixed !important;
+    top: 60px !important;
+    bottom: auto !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+    width: 95% !important;
+    max-width: 320px !important;
+    max-height: 70vh !important;
+    margin-top: 8px !important;
     overflow-y: auto !important;
-    padding-bottom: 100px !important;
-    margin-bottom: 20px !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain !important;
+    z-index: 9999 !important;
   }
   
-  /* Add more space at the bottom */
-  [data-radix-popper-content] {
-    max-height: 65vh !important;
-    padding-bottom: 90px !important;
-  }
-  
-  /* Adjust the sign out button */
-  .ios-signout-item {
-    padding-bottom: 20px !important;
-    margin-top: 30px !important;
-    position: sticky !important;
-    bottom: 0 !important;
-    z-index: 100 !important;
-  }
-  
-  /* Fix for all dropdowns to add padding at bottom */
+  /* Ensure small screens can access all dropdown content */
   .mobile-friendly-dropdown {
-    padding-bottom: 90px !important;
+    max-height: 70vh !important;
   }
-  
-  /* Adjust position to ensure visibility */
-  [data-radix-popper-content-wrapper] {
-    transform: translateY(-8%) !important;
+}
+
+/* Fix for iOS scrolling issues */
+@supports (-webkit-touch-callout: none) {
+  #profile-dropdown {
+    -webkit-overflow-scrolling: touch !important;
+    overflow-y: scroll !important;
   }
 }
 

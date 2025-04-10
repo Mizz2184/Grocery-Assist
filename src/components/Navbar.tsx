@@ -27,9 +27,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import React from "react";
 import { MobileCurrencyConverter } from "@/components/MobileCurrencyConverter";
-import { UserDropdown } from "@/components/UserDropdown";
-import { SignOutDropdownMenuItem } from "@/components/SignOutDropdownMenuItem";
-import { MobileSignOutButton } from "@/components/MobileSignOutButton";
 
 export const Navbar = () => {
   const { user, signOut } = useAuth();
@@ -234,7 +231,69 @@ export const Navbar = () => {
           </div>
           
           {user ? (
-            <UserDropdown />
+            <div className="relative" ref={dropdownRef}>
+              <Button 
+                variant="ghost" 
+                className="rounded-full h-9 gap-2 cursor-pointer hover:bg-accent active:bg-accent/80"
+                onClick={toggleDropdown}
+                onKeyDown={(e) => e.key === 'Enter' && toggleDropdown()}
+                aria-label="Open profile menu"
+                aria-haspopup="true"
+                aria-expanded={!document.getElementById('profile-dropdown')?.classList.contains('hidden')}
+                type="button"
+              >
+                <Avatar className="h-6 w-6">
+                  <AvatarImage src={user.user_metadata?.avatar_url || user.user_metadata?.picture} />
+                  <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                </Avatar>
+                <span className="hidden sm:inline">
+                  {user.user_metadata?.full_name || user.user_metadata?.name || user.email}
+                </span>
+              </Button>
+              
+              <div 
+                id="profile-dropdown" 
+                className="hidden absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-popover border border-border p-1 z-[999] max-h-[60vh] overflow-y-auto mobile-friendly-dropdown"
+                onKeyDown={handleDropdownKeyDown}
+                role="menu"
+                style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
+              >
+                <div className="px-2 py-1.5 text-sm font-semibold">
+                  {isTranslated ? "My Account" : translateText("Mi Cuenta")}
+                </div>
+                <div className="-mx-1 my-1 h-px bg-muted"></div>
+                <Link 
+                  to="/profile" 
+                  className="flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent cursor-pointer"
+                  onClick={toggleDropdown}
+                  role="menuitem"
+                >
+                  <User className="w-4 h-4 mr-2" />
+                  {isTranslated ? "Profile" : translateText("Perfil")}
+                </Link>
+                <Link 
+                  to="/settings" 
+                  className="flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent cursor-pointer"
+                  onClick={toggleDropdown}
+                  role="menuitem"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  {isTranslated ? "Settings" : translateText("Ajustes")}
+                </Link>
+                <div className="-mx-1 my-1 h-px bg-muted"></div>
+                <button
+                  onClick={() => {
+                    toggleDropdown();
+                    handleSignOut();
+                  }}
+                  className="flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent cursor-pointer text-red-500 w-full text-left"
+                  role="menuitem"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  {isTranslated ? "Sign Out" : translateText("Cerrar Sesión")}
+                </button>
+              </div>
+            </div>
           ) : (
             <Link to="/login">
               <Button variant="outline" className="rounded-full h-9">
@@ -265,8 +324,8 @@ export const Navbar = () => {
       
       {/* Mobile Menu */}
       {isMenuOpen && (
-        <div className="fixed inset-0 w-full h-full bg-background z-40 flex flex-col pt-20 pb-6 px-6 md:hidden overflow-y-auto">
-          <div className="flex flex-col gap-4 mt-4 h-full pb-24">
+        <div className="fixed inset-0 w-full h-full bg-background z-40 flex flex-col pt-20 pb-6 px-6 md:hidden">
+          <div className="flex flex-col gap-4 mt-4">
             {/* Exchange rate in mobile menu */}
             <div className="flex items-center justify-between mb-4">
               <TranslationToggle />
@@ -287,96 +346,98 @@ export const Navbar = () => {
             )}
             
             {/* Navigation items for mobile */}
-            <div className="mobile-dropdown-content overflow-y-auto flex-1">
-              {navItems.map((item, index) => {
-                // Special styling for currency converter item
-                if (item.path === '/exchange-rate') {
-                  return (
-                    <div key={item.path} className="mb-8">
-                      <div className="text-sm text-muted-foreground mt-2 mb-1 px-1">
-                        {isTranslated ? "Currency Tools" : translateText("Herramientas de Moneda")}
+            {navItems.map((item, index) => {
+              // Special styling for currency converter item
+              if (item.path === '/exchange-rate') {
+                return (
+                  <div key={item.path}>
+                    <div className="text-sm text-muted-foreground mt-2 mb-1 px-1">
+                      {isTranslated ? "Currency Tools" : translateText("Herramientas de Moneda")}
+                    </div>
+                    <Link
+                      to={item.path}
+                      className={cn(
+                        "flex items-center gap-3 text-xl px-6 py-3 rounded-full animate-fade-up w-full justify-center",
+                        isActive(item.path)
+                          ? "bg-secondary text-primary font-medium"
+                          : "text-muted-foreground hover:bg-secondary/80",
+                        `animate-delay-${index * 100}`
+                      )}
+                    >
+                      {item.icon}
+                      <span>
+                        {isTranslated ? item.labelEN : translateText(item.labelES)}
+                      </span>
+                    </Link>
+                    
+                    {/* Mini currency converter in mobile menu */}
+                    <div className="mt-2 rounded-lg bg-accent/50 p-3 animate-fade-up">
+                      <div className="mb-1 text-xs font-medium text-muted-foreground text-center">
+                        {isTranslated ? 
+                          "Quick Currency Converter" : 
+                          translateText("Conversor Rápido de Moneda")
+                        }
                       </div>
-                      <Link
-                        to={item.path}
-                        className={cn(
-                          "flex items-center gap-3 text-xl px-6 py-3 rounded-full animate-fade-up w-full justify-center",
-                          isActive(item.path)
-                            ? "bg-secondary text-primary font-medium"
-                            : "text-muted-foreground hover:bg-secondary/80",
-                          `animate-delay-${index * 100}`
-                        )}
-                      >
-                        {item.icon}
-                        <span>
-                          {isTranslated ? item.labelEN : translateText(item.labelES)}
-                        </span>
-                      </Link>
-                      
-                      {/* Mini currency converter in mobile menu */}
-                      <div className="mt-2 rounded-lg bg-accent/50 p-3 animate-fade-up">
-                        <div className="mb-1 text-xs font-medium text-muted-foreground text-center">
-                          {isTranslated ? 
-                            "Quick Currency Converter" : 
-                            translateText("Conversor Rápido de Moneda")
-                          }
-                        </div>
-                        <div className="flex justify-center">
-                          <div className="w-full max-w-xs">
-                            <div className="bg-background rounded-md p-3">
-                              <MobileCurrencyConverter />
-                            </div>
+                      <div className="flex justify-center">
+                        <div className="w-full max-w-xs">
+                          <div className="bg-background rounded-md p-3">
+                            <MobileCurrencyConverter />
                           </div>
                         </div>
                       </div>
                     </div>
-                  );
-                }
-                
-                // Regular nav items
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={cn(
-                      "flex items-center gap-3 text-xl px-6 py-3 rounded-full animate-fade-up w-full justify-center mb-3",
-                      isActive(item.path)
-                        ? "bg-secondary text-primary font-medium"
-                        : "text-muted-foreground hover:bg-secondary/80",
-                      `animate-delay-${index * 100}`
-                    )}
-                  >
-                    {item.icon}
-                    <span>
-                      {isTranslated ? item.labelEN : translateText(item.labelES)}
-                    </span>
-                  </Link>
+                  </div>
                 );
-              })}
+              }
               
-              {/* Profile link for mobile */}
-              <Link
-                to="/profile"
-                className={cn(
-                  "flex items-center gap-3 text-xl px-6 py-3 rounded-full animate-fade-up w-full justify-center mb-3",
-                  isActive("/profile")
-                    ? "bg-secondary text-primary font-medium"
-                    : "text-muted-foreground hover:bg-secondary/80",
-                  `animate-delay-${navItems.length * 100}`
-                )}
-              >
-                <User className="w-5 h-5" />
-                <span>
-                  {isTranslated ? "Profile" : translateText("Perfil")}
-                </span>
-              </Link>
-            </div>
+              // Regular nav items
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={cn(
+                    "flex items-center gap-3 text-xl px-6 py-3 rounded-full animate-fade-up w-full justify-center",
+                    isActive(item.path)
+                      ? "bg-secondary text-primary font-medium"
+                      : "text-muted-foreground hover:bg-secondary/80",
+                    `animate-delay-${index * 100}`
+                  )}
+                >
+                  {item.icon}
+                  <span>
+                    {isTranslated ? item.labelEN : translateText(item.labelES)}
+                  </span>
+                </Link>
+              );
+            })}
             
-            {/* Sign out button for mobile - fixed at bottom */}
+            {/* Profile link for mobile */}
+            <Link
+              to="/profile"
+              className={cn(
+                "flex items-center gap-3 text-xl px-6 py-3 rounded-full animate-fade-up w-full justify-center",
+                isActive("/profile")
+                  ? "bg-secondary text-primary font-medium"
+                  : "text-muted-foreground hover:bg-secondary/80",
+                `animate-delay-${navItems.length * 100}`
+              )}
+            >
+              <User className="w-5 h-5" />
+              <span>
+                {isTranslated ? "Profile" : translateText("Perfil")}
+              </span>
+            </Link>
+            
+            {/* Sign out button for mobile */}
             {user && (
-              <MobileSignOutButton 
-                className="animate-fade-up mt-auto" 
-                onSignOut={() => setIsMenuOpen(false)}
-              />
+              <Button
+                variant="destructive"
+                className="mt-6 rounded-full w-full animate-fade-up"
+                onClick={handleSignOut}
+              >
+                <LogOut className="w-5 h-5 mr-2" />
+                {isTranslated ? "Sign Out" : translateText("Cerrar Sesión")}
+              </Button>
             )}
           </div>
         </div>
