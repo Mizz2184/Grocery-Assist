@@ -13,6 +13,8 @@ import PaymentRequired from "@/components/PaymentRequired";
 import { fetchCurrentExchangeRate } from '@/utils/currencyUtils';
 import { checkUserPaymentStatus } from "@/lib/stripe/stripe-client";
 import { useAuth } from "@/hooks/useAuth";
+import DropdownFix from "@/components/DropdownFix";
+import IPhoneDropdownFix from "@/components/iPhoneDropdownFix";
 
 // Pages
 import Index from "./pages/Index";
@@ -318,6 +320,8 @@ export default function App() {
           <SearchProvider>
             <TranslationProvider>
               <Router>
+                <DropdownFix />
+                <IPhoneDropdownFix />
                 <AppContent />
                 <Toaster />
               </Router>

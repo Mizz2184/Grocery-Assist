@@ -300,6 +300,37 @@ html {
   scrollbar-width: thin;
   display: flex;
   flex-direction: column;
+  /* iOS-specific fixes */
+  max-height: 65vh !important;
+  padding-bottom: 40px !important;
+}
+
+/* iOS specific fixes */
+@supports (-webkit-touch-callout: none) {
+  .mobile-friendly-dropdown {
+    /* iOS-specific scrolling properties */
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-y !important;
+    overflow-y: scroll !important;
+    max-height: 60vh !important;
+  }
+  
+  [data-radix-popper-content-wrapper] {
+    max-height: 75vh !important;
+    overflow: visible !important;
+  }
+  
+  [data-radix-popper-content] {
+    overflow-y: scroll !important;
+    max-height: 65vh !important;
+  }
+  
+  /* Prevent content behind the dropdown from scrolling */
+  body:has([data-state="open"]) {
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+  }
 }
 
 /* Sign out button styling */
@@ -311,6 +342,18 @@ html {
   z-index: 10;
   padding-top: 8px;
   padding-bottom: 8px;
+}
+
+/* iOS sign out button styles */
+.ios-signout-item {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 50 !important;
+  margin-top: 20px !important;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+  background-color: var(--popover) !important;
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1) !important;
 }
 
 /* On small height screens, adjust dropdown to be taller */
@@ -331,4 +374,29 @@ html {
   min-height: 100dvh !important;
   width: 100vw !important;
   z-index: 200 !important;
+}
+
+/* iOS dropdown specific styles */
+.ios-dropdown {
+  -webkit-overflow-scrolling: touch !important;
+  overflow-y: scroll !important;
+  max-height: 60vh !important;
+  padding-bottom: 60px !important;
+  /* Fix for bouncing effect */
+  overscroll-behavior-y: none !important;
+}
+
+/* For iPhone 11 Pro Max specifically */
+@media only screen 
+  and (device-width: 414px) 
+  and (device-height: 896px) 
+  and (-webkit-device-pixel-ratio: 3) {
+  .ios-dropdown {
+    max-height: 55vh !important;
+  }
+  
+  /* Adjust position to ensure visibility */
+  [data-radix-popper-content-wrapper] {
+    transform: translateY(-5%) !important;
+  }
 }

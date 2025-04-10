@@ -70,6 +70,14 @@ const DropdownMenuContent = React.forwardRef<
 >(({ className, sideOffset = 4, ...props }, ref) => {
   const touchStartY = React.useRef<number | null>(null);
   const contentRef = React.useRef<HTMLDivElement>(null);
+  const [isIOS, setIsIOS] = React.useState(false);
+  
+  // Detect iOS device
+  React.useEffect(() => {
+    const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    setIsIOS(iOS);
+  }, []);
   
   // Use a merged ref to combine the forwarded ref and our local ref
   const mergedRef = (node: HTMLDivElement) => {
@@ -89,6 +97,24 @@ const DropdownMenuContent = React.forwardRef<
   // Handle touch move event
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     if (touchStartY.current === null) return;
+    
+    // Don't interfere with scrolling if we're on iOS and the content is scrollable
+    if (isIOS && contentRef.current) {
+      const { scrollHeight, clientHeight, scrollTop } = contentRef.current;
+      const isScrollable = scrollHeight > clientHeight;
+      
+      if (isScrollable) {
+        const atTop = scrollTop <= 0;
+        const atBottom = scrollTop + clientHeight >= scrollHeight - 10;
+        const currentY = e.touches[0].clientY;
+        const movingDown = currentY > touchStartY.current;
+        
+        // Allow native scrolling to work if we're not at the edges
+        if (!(atTop && movingDown) && !(atBottom && !movingDown)) {
+          return;
+        }
+      }
+    }
     
     const currentY = e.touches[0].clientY;
     const diff = touchStartY.current - currentY;
@@ -130,6 +156,16 @@ const DropdownMenuContent = React.forwardRef<
     }
   };
   
+  React.useEffect(() => {
+    // Prevent body scrolling when dropdown is open on iOS
+    if (isIOS) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [isIOS]);
+  
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
@@ -146,6 +182,7 @@ const DropdownMenuContent = React.forwardRef<
           "data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2",
           "data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
           "fixed-dropdown swipeable-dropdown overflow-y-auto mobile-friendly-dropdown",
+          isIOS && "ios-dropdown",
           className
         )}
         collisionPadding={16}
