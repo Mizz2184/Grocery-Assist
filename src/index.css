@@ -201,6 +201,49 @@ html {
   max-width: calc(100vw - 24px) !important;
 }
 
+/* Mobile dropdown max height */
+@media (max-width: 768px) {
+  .swipeable-dropdown {
+    max-height: 70vh !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain;
+  }
+  
+  /* Improve scrolling on small screens */
+  [data-radix-popper-content-wrapper] {
+    max-height: 80vh !important;
+    bottom: auto !important;
+  }
+  
+  [data-radix-popper-content] {
+    max-height: 75vh !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain;
+  }
+}
+
+/* Ensure mobile dropdown scrolls properly */
+@media (max-width: 768px) {
+  /* Adjust dropdown position for smaller screens */
+  [data-radix-popper-content-wrapper] {
+    transform: translateY(-10%) !important;
+  }
+  
+  /* Handle very small screens */
+  @media (max-height: 600px) {
+    .swipeable-dropdown, 
+    [data-radix-popper-content] {
+      max-height: 85vh !important;
+    }
+    
+    [data-radix-popper-content-wrapper] {
+      transform: translateY(-5%) !important;
+    }
+  }
+}
+
 /* Swipeable dropdown styles */
 .swipeable-dropdown {
   touch-action: pan-x pan-y;
@@ -246,8 +289,35 @@ html {
   position: fixed !important;
   z-index: 9999 !important;
   max-height: calc(100vh - 10px) !important;
-  overflow: auto !important;
   max-width: 100vw !important;
+}
+
+/* Mobile dropdown specific styles */
+.mobile-friendly-dropdown {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scroll-padding-bottom: 20px;
+  scrollbar-width: thin;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Sign out button styling */
+.mobile-friendly-dropdown [data-signout-item="true"] {
+  margin-top: auto;
+  position: sticky;
+  bottom: 0;
+  background-color: var(--popover);
+  z-index: 10;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+/* On small height screens, adjust dropdown to be taller */
+@media (max-height: 700px) {
+  .mobile-friendly-dropdown {
+    max-height: 85vh !important;
+  }
 }
 
 /* Add extra specificity for mobile dropdown menu */

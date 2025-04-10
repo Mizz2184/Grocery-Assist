@@ -27,6 +27,9 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import React from "react";
 import { MobileCurrencyConverter } from "@/components/MobileCurrencyConverter";
+import { UserDropdown } from "@/components/UserDropdown";
+import { SignOutDropdownMenuItem } from "@/components/SignOutDropdownMenuItem";
+import { MobileSignOutButton } from "@/components/MobileSignOutButton";
 
 export const Navbar = () => {
   const { user, signOut } = useAuth();
@@ -231,68 +234,7 @@ export const Navbar = () => {
           </div>
           
           {user ? (
-            <div className="relative" ref={dropdownRef}>
-              <Button 
-                variant="ghost" 
-                className="rounded-full h-9 gap-2 cursor-pointer hover:bg-accent active:bg-accent/80"
-                onClick={toggleDropdown}
-                onKeyDown={(e) => e.key === 'Enter' && toggleDropdown()}
-                aria-label="Open profile menu"
-                aria-haspopup="true"
-                aria-expanded={!document.getElementById('profile-dropdown')?.classList.contains('hidden')}
-                type="button"
-              >
-                <Avatar className="h-6 w-6">
-                  <AvatarImage src={user.user_metadata?.avatar_url || user.user_metadata?.picture} />
-                  <AvatarFallback>{getUserInitials()}</AvatarFallback>
-                </Avatar>
-                <span className="hidden sm:inline">
-                  {user.user_metadata?.full_name || user.user_metadata?.name || user.email}
-                </span>
-              </Button>
-              
-              <div 
-                id="profile-dropdown" 
-                className="hidden absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-popover border border-border p-1 z-[999]"
-                onKeyDown={handleDropdownKeyDown}
-                role="menu"
-              >
-                <div className="px-2 py-1.5 text-sm font-semibold">
-                  {isTranslated ? "My Account" : translateText("Mi Cuenta")}
-                </div>
-                <div className="-mx-1 my-1 h-px bg-muted"></div>
-                <Link 
-                  to="/profile" 
-                  className="flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent cursor-pointer"
-                  onClick={toggleDropdown}
-                  role="menuitem"
-                >
-                  <User className="w-4 h-4 mr-2" />
-                  {isTranslated ? "Profile" : translateText("Perfil")}
-                </Link>
-                <Link 
-                  to="/settings" 
-                  className="flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent cursor-pointer"
-                  onClick={toggleDropdown}
-                  role="menuitem"
-                >
-                  <Settings className="w-4 h-4 mr-2" />
-                  {isTranslated ? "Settings" : translateText("Ajustes")}
-                </Link>
-                <div className="-mx-1 my-1 h-px bg-muted"></div>
-                <button
-                  onClick={() => {
-                    toggleDropdown();
-                    handleSignOut();
-                  }}
-                  className="flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent cursor-pointer text-red-500 w-full text-left"
-                  role="menuitem"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  {isTranslated ? "Sign Out" : translateText("Cerrar Sesión")}
-                </button>
-              </div>
-            </div>
+            <UserDropdown />
           ) : (
             <Link to="/login">
               <Button variant="outline" className="rounded-full h-9">
@@ -324,7 +266,7 @@ export const Navbar = () => {
       {/* Mobile Menu */}
       {isMenuOpen && (
         <div className="fixed inset-0 w-full h-full bg-background z-40 flex flex-col pt-20 pb-6 px-6 md:hidden">
-          <div className="flex flex-col gap-4 mt-4">
+          <div className="flex flex-col gap-4 mt-4 h-full">
             {/* Exchange rate in mobile menu */}
             <div className="flex items-center justify-between mb-4">
               <TranslationToggle />
@@ -427,16 +369,12 @@ export const Navbar = () => {
               </span>
             </Link>
             
-            {/* Sign out button for mobile */}
+            {/* Sign out button for mobile - fixed at bottom */}
             {user && (
-              <Button
-                variant="destructive"
-                className="mt-6 rounded-full w-full animate-fade-up"
-                onClick={handleSignOut}
-              >
-                <LogOut className="w-5 h-5 mr-2" />
-                {isTranslated ? "Sign Out" : translateText("Cerrar Sesión")}
-              </Button>
+              <MobileSignOutButton 
+                className="animate-fade-up mt-6" 
+                onSignOut={() => setIsMenuOpen(false)}
+              />
             )}
           </div>
         </div>
