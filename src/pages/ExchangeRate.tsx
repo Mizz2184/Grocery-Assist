@@ -27,8 +27,8 @@ const ExchangeRatePage: React.FC = () => {
           </h2>
           <p className="text-sm text-muted-foreground">
             <TranslatedText 
-              es="Los tipos de cambio se obtienen de la API de @fawazahmed0/currency-api y se actualizan automáticamente. Si no se puede acceder a la API, se utiliza un tipo de cambio por defecto."
-              en="Exchange rates are obtained from @fawazahmed0/currency-api and updated automatically. If the API cannot be accessed, a default exchange rate is used."
+              es="Los tipos de cambio se obtienen y se actualizan automáticamente. Si no se puede acceder a la API, se utiliza un tipo de cambio por defecto."
+              en="Exchange rates are obtained and updated automatically. If the API cannot be accessed, a default exchange rate is used."
             />
           </p>
         </div>
