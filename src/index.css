@@ -193,167 +193,88 @@ html {
   }
 }
 
-/* Dropdown menu fix for scrolling */
-.fixed-dropdown {
-  position: fixed !important;
-  margin-top: 0 !important;
-  transform-origin: top center !important;
-  max-width: calc(100vw - 24px) !important;
-}
+/* ---------------------------------------------
+   DROPDOWN STYLING - COMPLETE RESET
+   --------------------------------------------- */
 
-/* Mobile dropdown max height */
-@media (max-width: 768px) {
-  .swipeable-dropdown {
-    max-height: 70vh !important;
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    overscroll-behavior: contain;
-  }
-  
-  /* Improve scrolling on small screens */
-  [data-radix-popper-content-wrapper] {
-    max-height: 80vh !important;
-    bottom: auto !important;
-  }
-  
-  [data-radix-popper-content] {
-    max-height: 75vh !important;
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    overscroll-behavior: contain;
-  }
-}
-
-/* Ensure mobile dropdown scrolls properly */
-@media (max-width: 768px) {
-  /* Adjust dropdown position for smaller screens */
-  [data-radix-popper-content-wrapper] {
-    transform: translateY(-10%) !important;
-  }
-  
-  /* Handle very small screens */
-  @media (max-height: 600px) {
-    .swipeable-dropdown, 
-    [data-radix-popper-content] {
-      max-height: 85vh !important;
-    }
-    
-    [data-radix-popper-content-wrapper] {
-      transform: translateY(-5%) !important;
-    }
-  }
-}
-
-/* Swipeable dropdown styles */
-.swipeable-dropdown {
-  touch-action: pan-x pan-y;
-  transition: transform 0.2s ease-out, opacity 0.2s ease-out;
-  position: relative;
-  padding-bottom: 12px !important;
-}
-
-.swipeable-dropdown::after {
-  content: '';
-  display: block;
-  height: 4px;
-  width: 36px;
-  background-color: rgba(150, 150, 150, 0.3);
-  border-radius: 2px;
-  margin: 6px auto 0 auto;
-  position: absolute;
-  bottom: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-/* Add bounce animation for dropdown handle on open */
-@keyframes handle-bounce {
-  0% { transform: translateX(-50%) scaleX(0.8); }
-  50% { transform: translateX(-50%) scaleX(1.2); }
-  100% { transform: translateX(-50%) scaleX(1); }
-}
-
-.swipeable-dropdown[data-state="open"]::after {
-  animation: handle-bounce 0.3s ease-out;
-}
-
-.dropdown-menu-container {
-  max-height: 90vh;
-  overflow-y: auto;
-  position: relative;
-  z-index: 999 !important;
-}
-
-/* Radix UI dropdown specific fixes */
-[data-radix-popper-content-wrapper] {
-  position: fixed !important;
-  z-index: 9999 !important;
-  max-height: calc(100vh - 10px) !important;
-  max-width: 100vw !important;
-}
-
-/* Mobile dropdown specific styles */
-.mobile-friendly-dropdown {
-  -webkit-overflow-scrolling: touch !important;
-  overscroll-behavior: contain !important;
-  scroll-padding-bottom: 20px !important;
-  scrollbar-width: thin !important;
-  max-height: 75vh !important;
-  position: relative !important;
-  overflow-y: auto !important;
-  touch-action: pan-y !important;
-}
-
-/* Reset problematic dropdown scroll rules */
+/* Simple dropdown styling */
 #profile-dropdown {
+  box-sizing: border-box;
   position: absolute;
-  top: calc(100% + 8px);
+  top: 45px;
   right: 0;
   width: 240px;
-  background-color: hsl(var(--popover));
-  border-radius: 8px;
+  background: hsl(var(--popover));
   border: 1px solid hsl(var(--border));
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  z-index: 999;
+  border-radius: var(--radius);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   padding: 8px;
-  max-height: 300px;
-  overflow-y: auto;
-  transform: none;
+  z-index: 50;
+  display: none;
 }
 
+/* Mobile dropdown content */
+.mobile-dropdown-content {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  padding-bottom: 20px;
+}
+
+/* Display state */
 #profile-dropdown.hidden {
-  display: none !important;
+  display: none;
 }
 
 #profile-dropdown:not(.hidden) {
-  display: block !important;
+  display: block;
 }
 
-/* Mobile viewport styling for dropdown */
+/* Mobile view adjustments */
 @media (max-width: 768px) {
   #profile-dropdown {
     position: fixed;
+    top: 70px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: 85vw;
+    max-width: 320px;
+    max-height: 70vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 16px;
+    /* Critical fixes for mobile scrolling */
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+    height: auto;
+  }
+  
+  /* Ensure iOS scroll works */
+  #profile-dropdown:not(.hidden) {
+    overflow-y: scroll !important;
+  }
+  
+  /* Add visual cue for scrollability */
+  #profile-dropdown::after {
+    content: '';
+    display: block;
+    height: 4px;
+    width: 36px;
+    background-color: rgba(150, 150, 150, 0.3);
+    border-radius: 2px;
+    margin: 6px auto 0 auto;
+    position: absolute;
+    bottom: 4px;
     left: 50%;
     transform: translateX(-50%);
-    top: 60px;
-    width: calc(100% - 32px);
-    max-width: 300px;
-    max-height: 60vh;
-    overflow-y: scroll !important;
-    -webkit-overflow-scrolling: touch !important;
-    overscroll-behavior: contain;
   }
 }
 
-/* iOS specific fixes */
-@supports (-webkit-touch-callout: none) {
-  #profile-dropdown {
-    -webkit-overflow-scrolling: touch !important;
-    overflow-y: scroll !important;
-  }
-}
+/* ---------------------------------------------
+   MOBILE DROPDOWN MENU OVERLAY
+   --------------------------------------------- */
 
-/* Add extra specificity for mobile dropdown menu */
 .fixed.inset-0.mobile-menu-overlay {
   position: fixed !important;
   top: 0 !important;
@@ -366,133 +287,31 @@ html {
   z-index: 200 !important;
 }
 
-/* Custom dropdown scroll container for mobile devices */
-.dropdown-scroll-container {
-  max-height: 60vh;
-  overflow-y: scroll !important; /* Force scroll instead of auto */
-  -webkit-overflow-scrolling: touch !important; /* Smooth scrolling on iOS */
-  overscroll-behavior: contain !important; /* Prevent body scroll when at boundaries */
-  touch-action: pan-y !important; /* Allow vertical touch gestures */
-  scroll-behavior: smooth !important; /* Smooth scrolling */
-  position: relative !important; 
-  padding-bottom: 20px !important; /* Add some padding at bottom */
-  margin-bottom: 10px !important;
+/* Mobile dropdown content */
+.mobile-dropdown-content {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  padding-bottom: 20px;
 }
 
-/* Special positioning for profile dropdown */
-#profile-dropdown {
-  display: block !important; /* Override hidden class with JS toggle */
-  visibility: visible;
-  opacity: 1;
-  transform: none;
-  pointer-events: auto;
-}
-
-#profile-dropdown.hidden {
-  display: none !important;
-  visibility: hidden;
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* Ensure iOS devices properly handle the scroll */
-@supports (-webkit-touch-callout: none) {
-  .dropdown-scroll-container {
-    overflow-y: scroll !important; /* Force scroll instead of auto */
-    position: relative !important;
-    padding-right: 10px; /* Space for scrollbar */
+/* Mobile view adjustments */
+@media (max-width: 768px) {
+  .fixed {
+    position: fixed !important;
   }
-}
-
-/* Clear out previous dropdown styling attempts that are causing conflicts */
-.mobile-friendly-dropdown,
-.swipeable-dropdown,
-.fixed-dropdown,
-.dropdown-scroll-container {
-  /* Reset conflicting styles */
-}
-
-/* Override any other conflicting styles */
-.dropdown-menu-container [data-radix-popper-content-wrapper],
-[data-radix-popper-content],
-.mobile-friendly-dropdown,
-.dropdown-scroll-container,
-.swipeable-dropdown,
-.fixed-dropdown {
-  max-height: none !important;
-  overflow: visible !important;
-}
-
-/* Force proper display of the dropdown */
-#profile-dropdown {
-  /* !important rules to override all other styles */
-  visibility: visible !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
   
-  /* Ensure it appears above other content */
-  z-index: 9999 !important;
-}
-
-/* Add important styles for showing/hiding */
-#profile-dropdown.hidden {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
-
-#profile-dropdown:not(.hidden) {
-  display: block !important;
-}
-
-/* Add extra specificity for mobile dropdown menu */
-.fixed.inset-0.mobile-menu-overlay {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  min-height: 100vh !important;
-  min-height: 100dvh !important;
-  width: 100vw !important;
-  z-index: 200 !important;
-}
-
-/* Custom dropdown scroll container for mobile devices */
-.dropdown-scroll-container {
-  max-height: 60vh;
-  overflow-y: scroll !important; /* Force scroll instead of auto */
-  -webkit-overflow-scrolling: touch !important; /* Smooth scrolling on iOS */
-  overscroll-behavior: contain !important; /* Prevent body scroll when at boundaries */
-  touch-action: pan-y !important; /* Allow vertical touch gestures */
-  scroll-behavior: smooth !important; /* Smooth scrolling */
-  position: relative !important; 
-  padding-bottom: 20px !important; /* Add some padding at bottom */
-  margin-bottom: 10px !important;
-}
-
-/* Special positioning for profile dropdown */
-#profile-dropdown {
-  display: block !important; /* Override hidden class with JS toggle */
-  visibility: visible;
-  opacity: 1;
-  transform: none;
-  pointer-events: auto;
-}
-
-#profile-dropdown.hidden {
-  display: none !important;
-  visibility: hidden;
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* Ensure iOS devices properly handle the scroll */
-@supports (-webkit-touch-callout: none) {
-  .dropdown-scroll-container {
-    overflow-y: scroll !important; /* Force scroll instead of auto */
-    position: relative !important;
-    padding-right: 10px; /* Space for scrollbar */
+  body.menu-open {
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    inset: 0;
+  }
+  
+  .nav-transparent {
+    background: transparent !important;
+    backdrop-filter: none !important;
   }
 }

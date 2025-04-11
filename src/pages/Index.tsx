@@ -386,6 +386,62 @@ const Index = () => {
     }
   }, [scrollPosition, searchResults]);
 
+  // Remove the two separate useEffect hooks for search restoration and replace with this single hook
+  useEffect(() => {
+    // This function handles restoring search state from sessionStorage
+    const restoreSearchState = async () => {
+      // Only attempt to restore if we don't already have results
+      if (searchResults.length === 0 && !isSearching) {
+        const savedQuery = sessionStorage.getItem('search_query');
+        const savedResults = sessionStorage.getItem('search_results');
+        
+        console.log('Checking for saved search state:', { 
+          hasSavedQuery: !!savedQuery, 
+          hasSavedResults: !!savedResults,
+          currentQuery: query
+        });
+        
+        if (savedQuery && savedResults) {
+          try {
+            // Parse saved results
+            const parsedResults = JSON.parse(savedResults);
+            
+            // If we have valid saved results, restore them
+            if (Array.isArray(parsedResults) && parsedResults.length > 0) {
+              console.log(`Restoring ${parsedResults.length} saved search results for query "${savedQuery}"`);
+              
+              // Only update query if it differs from current query
+              if (savedQuery !== query) {
+                setQuery(savedQuery);
+              }
+              
+              // Set search results from sessionStorage
+              setSearchResults(parsedResults);
+            } else if (savedQuery && savedQuery.trim() !== '' && savedQuery === query) {
+              // We have a query but no valid results, so perform the search again
+              console.log(`Saved results invalid, performing search for query: "${savedQuery}"`);
+              handleSearch(savedQuery);
+            }
+          } catch (error) {
+            console.error('Error restoring search results from sessionStorage:', error);
+            // If there was an error parsing the results but we have a valid query, search again
+            if (savedQuery && savedQuery.trim() !== '') {
+              console.log(`Error with saved results, re-searching for: "${savedQuery}"`);
+              handleSearch(savedQuery);
+            }
+          }
+        } else if (query && query.trim() !== '') {
+          // We have a query from context but no results and no saved results,
+          // so we need to perform the search
+          console.log(`No saved results but we have query "${query}", performing search`);
+          handleSearch(query);
+        }
+      }
+    };
+    
+    restoreSearchState();
+  }, []); // Run only once on mount
+  
   // Save scroll position when scrolling
   useEffect(() => {
     const handleScroll = () => {
@@ -501,6 +557,10 @@ const Index = () => {
     
     console.log('Performing product search for:', searchQuery);
     setIsSearching(true);
+    
+    // Save the query immediately to prevent race conditions
+    sessionStorage.setItem('search_query', searchQuery);
+    setQuery(searchQuery);
 
     try {
       // Perform searches in parallel
@@ -617,6 +677,12 @@ const Index = () => {
       
       setSearchResults(combinedResults);
       console.log('Set search results called with', combinedResults.length, 'products');
+      
+      // Always save search results to session storage, even if empty
+      // This helps prevent unnecessary re-searches
+      console.log('Saving search results to sessionStorage');
+      sessionStorage.setItem('search_results', JSON.stringify(combinedResults));
+      
     } catch (error) {
       console.error('Error during search:', error);
       toast({
@@ -624,6 +690,9 @@ const Index = () => {
         description: translateUI("Ocurrió un error durante la búsqueda. Por favor intenta de nuevo."),
         variant: "destructive"
       });
+      
+      // Clear stored search results on error to force a fresh search next time
+      sessionStorage.removeItem('search_results');
     } finally {
       setIsSearching(false);
     }

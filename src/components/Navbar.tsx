@@ -26,15 +26,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import React from "react";
-import { MobileCurrencyConverter } from "@/components/MobileCurrencyConverter";
 
 export const Navbar = () => {
   const { user, signOut } = useAuth();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { translateText, isTranslated } = useTranslation();
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+  // Touch gesture variables
+  const touchStartYRef = React.useRef<number | null>(null);
 
   // Track scroll position to add backdrop when scrolled
   useEffect(() => {
@@ -46,11 +48,50 @@ export const Navbar = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Add touch gesture handling for dropdown
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+    
+    const dropdown = document.getElementById('profile-dropdown');
+    if (!dropdown) return;
+    
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartYRef.current = e.touches[0].clientY;
+    };
+    
+    const handleTouchMove = (e: TouchEvent) => {
+      if (touchStartYRef.current === null) return;
+      
+      const touchY = e.touches[0].clientY;
+      const diff = touchStartYRef.current - touchY;
+      
+      // If swiped up by more than 30px, close the dropdown
+      if (diff > 30) {
+        setIsDropdownOpen(false);
+        touchStartYRef.current = null;
+      }
+    };
+    
+    const handleTouchEnd = () => {
+      touchStartYRef.current = null;
+    };
+    
+    dropdown.addEventListener('touchstart', handleTouchStart);
+    dropdown.addEventListener('touchmove', handleTouchMove);
+    dropdown.addEventListener('touchend', handleTouchEnd);
+    
+    return () => {
+      dropdown.removeEventListener('touchstart', handleTouchStart);
+      dropdown.removeEventListener('touchmove', handleTouchMove);
+      dropdown.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [isDropdownOpen]);
+
   // Handle click outside of dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        document.getElementById('profile-dropdown')?.classList.add('hidden');
+        setIsDropdownOpen(false);
       }
     };
     
@@ -76,6 +117,7 @@ export const Navbar = () => {
   // Close mobile menu when route changes
   useEffect(() => {
     setIsMenuOpen(false);
+    setIsDropdownOpen(false);
     document.body.classList.remove('menu-open');
   }, [location.pathname]);
   
@@ -134,29 +176,18 @@ export const Navbar = () => {
 
   // Toggle dropdown visibility
   const toggleDropdown = () => {
-    const dropdown = document.getElementById('profile-dropdown');
-    if (!dropdown) return;
-    
-    if (dropdown.classList.contains('hidden')) {
-      dropdown.classList.remove('hidden');
-      // If we just showed the dropdown, focus the first link
-      const firstLink = dropdown.querySelector('a, button') as HTMLElement;
-      firstLink?.focus();
-    } else {
-      dropdown.classList.add('hidden');
-    }
+    setIsDropdownOpen(!isDropdownOpen);
   };
   
   // Handle keyboard navigation
   const handleDropdownKeyDown = (e: React.KeyboardEvent) => {
-    const dropdown = document.getElementById('profile-dropdown');
-    
     if (e.key === 'Escape') {
-      dropdown?.classList.add('hidden');
+      setIsDropdownOpen(false);
       return;
     }
     
-    if (!dropdown?.classList.contains('hidden')) {
+    if (isDropdownOpen) {
+      const dropdown = document.getElementById('profile-dropdown');
       const focusableElements = dropdown?.querySelectorAll('a, button') as NodeListOf<HTMLElement>;
       
       if (e.key === 'ArrowDown') {
@@ -242,7 +273,7 @@ export const Navbar = () => {
                 onKeyDown={(e) => e.key === 'Enter' && toggleDropdown()}
                 aria-label="Open profile menu"
                 aria-haspopup="true"
-                aria-expanded={!document.getElementById('profile-dropdown')?.classList.contains('hidden')}
+                aria-expanded={isDropdownOpen}
                 type="button"
               >
                 <Avatar className="h-6 w-6">
@@ -254,47 +285,72 @@ export const Navbar = () => {
                 </span>
               </Button>
               
-              <div 
-                id="profile-dropdown" 
-                className="hidden"
-                onKeyDown={handleDropdownKeyDown}
-                role="menu"
-              >
-                <div className="px-2 py-1.5 text-sm font-semibold">
-                  {isTranslated ? "My Account" : translateText("Mi Cuenta")}
+              {isDropdownOpen && (
+                <div 
+                  id="profile-dropdown" 
+                  className="absolute right-0 top-full mt-2 w-64 bg-background border border-border rounded-md shadow-lg z-50 overflow-hidden"
+                  onKeyDown={handleDropdownKeyDown}
+                  role="menu"
+                  tabIndex={-1}
+                >
+                  <div className="mobile-dropdown-content p-2">
+                    <div className="flex items-center justify-between pb-2">
+                      <div className="px-2 text-sm font-semibold">
+                        {isTranslated ? "My Account" : translateText("Mi Cuenta")}
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="flex items-center justify-center rounded-md bg-accent/70 hover:bg-accent"
+                        onClick={toggleDropdown}
+                        aria-label="Close menu"
+                        title="Close menu"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="-mx-1 my-1 h-px bg-muted"></div>
+                    <Link 
+                      to="/profile" 
+                      className="flex items-center px-2 py-2 text-sm rounded-sm hover:bg-accent cursor-pointer"
+                      onClick={() => setIsDropdownOpen(false)}
+                      role="menuitem"
+                    >
+                      <User className="w-4 h-4 mr-2" />
+                      {isTranslated ? "Profile" : translateText("Perfil")}
+                    </Link>
+                    <Link 
+                      to="/settings" 
+                      className="flex items-center px-2 py-2 text-sm rounded-sm hover:bg-accent cursor-pointer"
+                      onClick={() => setIsDropdownOpen(false)}
+                      role="menuitem"
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      {isTranslated ? "Settings" : translateText("Ajustes")}
+                    </Link>
+                    <div className="-mx-1 my-1 h-px bg-muted"></div>
+                    <button
+                      onClick={() => {
+                        setIsDropdownOpen(false);
+                        handleSignOut();
+                      }}
+                      className="flex items-center px-2 py-2 text-sm rounded-sm hover:bg-accent cursor-pointer text-red-500 w-full text-left"
+                      role="menuitem"
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      {isTranslated ? "Sign Out" : translateText("Cerrar Sesión")}
+                    </button>
+                    
+                    {/* Swipe indicator */}
+                    <div className="mt-3 flex flex-col items-center opacity-60">
+                      <div className="h-1 w-10 rounded-full bg-border mb-2"></div>
+                      <div className="text-xs text-muted-foreground">
+                        {isTranslated ? "Swipe up to close" : translateText("Deslizar hacia arriba para cerrar")}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="-mx-1 my-1 h-px bg-muted"></div>
-                <Link 
-                  to="/profile" 
-                  className="flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent cursor-pointer"
-                  onClick={toggleDropdown}
-                  role="menuitem"
-                >
-                  <User className="w-4 h-4 mr-2" />
-                  {isTranslated ? "Profile" : translateText("Perfil")}
-                </Link>
-                <Link 
-                  to="/settings" 
-                  className="flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent cursor-pointer"
-                  onClick={toggleDropdown}
-                  role="menuitem"
-                >
-                  <Settings className="w-4 h-4 mr-2" />
-                  {isTranslated ? "Settings" : translateText("Ajustes")}
-                </Link>
-                <div className="-mx-1 my-1 h-px bg-muted"></div>
-                <button
-                  onClick={() => {
-                    toggleDropdown();
-                    handleSignOut();
-                  }}
-                  className="flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent cursor-pointer text-red-500 w-full text-left"
-                  role="menuitem"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  {isTranslated ? "Sign Out" : translateText("Cerrar Sesión")}
-                </button>
-              </div>
+              )}
             </div>
           ) : (
             <Link to="/login">
@@ -353,9 +409,6 @@ export const Navbar = () => {
               if (item.path === '/exchange-rate') {
                 return (
                   <div key={item.path}>
-                    <div className="text-sm text-muted-foreground mt-2 mb-1 px-1">
-                      {isTranslated ? "Currency Tools" : translateText("Herramientas de Moneda")}
-                    </div>
                     <Link
                       to={item.path}
                       className={cn(
@@ -371,23 +424,6 @@ export const Navbar = () => {
                         {isTranslated ? item.labelEN : translateText(item.labelES)}
                       </span>
                     </Link>
-                    
-                    {/* Mini currency converter in mobile menu */}
-                    <div className="mt-2 rounded-lg bg-accent/50 p-3 animate-fade-up">
-                      <div className="mb-1 text-xs font-medium text-muted-foreground text-center">
-                        {isTranslated ? 
-                          "Quick Currency Converter" : 
-                          translateText("Conversor Rápido de Moneda")
-                        }
-                      </div>
-                      <div className="flex justify-center">
-                        <div className="w-full max-w-xs">
-                          <div className="bg-background rounded-md p-3">
-                            <MobileCurrencyConverter />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 );
               }
