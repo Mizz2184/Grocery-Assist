@@ -121,7 +121,7 @@ const PaymentRequired = ({ children }: PaymentRequiredProps) => {
           <CardFooter>
             <Button 
               className="w-full"
-              onClick={() => window.location.href = '/payment'}
+              onClick={() => window.location.href = 'https://buy.stripe.com/aEUfZTbgNgJGd0s000'}
             >
               {isNewUser ? "Complete Payment" : "Subscribe Now"}
             </Button>
