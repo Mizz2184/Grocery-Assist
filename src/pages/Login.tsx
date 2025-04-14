@@ -233,7 +233,7 @@ const Login = () => {
             >
               <path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3" />
             </svg>
-            Grocery Assist
+            Shop-Assist
           </div>
           <div className="relative z-20 mt-auto">
             <blockquote className="space-y-2">
@@ -256,7 +256,7 @@ const Login = () => {
             </div>
             <Card>
               <CardHeader>
-                <CardTitle>Subscription Required</CardTitle>
+                <CardTitle>Payment Required</CardTitle>
                 <CardDescription>
                   To access all features, please complete your payment.
                 </CardDescription>
@@ -266,10 +266,10 @@ const Login = () => {
                   <div className="flex items-center space-x-4">
                     <div className="flex-1 space-y-1">
                       <p className="text-sm font-medium leading-none">
-                        Monthly Subscription
+                        One-Time Payment
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        $9.99/month
+                        $19.99
                       </p>
                     </div>
                   </div>
