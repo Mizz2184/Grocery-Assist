@@ -13,7 +13,7 @@ import {
 export const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder';
 
 // Direct payment link that can be used for checkout
-export const PAYMENT_LINK = import.meta.env.VITE_STRIPE_PAYMENT_LINK || 'https://buy.stripe.com/test_placeholder';
+export const PAYMENT_LINK = import.meta.env.VITE_STRIPE_PAYMENT_LINK || 'https://buy.stripe.com/aEUfZTbgNgJGd0s000';
 
 // App subscription price
 export const APP_PRICE = 19.99;

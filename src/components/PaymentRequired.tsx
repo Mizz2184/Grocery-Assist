@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { checkUserPaymentStatus } from "@/lib/stripe/stripe-client";
+import { checkUserPaymentStatus, PAYMENT_LINK } from "@/lib/stripe/stripe-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShoppingCart } from "lucide-react";
@@ -121,7 +121,7 @@ const PaymentRequired = ({ children }: PaymentRequiredProps) => {
           <CardFooter>
             <Button 
               className="w-full"
-              onClick={() => window.location.href = 'https://buy.stripe.com/aEUfZTbgNgJGd0s000'}
+              onClick={() => window.location.href = PAYMENT_LINK}
             >
               {isNewUser ? "Complete Payment" : "Subscribe Now"}
             </Button>
