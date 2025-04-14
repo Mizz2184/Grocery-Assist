@@ -193,6 +193,7 @@ export const addProductToGroceryList = async (
     
     // Log the store detection for debugging
     console.log(`addProductToGroceryList: Product ${product.id} store detection - Original: ${originalStore}, Normalized: ${product.store}`);
+    console.log(`Adding product with quantity: ${quantity}`);
     
     // Add some store-specific validation
     if (product.store === 'Walmart' && originalStore && originalStore.toLowerCase().includes('maxi')) {
@@ -210,7 +211,7 @@ export const addProductToGroceryList = async (
     if (!targetList) {
       return { success: false, message: 'Grocery list not found' };
     }
-    
+
     // Check if product already exists in the list by product ID and store
     const existingItem = targetList.items.find(item => {
       // First check if product IDs match
@@ -306,7 +307,7 @@ export const addProductToGroceryList = async (
       id: itemId,
       list_id: listId,
       product_id: product.id,
-      quantity: product.quantity || 1,
+      quantity: quantity, // Ensure we use the explicitly passed quantity parameter
       checked: false,
       product_data: {
         id: product.id,
@@ -322,7 +323,8 @@ export const addProductToGroceryList = async (
 
     console.log('Inserting item with data:', {
       ...itemData,
-      list_id: listId // explicitly log the list ID
+      list_id: listId, // explicitly log the list ID
+      quantity: quantity // explicitly log the quantity
     });
     
     // Insert the item into the database

@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { SearchBar } from "@/components/SearchBar";
-import { ProductCard } from "@/components/ProductCard";
 import { mockGroceryLists } from "@/utils/productData";
 import { stores } from "@/utils/storeData";
 import { useAuth } from "@/hooks/useAuth";
 import { useSearch } from "@/context/SearchContext";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Search as SearchIcon, Scan, Filter } from "lucide-react";
+import { ShoppingCart, Search as SearchIcon, Scan, Filter, ArrowLeft, Minus, Plus, Store } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { searchMaxiPaliProducts, searchMasxMenosProducts, searchWalmartProducts } from "@/lib/services";
 import { 
   getOrCreateDefaultList, 
@@ -16,7 +15,7 @@ import {
   syncGroceryListToDatabase,
   getUserGroceryLists 
 } from '@/lib/services/groceryListService';
-import { Product } from "@/lib/types/store";
+import { Product as ProductType } from "@/lib/types/store";
 import { Button } from "@/components/ui/button";
 import { BarcodeScannerModal } from "@/components/BarcodeScannerModal";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -32,10 +31,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { getProductStore, STORE } from '@/utils/storeUtils';
+import { STORE, storeColors } from '@/utils/storeUtils';
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
-import { Minus, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -47,114 +45,164 @@ import {
 import { useGroceryList } from "@/hooks/useGroceryList";
 import { Card, CardFooter, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Image } from "@/components/ui/image";
-import { CRC_TO_USD_RATE, convertCRCtoUSD } from "@/utils/currencyUtils";
 import { formatPrice } from "@/lib/utils/currency";
+import { useSearchNavigation } from "@/hooks/useSearchNavigation";
 
 interface ProductGridProps {
-  products: Product[];
-  onAddToList: (product: Product) => Promise<void>;
+  products: ProductType[];
+  onAddToList: (product: ProductType) => Promise<void>;
   isProductInList: (productId: string, store?: string) => boolean;
 }
 
 const ProductGrid = ({ products, onAddToList, isProductInList }: ProductGridProps) => {
+  if (!products || products.length === 0) {
+    return null;
+  }
+
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      {products.map((product) => (
-        <ProductCardComponent
-          key={`${product.store || 'unknown'}-${product.id}`}
-          product={product}
-          onAddToList={onAddToList}
-          isInList={isProductInList(product.id, product.store)}
-        />
-      ))}
+    <div className="w-full">
+      <AutoSizer disableHeight className="w-full">
+        {({ width }) => {
+          const columnCount = 2; // Force 2 columns
+          const gap = 16; // Define gap for calculation
+          const cardWidth = (width - gap * (columnCount - 1)) / columnCount;
+          const rowCount = Math.ceil(products.length / columnCount);
+          const cardHeight = cardWidth * 1.6; // Maintain aspect ratio
+
+          return (
+            <FixedSizeGrid
+              columnCount={columnCount}
+              columnWidth={cardWidth + gap}
+              height={Math.min(rowCount * (cardHeight + gap), window.innerHeight * 0.8)}
+              rowCount={rowCount}
+              rowHeight={cardHeight + gap}
+              width={width}
+              itemData={{ products, columnCount, onAddToList, isProductInList }}
+              className="product-grid-scroll scrollbar-hide"
+              style={{ overflowX: 'hidden' }}
+            >
+              {ProductGridCell}
+            </FixedSizeGrid>
+          );
+        }}
+      </AutoSizer>
     </div>
   );
 };
 
-// Add store colors constant at the top with other constants
-const STORE_COLORS = {
-  'Walmart': { bg: '#0071ce', text: '#fff' },
-  'MaxiPali': { bg: '#ffde00', text: '#000' },
-  'MasxMenos': { bg: '#0001ab', text: '#fff' }
+// Define the missing cell renderer component
+const ProductGridCell = ({ columnIndex, rowIndex, style, data }: any) => {
+  const { products, columnCount, onAddToList, isProductInList } = data;
+  const index = rowIndex * columnCount + columnIndex;
+  
+  // Prevent rendering cells beyond the actual product count
+  if (index >= products.length) {
+    return null; 
+  }
+
+  const product = products[index];
+
+  // Apply the style provided by FixedSizeGrid (width, height, positioning)
+  // REMOVED internal padding to prevent clipping
+  return (
+    <div style={style} className="flex items-stretch p-[8px]"> {/* Apply padding using className instead */} 
+      <ProductCardComponent 
+        product={product} 
+        onAddToList={onAddToList} 
+        isInList={isProductInList(product.id, product.store)}
+      />
+    </div>
+  );
 };
 
 interface ProductCardProps {
-  product: Product;
-  onAddToList: (product: Product) => Promise<void>;
+  product: ProductType;
+  onAddToList: (product: ProductType) => Promise<void>;
   isInList: boolean;
 }
 
 const ProductCardComponent = ({ product, onAddToList, isInList }: ProductCardProps) => {
-  const [showDetail, setShowDetail] = useState(false);
-  const storeColors = product.store ? STORE_COLORS[product.store as keyof typeof STORE_COLORS] : undefined;
-  
-  return (
-    <>
-      <Card 
-        className="h-full flex flex-col justify-between cursor-pointer hover:shadow-lg transition-shadow"
-        onClick={() => setShowDetail(true)}
-      >
-        <CardContent className="pt-6">
-          <div className="aspect-square relative mb-3">
-            {product.imageUrl && (
-              <Image
-                src={product.imageUrl}
-              alt={product.name}
-                fill
-                className="object-contain"
-              />
-            )}
-          </div>
-          <div className="space-y-1 text-sm">
-            <h3 className="font-medium leading-none">{product.name}</h3>
-            {product.brand && (
-              <p className="text-xs text-muted-foreground">{product.brand}</p>
-            )}
-            <div className="flex items-center justify-between">
-              <p className="font-medium">
-                {formatPrice(product.price)}
-              </p>
-              {product.store && (
-                <Badge 
-                  variant="secondary" 
-                  style={storeColors ? {
-                    backgroundColor: storeColors.bg,
-                    color: storeColors.text,
-                    border: 'none'
-                  } : undefined}
-                >
-                {product.store}
-                </Badge>
-              )}
-              </div>
-            </div>
-        </CardContent>
-        <CardFooter className="pt-6">
-          <Button
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddToList(product);
-            }}
-            disabled={isInList}
-            className="w-full"
-          >
-            {isInList ? 'In List' : 'Add to List'}
-          </Button>
-        </CardFooter>
-      </Card>
+  const { user } = useAuth();
+  const [isAdding, setIsAdding] = useState(false);
+  const { translateTitle, translateText, translateUI } = useTranslation();
+  const { navigatePreservingSearch } = useSearchNavigation();
+  const [showQuantityInput, setShowQuantityInput] = useState(false);
+  const [quantity, setQuantity] = useState(1);
 
-      {showDetail && (
-        <ProductDetailModal
-          product={product}
-          onClose={() => setShowDetail(false)}
-          onAddToList={async (quantity) => {
-            await onAddToList({ ...product, quantity });
-            setShowDetail(false);
-          }}
-          isInList={isInList}
-        />
-      )}
-    </>
+  const handleAddClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsAdding(true);
+    try {
+      await onAddToList(product);
+    } catch (error) {
+      console.error("Error adding product in card component:", error);
+    } finally {
+      setIsAdding(false);
+    }
+  };
+  
+  const handleCardNavigation = () => {
+    const navigationId = `${product.store || 'unknown'}|${product.id}`;
+    navigatePreservingSearch(`/product/${navigationId}`);
+  };
+
+  return (
+    <Card className="h-full flex flex-col overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 relative group">
+      <CardContent 
+        className="p-3 flex-grow cursor-pointer" 
+        onClick={handleCardNavigation}
+      >
+        <div className="aspect-square w-full overflow-hidden rounded-md mb-3 relative bg-muted">
+          <img 
+            src={product.imageUrl || 'https://placehold.co/400?text=No+Image'} 
+            alt={translateTitle(product.name)} 
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            loading="lazy"
+          />
+          {product.store && (
+            <Badge 
+              variant="secondary"
+              className={cn(
+                "absolute top-2 left-2 py-0.5 px-1.5 text-xs font-medium rounded-sm border-none",
+                storeColors[product.store as keyof typeof storeColors] || storeColors[STORE.UNKNOWN]
+              )}
+            >
+              {product.store}
+            </Badge>
+          )}
+        </div>
+        <h3 
+          className="font-medium text-sm leading-snug mb-1 line-clamp-2 h-[2.7em]"
+          title={translateTitle(product.name)}
+        >
+          {translateTitle(product.name)}
+        </h3>
+        <p className="text-xs text-muted-foreground mb-2 line-clamp-1">
+          {translateText(product.brand) || translateText('Marca desconocida')}
+        </p>
+      </CardContent>
+      <CardFooter className="p-3 pt-0 mt-auto flex items-center justify-between">
+        <div className="font-semibold text-sm text-primary">
+          {formatPrice(product.price)}
+        </div>
+        <Button 
+          variant={isInList ? "secondary" : "default"}
+          size="icon"
+          className="rounded-full h-8 w-8"
+          onClick={handleAddClick}
+          disabled={isAdding || isInList}
+          aria-label={isInList ? translateUI("En la Lista") : translateUI("Agregar")}
+        >
+          {isAdding ? (
+            <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
+          ) : isInList ? (
+            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <Plus className="h-4 w-4" />
+          )}
+        </Button>
+      </CardFooter>
+    </Card>
   );
 };
 
@@ -164,14 +212,14 @@ const ProductDetailModal = ({
   onAddToList, 
   isInList 
 }: { 
-  product: Product, 
+  product: ProductType, 
   onClose: () => void, 
   onAddToList: (quantity: number) => Promise<void>,
   isInList: boolean
 }) => {
   const [quantity, setQuantity] = useState(1);
   const totalPrice = product.price * quantity;
-  const usdPrice = convertCRCtoUSD(totalPrice); // Using the imported exchange rate function
+  // const usdPrice = convertCRCtoUSD(totalPrice);
 
   return (
     <Dialog open={true} onOpenChange={() => onClose()}>
@@ -182,11 +230,10 @@ const ProductDetailModal = ({
             {product.store && (
               <Badge 
                 variant="secondary"
-                style={product.store && STORE_COLORS[product.store as keyof typeof STORE_COLORS] ? {
-                  backgroundColor: STORE_COLORS[product.store as keyof typeof STORE_COLORS].bg,
-                  color: STORE_COLORS[product.store as keyof typeof STORE_COLORS].text,
-                  border: 'none'
-                } : undefined}
+                className={cn(
+                  "py-0.5 px-1.5 text-xs font-medium rounded-sm border-none",
+                  storeColors[product.store as keyof typeof storeColors] || storeColors[STORE.UNKNOWN]
+                )}
               >
                 {product.store}
               </Badge>
@@ -210,9 +257,9 @@ const ProductDetailModal = ({
                 <div className="text-xl font-semibold">
                   {formatPrice(product.price)}
                 </div>
-                <div className="text-sm text-muted-foreground">
+                {/* <div className="text-sm text-muted-foreground">
                   ${convertCRCtoUSD(product.price).toFixed(2)} USD
-                </div>
+                </div> */}
               </div>
               
               <div className="flex items-center gap-4">
@@ -248,13 +295,13 @@ const ProductDetailModal = ({
                   <div className="text-xl font-semibold">
                     {formatPrice(totalPrice)}
                   </div>
-                <div className="text-sm text-muted-foreground">
+                  {/* <div className="text-sm text-muted-foreground">
                     ${usdPrice.toFixed(2)} USD
+                  </div> */}
                 </div>
+              </div>
             </div>
           </div>
-        </div>
-    </div>
         </div>
         
         <DialogFooter className="flex gap-2">
@@ -298,11 +345,12 @@ const Index = () => {
   const navigate = useNavigate();
   const searchResultsRef = useRef<HTMLDivElement>(null);
   const { translateUI } = useTranslation();
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<ProductType | null>(null);
   const [modalQuantity, setModalQuantity] = useState(1);
   const searchBarRef = useRef<HTMLDivElement>(null);
   const { activeList, setActiveList } = useGroceryList();
   const [addingToList, setAddingToList] = useState(false);
+  const { navigatePreservingSearch } = useSearchNavigation();
 
   const featuredStores = [
     {
@@ -321,26 +369,20 @@ const Index = () => {
 
   const scrollToSearchBar = useCallback(() => {
     if (searchBarRef.current) {
-      // Get the element's position relative to the viewport
       const rect = searchBarRef.current.getBoundingClientRect();
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
       
-      // Calculate the absolute position
       const absoluteY = rect.top + scrollTop;
       
-      // Add offset for mobile header/navigation
       const offset = window.innerWidth <= 768 ? 80 : 20;
       
-      // Scroll to position
       window.scrollTo({
         top: absoluteY - offset,
         behavior: 'smooth'
       });
       
-      // Add a highlight effect
       searchBarRef.current.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
       
-      // Focus the search input after scrolling
       setTimeout(() => {
         const searchInput = searchBarRef.current?.querySelector('input');
         if (searchInput) {
@@ -348,7 +390,6 @@ const Index = () => {
         }
       }, 500);
       
-      // Remove the highlight effect after animation
       setTimeout(() => {
         if (searchBarRef.current) {
           searchBarRef.current.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
@@ -357,106 +398,41 @@ const Index = () => {
     }
   }, []);
 
-  // Handle payment success redirects
   useEffect(() => {
-    // Check if this is a redirect after a payment was initiated
-    // In test mode, we don't get a payment_intent parameter back
     const isPotentialPaymentRedirect = localStorage.getItem(`payment_session_${user?.id}`);
     
     if (isPotentialPaymentRedirect && user) {
-      // Process the successful payment
       toast({
         title: translateUI("Payment Successful"),
         description: translateUI("Thank you for your payment. You now have full access to search for products."),
       });
       
-      // User is already marked as paid in the Payment.tsx component for test mode
-      // Clear the session ID
       localStorage.removeItem(`payment_session_${user.id}`);
     }
   }, [user, toast, translateUI]);
 
-  // Restore scroll position when returning to the page
   useEffect(() => {
     if (scrollPosition > 0 && searchResultsRef.current) {
-      window.scrollTo({
-        top: scrollPosition,
-        behavior: 'auto'
-      });
-    }
-  }, [scrollPosition, searchResults]);
-
-  // Remove the two separate useEffect hooks for search restoration and replace with this single hook
-  useEffect(() => {
-    // This function handles restoring search state from sessionStorage
-    const restoreSearchState = async () => {
-      // Only attempt to restore if we don't already have results
-      if (searchResults.length === 0 && !isSearching) {
-        const savedQuery = sessionStorage.getItem('search_query');
-        const savedResults = sessionStorage.getItem('search_results');
-        
-        console.log('Checking for saved search state:', { 
-          hasSavedQuery: !!savedQuery, 
-          hasSavedResults: !!savedResults,
-          currentQuery: query
+      console.log(`Restoring scroll position to ${scrollPosition}px`);
+      setTimeout(() => {
+        window.scrollTo({
+          top: scrollPosition,
+          behavior: 'auto'
         });
-        
-        if (savedQuery && savedResults) {
-          try {
-            // Parse saved results
-            const parsedResults = JSON.parse(savedResults);
-            
-            // If we have valid saved results, restore them
-            if (Array.isArray(parsedResults) && parsedResults.length > 0) {
-              console.log(`Restoring ${parsedResults.length} saved search results for query "${savedQuery}"`);
-              
-              // Only update query if it differs from current query
-              if (savedQuery !== query) {
-                setQuery(savedQuery);
-              }
-              
-              // Set search results from sessionStorage
-              setSearchResults(parsedResults);
-            } else if (savedQuery && savedQuery.trim() !== '' && savedQuery === query) {
-              // We have a query but no valid results, so perform the search again
-              console.log(`Saved results invalid, performing search for query: "${savedQuery}"`);
-              handleSearch(savedQuery);
-            }
-          } catch (error) {
-            console.error('Error restoring search results from sessionStorage:', error);
-            // If there was an error parsing the results but we have a valid query, search again
-            if (savedQuery && savedQuery.trim() !== '') {
-              console.log(`Error with saved results, re-searching for: "${savedQuery}"`);
-              handleSearch(savedQuery);
-            }
-          }
-        } else if (query && query.trim() !== '') {
-          // We have a query from context but no results and no saved results,
-          // so we need to perform the search
-          console.log(`No saved results but we have query "${query}", performing search`);
-          handleSearch(query);
-        }
-      }
-    };
-    
-    restoreSearchState();
-  }, []); // Run only once on mount
-  
-  // Save scroll position when scrolling
+      }, 100);
+    }
+  }, [scrollPosition]);
+
   useEffect(() => {
-    const handleScroll = () => {
+    return () => {
       if (query && searchResults.length > 0) {
-        setScrollPosition(window.scrollY);
+        const finalScroll = window.scrollY;
+        console.log(`Index.tsx: Component unmounting, saving final scroll position ${finalScroll}px to sessionStorage.`);
+        sessionStorage.setItem('search_scroll_position', finalScroll.toString());
       }
     };
+  }, [query, searchResults.length]);
 
-    window.addEventListener('scroll', handleScroll);
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, [query, searchResults, setScrollPosition]);
-
-  // Fetch user's products in lists when user changes
   useEffect(() => {
     const fetchUserLists = async () => {
       if (!user) {
@@ -472,7 +448,6 @@ const Index = () => {
         
         lists.forEach(list => {
           list.items.forEach(item => {
-            // Simply use the product ID - this simplifies tracking
             productIds.add(item.productId);
           });
         });
@@ -487,11 +462,8 @@ const Index = () => {
     fetchUserLists();
   }, [user]);
 
-  // Check if product is in any grocery list
   const isProductInList = (productId: string, store: string) => {
-    // New implementation: Find the actual product in active lists
     try {
-      // First check our local state for a faster response
       if (productsInList.has(productId)) {
         console.log(`isProductInList: Found product ${productId} in productsInList Set`);
         return true;
@@ -500,16 +472,13 @@ const Index = () => {
       const allLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
       const productStore = store ? store : STORE.UNKNOWN;
       
-      // Look for both product ID and store match
       for (const list of allLists) {
         if (!list.items) continue;
         
         for (const item of list.items) {
           if (item.productId === productId) {
-            // We found a product with matching ID
             console.log(`isProductInList: Found product ${productId} in localStorage lists`);
             
-            // Add to our Set for faster lookup next time
             setProductsInList(prev => new Set([...prev, productId]));
             return true;
           }
@@ -519,32 +488,26 @@ const Index = () => {
       return false;
     } catch (error) {
       console.error('Error checking if product is in list:', error);
-      // Fall back to previous behavior
       return productsInList.has(productId);
     }
   };
 
-  // Update search ranking to use name, brand, and description
-  const rankSearchResults = (results: Product[], term: string): Product[] => {
+  const rankSearchResults = (results: ProductType[], term: string): ProductType[] => {
     const termLower = term.toLowerCase();
     
     return [...results].sort((a, b) => {
       let aScore = 0;
       let bScore = 0;
       
-      // Exact name match is most important
       if (a.name.toLowerCase() === termLower) aScore += 10;
       if (b.name.toLowerCase() === termLower) bScore += 10;
       
-      // Name contains term is next most important
       if (a.name.toLowerCase().includes(termLower)) aScore += 5;
       if (b.name.toLowerCase().includes(termLower)) bScore += 5;
       
-      // Brand match is next most important
       if ((a.brand || '').toLowerCase().includes(termLower)) aScore += 3;
       if ((b.brand || '').toLowerCase().includes(termLower)) bScore += 3;
       
-      // Description match is least important
       if ((a.description || '').toLowerCase().includes(termLower)) aScore += 1;
       if ((b.description || '').toLowerCase().includes(termLower)) bScore += 1;
       
@@ -558,12 +521,9 @@ const Index = () => {
     console.log('Performing product search for:', searchQuery);
     setIsSearching(true);
     
-    // Save the query immediately to prevent race conditions
-    sessionStorage.setItem('search_query', searchQuery);
     setQuery(searchQuery);
 
     try {
-      // Perform searches in parallel
       console.log('Starting parallel store searches...');
       const [maxiPaliResults, masxMenosResults, walmartResults] = await Promise.all([
         searchMaxiPaliProducts({ query: searchQuery }),
@@ -572,22 +532,19 @@ const Index = () => {
       ]);
       console.log('All store API searches completed');
 
-      // Debug full response data
       console.log('=== DEBUG SEARCH RESPONSES ===');
       console.log('MaxiPali response structure:', JSON.stringify(maxiPaliResults).substring(0, 200) + '...');
       console.log('MasxMenos response structure:', JSON.stringify(masxMenosResults).substring(0, 200) + '...');
       console.log('Walmart response structure:', JSON.stringify(walmartResults).substring(0, 200) + '...');
 
-      let combinedResults: Product[] = [];
+      let combinedResults: ProductType[] = [];
       let totalProductCount = 0;
       
-      // Add MaxiPali results
       if (maxiPaliResults && maxiPaliResults.products && maxiPaliResults.products.length > 0) {
         console.log(`Adding ${maxiPaliResults.products.length} MaxiPali products`);
-        // Make sure store field is set correctly and normalized
         const maxiPaliWithStore = maxiPaliResults.products.map(p => ({
           ...p,
-          store: 'MaxiPali' as const // Keep as const for type safety
+          store: 'MaxiPali' as const
         }));
         combinedResults = [...combinedResults, ...maxiPaliWithStore];
         totalProductCount += maxiPaliResults.products.length;
@@ -596,13 +553,11 @@ const Index = () => {
         console.log('No MaxiPali products found');
       }
       
-      // Add MasxMenos results
       if (masxMenosResults && masxMenosResults.products && masxMenosResults.products.length > 0) {
         console.log(`Adding ${masxMenosResults.products.length} MasxMenos products`);
-        // Make sure store field is set correctly and normalized
         const masxMenosWithStore = masxMenosResults.products.map(p => ({
           ...p,
-          store: 'MasxMenos' as const // Keep as const for type safety
+          store: 'MasxMenos' as const
         }));
         combinedResults = [...combinedResults, ...masxMenosWithStore];
         totalProductCount += masxMenosResults.products.length;
@@ -611,16 +566,13 @@ const Index = () => {
         console.log('No MasxMenos products found');
       }
       
-      // Add Walmart results
       if (walmartResults && walmartResults.products && walmartResults.products.length > 0) {
         console.log(`Adding ${walmartResults.products.length} Walmart products`);
-        // Make sure store field is set correctly and normalized
         const walmartWithStore = walmartResults.products.map(p => ({
           ...p,
-          store: 'Walmart' as const // Keep as const for type safety
+          store: 'Walmart' as const
         }));
         
-        // Additional debug logging for Walmart products
         console.log('Walmart product examples:');
         walmartResults.products.slice(0, 2).forEach((p, i) => {
           console.log(`Walmart product ${i}: id=${p.id}, name=${p.name}, price=${p.price}, store=${p.store}`);
@@ -634,7 +586,6 @@ const Index = () => {
         console.log('Walmart results structure:', walmartResults);
       }
       
-      // If all searches failed or returned no results
       if (combinedResults.length === 0) {
         console.log('No products found across any store');
         toast({
@@ -645,7 +596,6 @@ const Index = () => {
       } else {
         console.log(`Found ${combinedResults.length} total products, by store count: MaxiPali=${maxiPaliResults.products?.length || 0}, MasxMenos=${masxMenosResults.products?.length || 0}, Walmart=${walmartResults.products?.length || 0}`);
         
-        // Ensure all products have required properties
         combinedResults = combinedResults.filter(product => {
           if (!product.id || !product.name || typeof product.price !== 'number') {
             console.error('Invalid product found in results:', product);
@@ -654,12 +604,10 @@ const Index = () => {
           return true;
         });
         
-        // Check for store type issues
         const storeTypes = combinedResults.map(p => p.store);
         const uniqueStores = [...new Set(storeTypes)];
         console.log('Store types in combined results:', uniqueStores);
         
-        // Log sample of combined results
         console.log('Sample of combined results (first 2 products):', 
           combinedResults.slice(0, 2).map(p => ({
             id: p.id,
@@ -675,13 +623,13 @@ const Index = () => {
         });
       }
       
+      console.log(`Index.tsx/handleSearch: Saving query="${searchQuery}" and ${combinedResults.length} results DIRECTLY to sessionStorage BEFORE updating context.`);
+      sessionStorage.setItem('search_query', searchQuery);
+      sessionStorage.setItem('search_results', JSON.stringify(combinedResults));
+      
+      console.log(`About to set ${combinedResults.length} search results in context.`);
       setSearchResults(combinedResults);
       console.log('Set search results called with', combinedResults.length, 'products');
-      
-      // Always save search results to session storage, even if empty
-      // This helps prevent unnecessary re-searches
-      console.log('Saving search results to sessionStorage');
-      sessionStorage.setItem('search_results', JSON.stringify(combinedResults));
       
     } catch (error) {
       console.error('Error during search:', error);
@@ -691,14 +639,15 @@ const Index = () => {
         variant: "destructive"
       });
       
-      // Clear stored search results on error to force a fresh search next time
+      console.log('Index.tsx/handleSearch: Clearing sessionStorage due to search error.');
       sessionStorage.removeItem('search_results');
+      sessionStorage.removeItem('search_query');
     } finally {
       setIsSearching(false);
     }
   };
 
-  const handleAddToList = async (product: Product) => {
+  const handleAddToList = async (product: ProductType) => {
       if (!user) {
         toast({
         title: "Error",
@@ -708,7 +657,6 @@ const Index = () => {
       return;
       }
       
-    // Ensure we have the most current activeList
     const currentActiveList = useGroceryList.getState().activeList;
       
     if (!currentActiveList) {
@@ -724,11 +672,10 @@ const Index = () => {
     try {
       setAddingToList(true);
 
-      // Ensure store information is preserved and set default quantity if not provided
       const productToAdd = {
         ...product,
-        store: product.store || getProductStore(product),
-        quantity: product.quantity || 1
+        quantity: product.quantity || 1,
+        store: product.store || STORE.UNKNOWN
       };
 
       const result = await addProductToGroceryList(
@@ -738,10 +685,8 @@ const Index = () => {
       );
 
       if (result.success) {
-        // Add the product ID to the productsInList Set
         setProductsInList(prev => new Set([...prev, product.id]));
         
-        // Update the local storage to reflect the change immediately
         const lists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
         const updatedLists = lists.map((list: any) => {
           if (list.id === currentActiveList.id) {
@@ -781,7 +726,7 @@ const Index = () => {
     }
   };
   
-  const handleAddScannedProduct = async (product: Product) => {
+  const handleAddScannedProduct = async (product: ProductType) => {
     if (!user) {
       toast({
         title: translateUI("Se requiere iniciar sesión"),
@@ -795,7 +740,6 @@ const Index = () => {
     try {
       console.log('Adding scanned product to list:', product);
       
-      // Get the current active list or create a default one if it doesn't exist
       const currentActiveList = useGroceryList.getState().activeList;
       let targetList;
       
@@ -808,7 +752,6 @@ const Index = () => {
         targetList = defaultList;
       }
       
-      // Add the product to the list
       const result = await addProductToGroceryList(targetList.id, user.id, product);
       console.log('Result of adding scanned product:', result);
       
@@ -821,7 +764,6 @@ const Index = () => {
         return Promise.reject(new Error(result.message));
       }
       
-      // Update the list of products in user's lists with the product ID directly
       setProductsInList(prev => new Set([...prev, product.id]));
       
       toast({
@@ -836,22 +778,20 @@ const Index = () => {
     }
   };
 
-  // Filter search results by store
-  const filterSearchResults = (results: Product[], store: string): Product[] => {
+  const filterSearchResults = (results: ProductType[], store: string): ProductType[] => {
     if (!store || store === 'all') return results;
     
     return results.filter(product => {
-      const productStore = getProductStore(product);
-      return productStore === store;
+      const productStore = (product.store || '').trim().toLowerCase();
+      const filterStore = store.trim().toLowerCase();
+      return productStore === filterStore;
     });
   };
 
-  // Memoize filtered results
   const filteredResults = useMemo(() => {
     return filterSearchResults(searchResults, storeFilter);
   }, [searchResults, storeFilter]);
 
-  // Debug effect for filtered results
   useEffect(() => {
     if (filteredResults && filteredResults.length > 0) {
       console.log('Current filter:', storeFilter);
@@ -864,14 +804,11 @@ const Index = () => {
     }
   }, [filteredResults, storeFilter]);
 
-  // Handler for changing store filter
   const handleStoreFilterChange = (value: string) => {
     console.log(`Changing store filter from ${storeFilter} to ${value}`);
     
-    // Set the new filter value
     setStoreFilter(value as 'all' | 'MaxiPali' | 'MasxMenos' | 'Walmart');
     
-    // Debug expected count from newly selected filter
     if (value !== 'all' && searchResults.length > 0) {
       const expectedCount = searchResults.filter(p => 
         String(p.store).trim().toLowerCase() === value.toLowerCase()
@@ -879,7 +816,6 @@ const Index = () => {
       
       console.log(`Selected filter: ${value}. Expected products matching this filter: ${expectedCount}`);
       
-      // Check case sensitivity issues
       const exactMatches = searchResults.filter(p => p.store === value).length;
       if (exactMatches !== expectedCount) {
         console.warn(`Store case sensitivity issue detected. Exact matches: ${exactMatches}, 
@@ -887,7 +823,6 @@ const Index = () => {
       }
     }
     
-    // Provide user feedback via toast if appropriate
     if (value !== 'all') {
       const storeCount = searchResults.filter(p => p.store === value).length;
       if (storeCount === 0) {
@@ -900,14 +835,39 @@ const Index = () => {
     }
   };
 
-  // Log active list when component mounts
   useEffect(() => {
     console.log('Index page mounted, activeList:', activeList?.id, activeList?.name);
   }, []);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      if (query && searchResults.length > 0) {
+        const currentPos = window.scrollY;
+        if (Math.abs(currentPos - scrollPosition) > 50) {
+          setScrollPosition(currentPos);
+        }
+      }
+    };
+
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const throttledScroll = () => {
+      if (!timeoutId) {
+        timeoutId = setTimeout(() => {
+          handleScroll();
+          timeoutId = undefined;
+        }, 100);
+      }
+    };
+
+    window.addEventListener('scroll', throttledScroll);
+    return () => {
+      window.removeEventListener('scroll', throttledScroll);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [query, searchResults.length, scrollPosition, setScrollPosition]);
+
   return (
     <div className="w-full">
-      {/* Header section with max-width */}
       <div className="max-w-2xl mx-auto text-center mb-8 px-4 w-full">
         <h1 className="text-4xl font-semibold tracking-tight mb-2">
           <TranslatedText es="Comparar Precios, Ahorrar Dinero" en="Compare Prices, Save Money" />
@@ -917,7 +877,6 @@ const Index = () => {
         </p>
       </div>
 
-      {/* Search bar section with max-width */}
       <div className="max-w-xl mx-auto mb-12 px-4 w-full" ref={searchBarRef}>
         <div className="flex gap-2 items-center">
           <div className="flex-1">
@@ -931,7 +890,7 @@ const Index = () => {
             />
           </div>
           <Button 
-            onClick={() => navigate('/grocery-list')}
+            onClick={() => navigatePreservingSearch('/grocery-list')}
             variant="outline"
             className="rounded-full h-12 w-12 flex items-center justify-center text-muted-foreground hover:text-primary"
             aria-label={translateUI("Ver lista de compras")}
@@ -941,7 +900,6 @@ const Index = () => {
         </div>
       </div>
 
-      {/* Full width search results section */}
       {query ? (
         <div className="w-full px-4" style={{ maxWidth: "100%" }}>
           <div className="w-full mb-6">
@@ -1021,11 +979,11 @@ const Index = () => {
             </div>
           ) : filteredResults && filteredResults.length > 0 ? (
             <div style={{ width: "100%", maxWidth: "100%" }}>
-            <ProductGrid
-              products={filteredResults}
-              onAddToList={handleAddToList}
-              isProductInList={isProductInList}
-            />
+              <ProductGrid
+                products={filteredResults}
+                onAddToList={handleAddToList}
+                isProductInList={isProductInList}
+              />
             </div>
           ) : searchResults.length > 0 ? (
             <div className="text-center py-12">
@@ -1084,10 +1042,8 @@ const Index = () => {
                       "white"
                   }}
                   onClick={() => {
-                    // Change store filter
                     setStoreFilter(store.name as 'Walmart' | 'MaxiPali' | 'MasxMenos');
                     
-                    // If there's no search query yet, scroll to search bar
                     if (!query) {
                       scrollToSearchBar();
                       toast({
@@ -1095,7 +1051,6 @@ const Index = () => {
                         description: translateUI(`Search for products in ${store.name}`),
                       });
                     } else {
-                      // If there's already a search query, filter the results
                       handleStoreFilterChange(store.name);
                     }
                   }}
@@ -1136,7 +1091,6 @@ const Index = () => {
         </div>
       )}
 
-      {/* Barcode Scanner Modal */}
       <BarcodeScannerModal
         open={isScannerOpen}
         onOpenChange={setIsScannerOpen}

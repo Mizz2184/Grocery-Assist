@@ -105,6 +105,7 @@ const GroceryList = () => {
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [editingListName, setEditingListName] = useState(false);
   const [newListName, setNewListName] = useState("");
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
 
   // Define store groups for rendering section headers
   const storeGroupNames: { [key: string]: string } = {
@@ -133,18 +134,14 @@ const GroceryList = () => {
     }).format(amount);
   };
 
-  // Share list function
+  // Share list function - now opens the dialog
   const handleShare = () => {
-    if (!activeList) return;
-    
-    const shareUrl = `${window.location.origin}/shared-list/${activeList.id}`;
-    
-    navigator.clipboard.writeText(shareUrl).then(() => {
-      toast({
-        title: "Link copied",
-        description: "Anyone with this link can view your list. Only collaborators you've added can edit the list.",
-      });
-    });
+    if (!activeList) {
+      toast({ title: "No active list selected", variant: "destructive" });
+      return;
+    }
+    console.log("Opening share dialog for list:", activeList.name); // Add log
+    setIsShareDialogOpen(true); // Set state to open dialog
   };
 
   // Invite collaborator function
@@ -1092,6 +1089,87 @@ const GroceryList = () => {
             </div>
           </div>
         </div>
+
+        {/* Share List Dialog */}
+        <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Share List: {activeList?.name}</DialogTitle>
+              <DialogDescription>
+                Choose how you want to share this grocery list. Anyone with the link can view.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-3">
+              {(['sms', 'email', 'whatsapp', 'copy'] as const).map((method) => {
+                const shareUrl = activeList ? `${window.location.origin}/shared-list/${activeList.id}` : '';
+                let href = '#';
+                let target = '_blank';
+                let icon = <LinkIcon className="h-4 w-4 mr-2" />;
+                let label = 'Copy Link';
+
+                if (method === 'sms') {
+                  href = `sms:?&body=${encodeURIComponent(`Check out my grocery list: ${shareUrl}`)}`;
+                  target = '_self';
+                  label = 'Send via SMS';
+                  // Assuming you have an icon for SMS, e.g., MessageSquare
+                  // icon = <MessageSquare className="h-4 w-4 mr-2" />;
+                } else if (method === 'email') {
+                  href = `mailto:?subject=${encodeURIComponent(`Grocery List: ${activeList?.name}`)}&body=${encodeURIComponent(`Here's the grocery list we're working on:
+${shareUrl}`)}`;
+                  target = '_self';
+                  label = 'Send via Email';
+                  // Assuming you have an icon for Email, e.g., Mail
+                  // icon = <Mail className="h-4 w-4 mr-2" />;
+                } else if (method === 'whatsapp') {
+                  href = `https://wa.me/?text=${encodeURIComponent(`Check out our grocery list: ${shareUrl}`)}`;
+                  label = 'Share on WhatsApp';
+                  // Assuming you have a WhatsApp icon
+                  // icon = <WhatsAppIcon className="h-4 w-4 mr-2" />;
+                } else { // copy
+                  // href is not used, onClick handles it
+                }
+
+                return (
+                  <Button
+                    key={method}
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={(e) => {
+                      if (method === 'copy') {
+                        e.preventDefault();
+                        navigator.clipboard.writeText(shareUrl).then(() => {
+                          toast({ title: "Link Copied!" });
+                          setIsShareDialogOpen(false); // Close dialog after copying
+                        });
+                      } else {
+                        // For links, let the default behavior happen, but close dialog
+                        setIsShareDialogOpen(false);
+                        // No need to preventDefault for actual links
+                      }
+                    }}
+                    // Use anchor tag for sms, email, whatsapp for better mobile handling
+                    {...(method !== 'copy' ? { asChild: true } : {})}
+                  >
+                    {method !== 'copy' ? (
+                      <a href={href} target={target} className="flex items-center w-full">
+                        {icon} {label}
+                      </a>
+                    ) : (
+                      <>
+                        {icon} {label}
+                      </>
+                    )}
+                  </Button>
+                );
+              })}
+            </div>
+            <DialogFooter className="sm:justify-end">
+              <Button type="button" variant="secondary" onClick={() => setIsShareDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

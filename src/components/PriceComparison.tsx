@@ -13,15 +13,25 @@ export const PriceComparison = ({
   detailed = false, 
   compareStores = false 
 }: PriceComparisonProps) => {
+  // Add debug logging to see incoming price data
+  console.log("PriceComparison received prices:", prices);
+  
   // Normalize store IDs to lowercase for case-insensitive comparison
-  const normalizedPrices = prices.map(price => ({
-    ...price,
-    storeId: price.storeId.toLowerCase()
-  }));
+  const normalizedPrices = prices.map(price => {
+    const normalized = {
+      ...price,
+      storeId: price.storeId.toLowerCase()
+    };
+    console.log(`Normalized price: ${price.storeId} → ${normalized.storeId}, price: ${normalized.price}`);
+    return normalized;
+  });
 
   // Check if we have maxipali and masxmenos prices
   const hasMaxiPali = normalizedPrices.some(p => p.storeId === 'maxipali');
   const hasMasxMenos = normalizedPrices.some(p => p.storeId === 'masxmenos');
+  const hasWalmart = normalizedPrices.some(p => p.storeId === 'walmart');
+  
+  console.log(`Store presence check - MaxiPali: ${hasMaxiPali}, MasxMenos: ${hasMasxMenos}, Walmart: ${hasWalmart}`);
 
   // Remove prices that are exactly 0 for sorting purposes
   const validPrices = normalizedPrices.filter(p => p.price > 0);
@@ -30,6 +40,13 @@ export const PriceComparison = ({
   const sortedPrices = [...validPrices].sort((a, b) => a.price - b.price);
   const lowestPrice = sortedPrices.length > 0 ? sortedPrices[0] : null;
   const highestPrice = sortedPrices.length > 0 ? sortedPrices[sortedPrices.length - 1] : null;
+  
+  if (lowestPrice) {
+    console.log(`Lowest price: ${lowestPrice.storeId}, ${lowestPrice.price}`);
+  }
+  if (highestPrice) {
+    console.log(`Highest price: ${highestPrice.storeId}, ${highestPrice.price}`);
+  }
 
   // Format number with commas and 2 decimal places
   const formatPrice = (price: number) => {
@@ -42,7 +59,11 @@ export const PriceComparison = ({
 
   // Get store details by id (case insensitive)
   const getStore = (storeId: string) => {
-    return stores.find(store => store.id.toLowerCase() === storeId.toLowerCase());
+    const store = stores.find(store => store.id.toLowerCase() === storeId.toLowerCase());
+    if (!store) {
+      console.warn(`Store not found for ID: ${storeId}`);
+    }
+    return store;
   };
 
   // Calculate savings between stores
@@ -62,12 +83,16 @@ export const PriceComparison = ({
 
   const savings = calculateSavings();
 
-  // Ensure we always show stores in a consistent order (MaxiPali first, MasxMenos second)
+  // Ensure we always show stores in a consistent order (MaxiPali first, MasxMenos second, Walmart third)
   const orderedPrices = [...normalizedPrices].sort((a, b) => {
     if (a.storeId === 'maxipali') return -1;
     if (b.storeId === 'maxipali') return 1;
+    if (a.storeId === 'masxmenos') return -1;
+    if (b.storeId === 'masxmenos') return 1;
     return 0;
   });
+  
+  console.log("Ordered prices for display:", orderedPrices.map(p => `${p.storeId}: ${p.price}`));
 
   return (
     <div className="space-y-2">

@@ -47,14 +47,11 @@ const Login = () => {
       // Check if this is a new user that needs to complete payment
       const isNewUser = localStorage.getItem('is_new_user') === 'true';
       
-      // Clear search when user logs in
-      clearSearch();
-      
       // Set redirect state instead of navigating directly
       setShouldRedirect(true);
       setRedirectPath(isNewUser ? '/payment' : redirectUrl);
     }
-  }, [user, redirectUrl, clearSearch]);
+  }, [user, redirectUrl]);
 
   // If user is already logged in, check their payment status once
   useEffect(() => {
@@ -94,7 +91,7 @@ const Login = () => {
       setIsLoggingIn(true);
       setError(null);
       // Clear search state before login attempt
-      clearSearch();
+      // clearSearch();
       
       console.log("Attempting login with:", email);
       const { error } = await signInWithEmail(email, password);
@@ -139,7 +136,7 @@ const Login = () => {
       setIsLoggingIn(true);
       setError(null);
       // Clear search state before login attempt
-      clearSearch();
+      // clearSearch();
       const { error } = await signInWithGoogle();
       if (error) {
         setError(error.message);

@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import React from "react";
+import { useSearchNavigation } from "@/hooks/useSearchNavigation";
 
 export const Navbar = () => {
   const { user, signOut } = useAuth();
@@ -37,6 +38,7 @@ export const Navbar = () => {
   const dropdownRef = React.useRef<HTMLDivElement>(null);
   // Touch gesture variables
   const touchStartYRef = React.useRef<number | null>(null);
+  const { navigatePreservingSearch } = useSearchNavigation();
 
   // Track scroll position to add backdrop when scrolled
   useEffect(() => {
@@ -246,12 +248,17 @@ export const Navbar = () => {
               {isTranslated ? "Search" : translateText("Buscar")}
             </Button>
           </Link>
-          <Link to="/grocery-list">
-            <Button variant="ghost" className="rounded-full h-9">
-              <ShoppingCart className="w-4 h-4 mr-2" />
-              {isTranslated ? "Grocery List" : translateText("Lista de Compras")}
-            </Button>
-          </Link>
+          <Button 
+            variant="ghost" 
+            className="rounded-full h-9" 
+            onClick={(e) => {
+              e.preventDefault();
+              navigatePreservingSearch('/grocery-list');
+            }}
+          >
+            <ShoppingCart className="w-4 h-4 mr-2" />
+            {isTranslated ? "Grocery List" : translateText("Lista de Compras")}
+          </Button>
           <Link to="/exchange-rate">
             <Button variant="ghost" className="rounded-full h-9">
               <span className="mr-2">$</span>
@@ -383,6 +390,17 @@ export const Navbar = () => {
       {/* Mobile Menu */}
       {isMenuOpen && (
         <div className="fixed inset-0 w-full h-full bg-background z-40 flex flex-col pt-20 pb-6 px-6 md:hidden">
+          {/* Add Close Button for Mobile Menu Overlay */}
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={toggleMenu}
+            className="absolute top-4 right-4 p-1 z-50 text-foreground" // Positioned top-right
+            aria-label="Close menu"
+          >
+            <X className="h-6 w-6" />
+          </Button>
+
           <div className="flex flex-col gap-4 mt-4">
             {/* Exchange rate in mobile menu */}
             <div className="flex items-center justify-between mb-4">
@@ -425,6 +443,33 @@ export const Navbar = () => {
                       </span>
                     </Link>
                   </div>
+                );
+              }
+              
+              // Update Grocery List Link in Mobile Menu
+              if (item.path === '/grocery-list') {
+                return (
+                  <Button
+                    key={item.path}
+                    variant="ghost" // Match styling, but use Button for onClick
+                    onClick={(e) => {
+                      e.preventDefault();
+                      toggleMenu(); // Close menu first
+                      navigatePreservingSearch('/grocery-list');
+                    }}
+                    className={cn(
+                      "flex items-center gap-3 text-xl px-6 py-3 rounded-full animate-fade-up w-full justify-center",
+                      isActive(item.path)
+                        ? "bg-secondary text-primary font-medium"
+                        : "text-muted-foreground hover:bg-secondary/80",
+                      `animate-delay-${index * 100}`
+                    )}
+                  >
+                    {item.icon}
+                    <span>
+                      {isTranslated ? item.labelEN : translateText(item.labelES)}
+                    </span>
+                  </Button>
                 );
               }
               
