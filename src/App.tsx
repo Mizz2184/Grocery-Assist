@@ -149,6 +149,8 @@ const ProtectedRouteComponent = ({ children }: { children: React.ReactNode }) =>
 // Payment protected route that checks if user has paid
 const PaymentProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
+  // Comment out payment verification state
+  /* 
   const [hasPaid, setHasPaid] = useState<boolean | null>(null);
   const [checking, setChecking] = useState(true);
 
@@ -167,14 +169,22 @@ const PaymentProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (loading || checking) {
     return <div>Loading...</div>;
   }
+  */
+
+  // Simplified loading check without payment verification
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
+  /* Comment out payment requirement
   if (!hasPaid) {
     return <Navigate to="/payment" replace />;
   }
+  */
 
   return <>{children}</>;
 };
@@ -206,91 +216,91 @@ function AppContent() {
       
       {/* Routes that require both auth and payment */}
       <Route path="/home" element={
-        <PaymentProtectedRoute>
+        <ProtectedRouteComponent>
           <div className="min-h-screen flex flex-col pt-20 w-full">
             <Navbar />
             <main className="flex-1 w-full">
               <Index />
             </main>
           </div>
-        </PaymentProtectedRoute>
+        </ProtectedRouteComponent>
       } />
       
       <Route path="/product/:id" element={
-        <PaymentProtectedRoute>
+        <ProtectedRouteComponent>
           <div className="min-h-screen flex flex-col pt-20 w-full">
             <Navbar />
             <main className="flex-1 w-full">
               <Product />
             </main>
           </div>
-        </PaymentProtectedRoute>
+        </ProtectedRouteComponent>
       } />
       
       <Route path="/grocery-list" element={
-        <PaymentProtectedRoute>
+        <ProtectedRouteComponent>
           <div className="min-h-screen flex flex-col pt-20 w-full">
             <Navbar />
             <main className="flex-1 w-full">
               <GroceryList />
             </main>
           </div>
-        </PaymentProtectedRoute>
+        </ProtectedRouteComponent>
       } />
       
       <Route path="/profile" element={
-        <PaymentProtectedRoute>
+        <ProtectedRouteComponent>
           <div className="min-h-screen flex flex-col pt-20 w-full">
             <Navbar />
             <main className="flex-1 w-full">
               <Profile />
             </main>
           </div>
-        </PaymentProtectedRoute>
+        </ProtectedRouteComponent>
       } />
       
       <Route path="/settings" element={
-        <PaymentProtectedRoute>
+        <ProtectedRouteComponent>
           <div className="min-h-screen flex flex-col pt-20 w-full">
             <Navbar />
             <main className="flex-1 w-full">
               <Settings />
             </main>
           </div>
-        </PaymentProtectedRoute>
+        </ProtectedRouteComponent>
       } />
       
       <Route path="/shared-list" element={
-        <PaymentProtectedRoute>
+        <ProtectedRouteComponent>
           <div className="min-h-screen flex flex-col pt-20 w-full">
             <Navbar />
             <main className="flex-1 w-full">
               <SharedList />
             </main>
           </div>
-        </PaymentProtectedRoute>
+        </ProtectedRouteComponent>
       } />
       
       <Route path="/shared-list/:listId" element={
-        <PaymentProtectedRoute>
+        <ProtectedRouteComponent>
           <div className="min-h-screen flex flex-col pt-20 w-full">
             <Navbar />
             <main className="flex-1 w-full">
               <SharedList />
             </main>
           </div>
-        </PaymentProtectedRoute>
+        </ProtectedRouteComponent>
       } />
       
       <Route path="/exchange-rate" element={
-        <PaymentProtectedRoute>
+        <ProtectedRouteComponent>
           <div className="min-h-screen flex flex-col pt-20 w-full">
             <Navbar />
             <main className="flex-1 w-full">
               <ExchangeRate />
             </main>
           </div>
-        </PaymentProtectedRoute>
+        </ProtectedRouteComponent>
       } />
       
       {/* Redirect all unknown routes to login */}

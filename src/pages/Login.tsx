@@ -44,12 +44,19 @@ const Login = () => {
   // Handle user authentication state
   useEffect(() => {
     if (user) {
+      // PAYMENT REQUIREMENT DISABLED - Always redirect to home
+      /*
       // Check if this is a new user that needs to complete payment
       const isNewUser = localStorage.getItem('is_new_user') === 'true';
       
       // Set redirect state instead of navigating directly
       setShouldRedirect(true);
       setRedirectPath(isNewUser ? '/payment' : redirectUrl);
+      */
+      
+      // Always redirect to home
+      setShouldRedirect(true);
+      setRedirectPath('/home');
     }
   }, [user, redirectUrl]);
 
@@ -60,6 +67,9 @@ const Login = () => {
     const checkUserStatus = async () => {
       if (!user || !isMounted) return;
 
+      // PAYMENT REQUIREMENT DISABLED - App is free for now
+      // Original implementation is commented out for future use
+      /*
       try {
         const hasPaid = await checkUserPaymentStatus(user.id);
         if (hasPaid && isMounted) {
@@ -70,6 +80,10 @@ const Login = () => {
       } catch (error) {
         console.error('Error checking payment status:', error);
       }
+      */
+      
+      // Always redirect to home page, bypassing payment verification
+      navigate('/home');
     };
 
     checkUserStatus();
@@ -165,14 +179,20 @@ const Login = () => {
       if (error) throw error;
 
       if (data.user) {
-        // Mark user as new in the database
+        // Mark user as new in the database but don't show payment screen
         await markUserAsNew(data.user.id);
-        setNewUserEmail(email);
-        setShowPaymentCard(true);
+        
+        // Don't set these states that trigger payment flow
+        // setNewUserEmail(email);
+        // setShowPaymentCard(true);
+        
         toast({
           title: "Account created",
-          description: "Please complete your payment to access the app.",
+          description: "Please check your email to verify your account. Once verified, you can sign in to access the app.",
         });
+        
+        // Switch back to login view after successful signup
+        setCurrentView("login");
       }
     } catch (error) {
       console.error("Error signing up:", error);
@@ -198,6 +218,12 @@ const Login = () => {
       });
 
       if (error) throw error;
+      
+      // Show success toast
+      toast({
+        title: "Google authentication initiated",
+        description: "Please complete the Google sign-in process in the popup window.",
+      });
     } catch (error) {
       console.error("Error signing in with Google:", error);
       toast({
@@ -213,91 +239,6 @@ const Login = () => {
   // Render redirect if user is authenticated
   if (shouldRedirect && user) {
     return <Navigate to={redirectPath} />;
-  }
-
-  if (showPaymentCard) {
-    return (
-      <div className="container relative h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-2 lg:px-0">
-        <div className="relative hidden h-full flex-col bg-muted p-10 text-white lg:flex dark:border-r">
-          <div className="absolute inset-0 bg-zinc-900" />
-          <div className="relative z-20 flex items-center text-lg font-medium">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="mr-2 h-6 w-6"
-            >
-              <path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3" />
-            </svg>
-            Shop-Assist
-          </div>
-          <div className="relative z-20 mt-auto">
-            <blockquote className="space-y-2">
-              <p className="text-lg">
-                &ldquo;This app has completely transformed how I manage my grocery shopping.&rdquo;
-              </p>
-              <footer className="text-sm">Sofia Davis</footer>
-            </blockquote>
-          </div>
-        </div>
-        <div className="lg:p-8">
-          <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
-            <div className="flex flex-col space-y-2 text-center">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                Complete Your Registration
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Please complete your payment to access the app.
-              </p>
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Payment Required</CardTitle>
-                <CardDescription>
-                  To access all features, please complete your payment.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex-1 space-y-1">
-                      <p className="text-sm font-medium leading-none">
-                        One-Time Payment
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        $19.99
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button
-                  className="w-full"
-                  onClick={() => window.open(PAYMENT_LINK, '_blank')}
-                >
-                  Complete Payment
-                </Button>
-              </CardFooter>
-            </Card>
-            <p className="px-8 text-center text-sm text-muted-foreground">
-              Already have an account?{" "}
-              <Link
-                to="/login"
-                className="underline underline-offset-4 hover:text-primary"
-                onClick={() => setShowPaymentCard(false)}
-              >
-                Sign in
-              </Link>
-            </p>
-          </div>
-        </div>
-      </div>
-    );
   }
 
   // Main render

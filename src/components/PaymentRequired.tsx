@@ -15,6 +15,10 @@ interface PaymentRequiredProps {
 }
 
 const PaymentRequired = ({ children }: PaymentRequiredProps) => {
+  // PAYMENT REQUIREMENT DISABLED - App is free for now
+  // Original implementation is commented out for future use when premium features are re-enabled
+  
+  /* Original payment verification code
   const { user, loading } = useAuth();
   const location = useLocation();
   const [hasPaid, setHasPaid] = useState<boolean | null>(null);
@@ -130,8 +134,9 @@ const PaymentRequired = ({ children }: PaymentRequiredProps) => {
       </div>
     );
   }
+  */
 
-  // If authenticated and paid or on a payment-related page, render the children
+  // Always render children, bypassing payment verification
   return <>{children}</>;
 };
 

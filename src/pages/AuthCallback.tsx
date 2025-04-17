@@ -12,6 +12,9 @@ const AuthCallback = () => {
     const handleCallback = async () => {
       if (!user) return;
 
+      // PAYMENT REQUIREMENT DISABLED - App is free for now
+      // Original implementation is commented out for future use
+      /*
       try {
         // Check if user has already paid
         const hasPaid = await checkUserPaymentStatus(user.id);
@@ -29,6 +32,10 @@ const AuthCallback = () => {
         // On error, redirect to payment to be safe
         navigate('/payment');
       }
+      */
+
+      // Always redirect to home page, bypassing payment verification
+      navigate('/home');
     };
 
     handleCallback();
