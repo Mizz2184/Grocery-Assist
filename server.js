@@ -686,6 +686,102 @@ app.get('/api/proxy/masxmenos/barcode/:ean', async (req, res) => {
   }
 });
 
+// Automercado API proxy endpoint (Algolia)
+app.post('/api/proxy/automercado/search', async (req, res) => {
+  try {
+    const { query, page = 1, pageSize = 30 } = req.body;
+    console.log('Received Automercado search request:', { query, page, pageSize });
+    
+    if (!query || typeof query !== 'string' || query.trim() === '') {
+      return res.status(400).json({ error: 'Query parameter is required' });
+    }
+    
+    // Algolia API configuration for Automercado
+    const algoliaUrl = 'https://fu5xfx7knl-dsn.algolia.net/1/indexes/*/queries';
+    const algoliaAppId = 'FU5XFX7KNL';
+    const algoliaApiKey = '113941a18a90ae0f17d602acd16f91b2';
+    
+    // Build the Algolia request
+    const requestBody = {
+      requests: [{
+        indexName: 'Product_CatalogueV2',
+        page: page - 1, // Algolia uses 0-based pages
+        hitsPerPage: pageSize,
+        query: query,
+        getRankingInfo: true,
+        userToken: '0d9487b4-fd6d-4dc6-bde0-b34aa2e04b42',
+        enablePersonalization: true,
+        facetFilters: [
+          [
+            'categoryPageId:abarrotes',
+            'categoryPageId:bebes-y-ninos',
+            'categoryPageId:bebidas-y-licores',
+            'categoryPageId:carnes-y-pescado',
+            'categoryPageId:coleccionables',
+            'categoryPageId:comidas-preparadas',
+            'categoryPageId:congelados-y-refrigerados',
+            'categoryPageId:cuidado-personal-y-belleza',
+            'categoryPageId:frutas-y-verduras',
+            'categoryPageId:lacteos-y-embutidos',
+            'categoryPageId:limpieza-y-articulos-desechables',
+            'categoryPageId:mascotas',
+            'categoryPageId:panaderia-reposteria-y-tortillas',
+            'categoryPageId:snack-y-golosina',
+            'categoryPageId:tienda-y-hogar'
+          ],
+          ['storeDetail.06.hasInvontory:1']
+        ],
+        facets: [
+          'storeDetail.06.amount',
+          'storeDetail.06.hasInvontory',
+          'storeDetail.06.basePrice'
+        ]
+      }]
+    };
+    
+    console.log('Calling Automercado Algolia API with query:', query);
+    
+    // Call the Algolia API
+    const apiResponse = await axios.post(algoliaUrl, requestBody, {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-Algolia-Application-Id': algoliaAppId,
+        'X-Algolia-API-Key': algoliaApiKey,
+        'X-Algolia-Agent': 'Algolia for JavaScript (4.24.0); Browser (lite)'
+      },
+      timeout: 15000
+    });
+
+    console.log('Automercado API response status:', apiResponse.status);
+    console.log(`Found ${apiResponse.data?.results?.[0]?.hits?.length || 0} Automercado products`);
+    
+    // Extract hits from Algolia response
+    const hits = apiResponse.data?.results?.[0]?.hits || [];
+    
+    // Return the hits
+    return res.json({
+      hits: hits,
+      total: apiResponse.data?.results?.[0]?.nbHits || 0,
+      page: page,
+      pageSize: pageSize
+    });
+  } catch (error) {
+    console.error('Automercado search API error:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status
+    });
+    
+    res.status(error.response?.status || 500).json({ 
+      error: 'Failed to fetch Automercado products',
+      details: error.message,
+      status: error.response?.status || 500,
+      serverMessage: error.response?.data?.message || 'Unknown error'
+    });
+  }
+});
+
 // Walmart API proxy endpoint
 app.post('/api/proxy/walmart/search', async (req, res) => {
   try {

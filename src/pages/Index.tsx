@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ShoppingCart, Search as SearchIcon, Scan, Filter, ArrowLeft, Minus, Plus, Store } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { searchMaxiPaliProducts, searchMasxMenosProducts, searchWalmartProducts } from "@/lib/services";
+import { searchMaxiPaliProducts, searchMasxMenosProducts, searchWalmartProducts, searchAutomercadoProducts } from "@/lib/services";
 import { 
   getOrCreateDefaultList, 
   addProductToGroceryList,
@@ -342,7 +342,7 @@ const Index = () => {
   } = useSearch();
   const [productsInList, setProductsInList] = useState<Set<string>>(new Set());
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [storeFilter, setStoreFilter] = useState<'all' | 'MaxiPali' | 'MasxMenos' | 'Walmart'>('all');
+  const [storeFilter, setStoreFilter] = useState<'all' | 'MaxiPali' | 'MasxMenos' | 'Walmart' | 'Automercado'>('all');
   const [showBanner, setShowBanner] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -368,6 +368,10 @@ const Index = () => {
     {
       name: "MasxMenos",
       logo: "https://supermxmcr.vtexassets.com/assets/vtex.file-manager-graphql/images/3ded2a1c-d612-4f03-8a2b-45ed6cbc7ca4___cfba4950414c4e5734e110da25e4900b.svg"
+    },
+    {
+      name: "Automercado",
+      logo: "https://automercado.cr/content/images/logoAM.svg"
     }
   ];
 
@@ -529,10 +533,11 @@ const Index = () => {
 
     try {
       console.log('Starting parallel store searches...');
-      const [maxiPaliResults, masxMenosResults, walmartResults] = await Promise.all([
+      const [maxiPaliResults, masxMenosResults, walmartResults, automercadoResults] = await Promise.all([
         searchMaxiPaliProducts({ query: searchQuery }),
         searchMasxMenosProducts({ query: searchQuery }),
-        searchWalmartProducts({ query: searchQuery })
+        searchWalmartProducts({ query: searchQuery }),
+        searchAutomercadoProducts({ query: searchQuery })
       ]);
       console.log('All store API searches completed');
 
@@ -540,6 +545,7 @@ const Index = () => {
       console.log('MaxiPali response structure:', JSON.stringify(maxiPaliResults).substring(0, 200) + '...');
       console.log('MasxMenos response structure:', JSON.stringify(masxMenosResults).substring(0, 200) + '...');
       console.log('Walmart response structure:', JSON.stringify(walmartResults).substring(0, 200) + '...');
+      console.log('Automercado response structure:', JSON.stringify(automercadoResults).substring(0, 200) + '...');
 
       let combinedResults: ProductType[] = [];
       let totalProductCount = 0;
@@ -590,6 +596,19 @@ const Index = () => {
         console.log('Walmart results structure:', walmartResults);
       }
       
+      if (automercadoResults && automercadoResults.products && automercadoResults.products.length > 0) {
+        console.log(`Adding ${automercadoResults.products.length} Automercado products`);
+        const automercadoWithStore = automercadoResults.products.map(p => ({
+          ...p,
+          store: 'Automercado' as const
+        }));
+        combinedResults = [...combinedResults, ...automercadoWithStore];
+        totalProductCount += automercadoResults.products.length;
+        console.log(`Found ${automercadoResults.products.length} Automercado products`);
+      } else {
+        console.log('No Automercado products found');
+      }
+      
       if (combinedResults.length === 0) {
         console.log('No products found across any store');
         toast({
@@ -598,7 +617,7 @@ const Index = () => {
           variant: "destructive"
         });
       } else {
-        console.log(`Found ${combinedResults.length} total products, by store count: MaxiPali=${maxiPaliResults.products?.length || 0}, MasxMenos=${masxMenosResults.products?.length || 0}, Walmart=${walmartResults.products?.length || 0}`);
+        console.log(`Found ${combinedResults.length} total products, by store count: MaxiPali=${maxiPaliResults.products?.length || 0}, MasxMenos=${masxMenosResults.products?.length || 0}, Walmart=${walmartResults.products?.length || 0}, Automercado=${automercadoResults.products?.length || 0}`);
         
         combinedResults = combinedResults.filter(product => {
           if (!product.id || !product.name || typeof product.price !== 'number') {
@@ -803,7 +822,8 @@ const Index = () => {
       console.log('Store counts in filteredResults:', {
         'Walmart': filteredResults.filter(p => p.store === 'Walmart').length,
         'MaxiPali': filteredResults.filter(p => p.store === 'MaxiPali').length,
-        'MasxMenos': filteredResults.filter(p => p.store === 'MasxMenos').length
+        'MasxMenos': filteredResults.filter(p => p.store === 'MasxMenos').length,
+        'Automercado': filteredResults.filter(p => p.store === 'Automercado').length
       });
     }
   }, [filteredResults, storeFilter]);
@@ -811,7 +831,7 @@ const Index = () => {
   const handleStoreFilterChange = (value: string) => {
     console.log(`Changing store filter from ${storeFilter} to ${value}`);
     
-    setStoreFilter(value as 'all' | 'MaxiPali' | 'MasxMenos' | 'Walmart');
+    setStoreFilter(value as 'all' | 'MaxiPali' | 'MasxMenos' | 'Walmart' | 'Automercado');
     
     if (value !== 'all' && searchResults.length > 0) {
       const expectedCount = searchResults.filter(p => 
@@ -877,7 +897,7 @@ const Index = () => {
           <TranslatedText es="Comparar Precios, Ahorrar Dinero" en="Compare Prices, Save Money" />
         </h1>
         <p className="text-muted-foreground text-lg">
-          <TranslatedText es="Encuentra las mejores ofertas de supermercados en MaxiPali, MasxMenos y Walmart" en="Find the best grocery deals at MaxiPali, MasxMenos, and Walmart" />
+          <TranslatedText es="Encuentra las mejores ofertas de supermercados en MaxiPali, MasxMenos, Walmart y Automercado" en="Find the best grocery deals at MaxiPali, MasxMenos, Walmart, and Automercado" />
         </p>
       </div>
 
@@ -963,6 +983,14 @@ const Index = () => {
                         <span>Walmart</span>
                         <span className="text-xs text-muted-foreground">
                           ({searchResults.filter(p => p.store === 'Walmart').length})
+                        </span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="Automercado">
+                      <div className="flex items-center justify-between w-full">
+                        <span>Automercado</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({searchResults.filter(p => p.store === 'Automercado').length})
                         </span>
                       </div>
                     </SelectItem>

@@ -307,6 +307,101 @@ export const searchWalmartProducts = async ({ query, page = 1, pageSize = 30 }: 
   }
 };
 
+export const searchAutomercadoProducts = async ({ query, page = 1, pageSize = 30 }: ProductSearchParams): Promise<ProductSearchResponse> => {
+  try {
+    console.log(`Searching Automercado products with query "${query}"`);
+    
+    if (!query || query.trim() === '') {
+      console.log('Empty query provided to searchAutomercadoProducts, returning empty results');
+      return {
+        products: [],
+        total: 0,
+        page,
+        pageSize,
+        hasMore: false
+      };
+    }
+    
+    console.log(`Sending request to Automercado API endpoint with query: "${query}"`);
+    const response = await axios.post<any>('/api/proxy/automercado/search', {
+      query,
+      page,
+      pageSize
+    });
+
+    console.log('Automercado API response:', {
+      status: response.status,
+      hasData: !!response.data,
+      hasHits: !!(response.data && response.data.hits),
+      hitCount: response.data?.hits?.length || 0
+    });
+
+    if (response.status !== 200) {
+      console.error('Automercado API returned non-200 status:', response.status);
+    }
+
+    // Ensure we have valid product data
+    if (!response.data?.hits || !Array.isArray(response.data.hits)) {
+      console.error('Invalid response from Automercado API:', response.data);
+      return {
+        products: [],
+        total: 0,
+        page,
+        pageSize,
+        hasMore: false
+      };
+    }
+
+    // Transform Algolia hits to Product format
+    const validProducts = response.data.hits.map((hit: any): Product => {
+      const storeDetail = hit.storeDetail?.['06'] || {};
+      const price = parseFloat(storeDetail.basePrice) || 0;
+      
+      return {
+        id: hit.objectID || hit.productNumber || `automercado-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        name: hit.ecomDescription || hit.productName || 'Unknown Automercado Product',
+        price: price,
+        store: 'Automercado',
+        currency: 'CRC',
+        imageUrl: hit.imageUrl || '',
+        description: hit.ecomDescription || '',
+        brand: hit.supplier || hit.brand || ''
+      };
+    }).filter((p: Product) => p.price > 0);
+
+    console.log(`Processed ${validProducts.length} valid Automercado products`);
+    
+    if (validProducts.length > 0) {
+      console.log('First Automercado product being returned:', JSON.stringify(validProducts[0]));
+    } else {
+      console.warn('No Automercado products to return after filtering');
+    }
+
+    return {
+      products: validProducts,
+      total: validProducts.length,
+      page,
+      pageSize,
+      hasMore: validProducts.length >= pageSize
+    };
+  } catch (error) {
+    console.error('Error searching Automercado products:', error);
+    console.error('Error details:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+      stack: error.stack
+    });
+    return {
+      products: [],
+      total: 0,
+      page,
+      pageSize,
+      hasMore: false
+    };
+  }
+};
+
 export const compareProductPrices = async (
   productName: string,
   barcode?: string,
