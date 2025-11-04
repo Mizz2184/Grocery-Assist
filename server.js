@@ -17,6 +17,9 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
   try {
     const { query, page = 1, pageSize = 49 } = req.body;
     console.log('Received search request (proxy endpoint):', { query, page, pageSize });
+    if (!query || typeof query !== 'string' || query.trim() === '') {
+      return res.status(400).json({ error: 'Query parameter is required' });
+    }
     
     // Simplify search query - take first word if multi-word query
     // MaxiPali API frequently fails with complex queries
@@ -511,6 +514,9 @@ app.post('/api/proxy/masxmenos/search', async (req, res) => {
   try {
     const { query, variables, page = 1, pageSize = 49 } = req.body;
     console.log('Received MasxMenos search request:', { query, page, pageSize });
+    if (!query || typeof query !== 'string' || query.trim() === '') {
+      return res.status(400).json({ error: 'Query parameter is required' });
+    }
     
     // Build the GraphQL URL with variables
     const url = 'https://www.masxmenos.cr/_v/segment/graphql/v1';
@@ -581,6 +587,23 @@ app.post('/api/proxy/masxmenos/search', async (req, res) => {
       },
       timeout: 15000 // Increased timeout to 15 seconds for larger result sets
     });
+
+    // Log the raw response for debugging
+    console.log('MasxMenos API response status:', apiResponse.status);
+    console.log('MasxMenos API response data structure:', JSON.stringify(apiResponse.data).substring(0, 200));
+    
+    // Check if we have valid data structure
+    if (!apiResponse.data || !apiResponse.data.data || !apiResponse.data.data.productSearch) {
+      console.error('Invalid MasxMenos API response structure:', apiResponse.data);
+      return res.json({
+        data: {
+          productSearch: {
+            products: [],
+            recordsFiltered: 0
+          }
+        }
+      });
+    }
 
     // Add translation information to the response
     const products = apiResponse.data?.data?.productSearch?.products || [];

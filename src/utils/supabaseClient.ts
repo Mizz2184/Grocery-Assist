@@ -3,8 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 // import { Database } from './database.types'
 
 // Hardcode the values temporarily for testing
-const supabaseUrl = 'https://zukicxckcsmtciqgkhrk.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1a2ljeGNrY3NtdGNpcWdraHJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzOTgyMjUsImV4cCI6MjA1Nzk3NDIyNX0.cnRY1wslujO0USUVkclt9Iel3Ceiq7zTRwKaLvBoizY';
+const supabaseUrl = 'https://rcmuzstcirbulftnbcth.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjbXV6c3RjaXJidWxmdG5iY3RoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA4ODMxMTUsImV4cCI6MjA1NjQ1OTExNX0.0pg6_Qfawu96RnUft9kEQdqPrLvJk5OQ414jKNF0_Kc';
 
 // Log the values being used
 console.log('DIAGNOSTIC: Using Supabase URL:', supabaseUrl);
@@ -72,7 +72,7 @@ export const sendCollaboratorInvite = async (
         }
       });
 
-      const response = await fetch('https://zukicxckcsmtciqgkhrk.supabase.co/functions/v1/email-function', {
+      const response = await fetch('https://rcmuzstcirbulftnbcth.supabase.co/functions/v1/email-function', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
