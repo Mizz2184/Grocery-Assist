@@ -518,116 +518,65 @@ app.post('/api/proxy/masxmenos/search', async (req, res) => {
       return res.status(400).json({ error: 'Query parameter is required' });
     }
     
-    // Build the GraphQL URL with variables
-    const url = 'https://www.masxmenos.cr/_v/segment/graphql/v1';
-    const params = new URLSearchParams({
-      workspace: 'master',
-      maxAge: 'short',
-      appsEtag: 'remove',
-      domain: 'store',
-      locale: 'es-CR',
-      __bindingId: 'f682d719-102f-4a96-b340-dfdf524c216c',
-      operationName: 'productSearchV3',
-      variables: '{}',
-    });
-    
-    // Add the GraphQL extensions with the search query
+    // Use VTEX catalog API (simpler and more reliable than GraphQL)
     const from = (page - 1) * pageSize;
-    const to = from + pageSize;
+    const to = from + pageSize - 1;
     
     const searchQuery = query || '';
     
-    const extensions = {
-      persistedQuery: {
-        version: 1,
-        sha256Hash: '9177ba6f883473505dc99fcf2b679a6e270af6320a157f0798b92efeab98d5d3',
-        sender: 'vtex.store-resources@0.x',
-        provider: 'vtex.search-graphql@0.x'
+    console.log('Calling MasxMenos catalog API with query:', searchQuery);
+    
+    // Call the MasxMenos catalog API
+    const apiResponse = await axios.get('https://www.masxmenos.cr/api/catalog_system/pub/products/search', {
+      params: {
+        ft: searchQuery,
+        _from: from,
+        _to: to
       },
-      variables: btoa(JSON.stringify({
-        hideUnavailableItems: false,
-        skusFilter: 'ALL',
-        simulationBehavior: 'default',
-        installmentCriteria: 'MAX_WITHOUT_INTEREST',
-        productOriginVtex: true,
-        map: 'ft',
-        query: searchQuery,
-        orderBy: 'OrderByScoreDESC',
-        from: from,
-        to: to,
-        selectedFacets: [],
-        operator: 'or',
-        fuzzy: '0.7',
-        searchState: null,
-        facetsBehavior: 'Static',
-        categoryTreeBehavior: 'default',
-        withFacets: true,
-        fullText: searchQuery,
-        priceRange: null,
-        advertisementOptions: {
-          showSponsored: false,
-          sponsoredCount: 0,
-          advertisementPlacement: 'top_search',
-          repeatSponsoredProducts: false
-        }
-      }))
-    };
-    
-    params.append('extensions', JSON.stringify(extensions));
-    
-    const fullUrl = `${url}?${params.toString()}`;
-    
-    // Call the MasxMenos API
-    const apiResponse = await axios.get(fullUrl, {
-        headers: {
-          'Accept': 'application/json',
+      headers: {
+        'Accept': 'application/json',
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-          'Origin': 'https://www.masxmenos.cr',
-          'Referer': 'https://www.masxmenos.cr/',
+        'Origin': 'https://www.masxmenos.cr',
+        'Referer': 'https://www.masxmenos.cr/',
       },
-      timeout: 15000 // Increased timeout to 15 seconds for larger result sets
+      timeout: 15000
     });
 
     // Log the raw response for debugging
     console.log('MasxMenos API response status:', apiResponse.status);
-    console.log('MasxMenos API response data structure:', JSON.stringify(apiResponse.data).substring(0, 200));
+    console.log(`Found ${apiResponse.data?.length || 0} MasxMenos products`);
     
-    // Check if we have valid data structure
-    if (!apiResponse.data || !apiResponse.data.data || !apiResponse.data.data.productSearch) {
-      console.error('Invalid MasxMenos API response structure:', apiResponse.data);
-      return res.json({
-        data: {
-          productSearch: {
-            products: [],
-            recordsFiltered: 0
-          }
-        }
-      });
-    }
-
-    // Add translation information to the response
-    const products = apiResponse.data?.data?.productSearch?.products || [];
-    const translatedProducts = products.map(product => {
-      const item = product.items && product.items.length > 0 ? product.items[0] : null;
-      const productName = product.productName || '';
-      const brand = product.brand || '';
-      const description = product.description || '';
-      
-      // Add translation information
-      product.translationInfo = {
-        originalName: productName,
-        originalBrand: brand,
-        originalDescription: description,
+    // Transform catalog API response to match GraphQL format expected by frontend
+    const products = (apiResponse.data || []).map(product => ({
+      cacheId: product.productId,
+      productId: product.productId,
+      productName: product.productName,
+      brand: product.brand || '',
+      brandId: product.brandId,
+      linkText: product.linkText,
+      productReference: product.productReference,
+      categoryId: product.categoryId,
+      link: product.link,
+      description: product.description || '',
+      categories: product.categories || [],
+      items: product.items || [],
+      translationInfo: {
+        originalName: product.productName || '',
+        originalBrand: product.brand || '',
+        originalDescription: product.description || '',
         isTranslated: false
-      };
-      
-      return product;
+      }
+    }));
+    
+    // Return in GraphQL-like format for compatibility with frontend
+    return res.json({
+      data: {
+        productSearch: {
+          products: products,
+          recordsFiltered: products.length
+        }
+      }
     });
-    
-    apiResponse.data.data.productSearch.products = translatedProducts;
-    
-    // Return the modified API response data
-    return res.json(apiResponse.data);
   } catch (error) {
     console.error('MasxMenos search API error:', {
       message: error.message,
@@ -657,66 +606,27 @@ app.get('/api/proxy/masxmenos/barcode/:ean', async (req, res) => {
       });
     }
 
-    // Build the GraphQL URL with variables to search by EAN
-    const url = 'https://www.masxmenos.cr/_v/segment/graphql/v1';
-    const params = new URLSearchParams({
-      workspace: 'master',
-      maxAge: 'short',
-      appsEtag: 'remove',
-      domain: 'store',
-      locale: 'es-CR',
-      __bindingId: 'f682d719-102f-4a96-b340-dfdf524c216c',
-      operationName: 'productSearchV3',
-      variables: '{}',
-    });
+    // Use VTEX catalog API to search by EAN
+    console.log('Searching MasxMenos by EAN:', ean);
     
-    // Add the GraphQL extensions with the EAN search
-    const extensions = {
-      persistedQuery: {
-        version: 1,
-        sha256Hash: '9177ba6f883473505dc99fcf2b679a6e270af6320a157f0798b92efeab98d5d3',
-        sender: 'vtex.store-resources@0.x',
-        provider: 'vtex.search-graphql@0.x'
+    const apiResponse = await axios.get('https://www.masxmenos.cr/api/catalog_system/pub/products/search', {
+      params: {
+        ft: ean,
+        _from: 0,
+        _to: 10
       },
-      variables: btoa(JSON.stringify({
-        hideUnavailableItems: false,
-        skusFilter: 'ALL',
-        simulationBehavior: 'default',
-        installmentCriteria: 'MAX_WITHOUT_INTEREST',
-        productOriginVtex: true,
-        map: 'ft',
-        query: ean,
-        orderBy: 'OrderByScoreDESC',
-        from: 0,
-        to: 10,
-        selectedFacets: [],
-        operator: 'and',
-        fuzzy: '0',
-        searchState: null,
-        facetsBehavior: 'Static',
-        categoryTreeBehavior: 'default',
-        withFacets: false
-      }))
-    };
-    
-    params.append('extensions', JSON.stringify(extensions));
-    
-    const fullUrl = `${url}?${params.toString()}`;
-    
-    // Call the MasxMenos API
-    const apiResponse = await axios.get(fullUrl, {
-        headers: {
-          'Accept': 'application/json',
+      headers: {
+        'Accept': 'application/json',
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
         'Origin': 'https://www.masxmenos.cr',
         'Referer': 'https://www.masxmenos.cr/',
       },
-      timeout: 10000 // 10 second timeout
+      timeout: 10000
     });
 
     // Check if we got any products
-    if (apiResponse.data?.data?.productSearch?.products?.length > 0) {
-      const product = apiResponse.data.data.productSearch.products[0];
+    if (apiResponse.data && apiResponse.data.length > 0) {
+      const product = apiResponse.data[0];
       const item = product.items && product.items.length > 0 ? product.items[0] : null;
       
       // If no item found, return error
