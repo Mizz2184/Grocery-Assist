@@ -51,11 +51,12 @@ interface Price {
   date: string;
 }
 
-// Added Walmart to the possible matches
+// Added Walmart and Automercado to the possible matches
 interface MatchedProducts {
   maxiPali?: ProductType | null; 
   masxMenos?: ProductType | null;
   walmart?: ProductType | null;
+  automercado?: ProductType | null;
 }
 
 // Function to calculate similarity between product names
