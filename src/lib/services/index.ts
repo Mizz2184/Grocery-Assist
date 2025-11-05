@@ -57,7 +57,7 @@ export const searchMasxMenosProducts = async ({
   pageSize = 49
 }: ProductSearchParams): Promise<ProductSearchResponse> => {
   try {
-    console.log('Searching MasxMenos for:', query);
+    console.log('[FIXED v2] Searching MasxMenos for:', query);
     
     // If no query is provided, return empty results
     if (!query || query.trim() === '') {
