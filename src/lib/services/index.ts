@@ -143,6 +143,20 @@ export const searchMasxMenosProducts = async ({
         const seller = item?.sellers && item.sellers.length > 0 ? item.sellers[0] : null;
         const price = seller?.commertialOffer?.Price || 0;
         
+        // Debug logging for first product
+        if (product.productId === (data.data?.productSearch?.products || [])[0]?.productId) {
+          console.log('MasxMenos first product debug:', {
+            productName: product.productName,
+            hasItems: !!product.items,
+            itemsLength: product.items?.length,
+            hasSellers: !!item?.sellers,
+            sellersLength: item?.sellers?.length,
+            hasCommertialOffer: !!seller?.commertialOffer,
+            price: price,
+            rawPrice: seller?.commertialOffer?.Price
+          });
+        }
+        
         // Get the first image URL
         const imageUrl = item?.images && item.images.length > 0 
           ? item.images[0].imageUrl 
