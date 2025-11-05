@@ -46,7 +46,7 @@ import { useGroceryList } from "@/hooks/useGroceryList";
 import { Card, CardFooter, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Image } from "@/components/ui/image";
 import { formatPrice } from "@/lib/utils/currency";
-import { useSearchNavigation } from "@/hooks/useSearchNavigation";
+// import { useSearchNavigation } from "@/hooks/useSearchNavigation"; // Disabled - product page navigation removed
 
 interface ProductGridProps {
   products: ProductType[];
@@ -129,7 +129,7 @@ const ProductCardComponent = ({ product, onAddToList, isInList }: ProductCardPro
   const { user } = useAuth();
   const [isAdding, setIsAdding] = useState(false);
   const { translateTitle, translateText, translateUI } = useTranslation();
-  const { navigatePreservingSearch } = useSearchNavigation();
+  // const { navigatePreservingSearch } = useSearchNavigation(); // Disabled - product navigation removed
   const [showQuantityInput, setShowQuantityInput] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
@@ -145,16 +145,16 @@ const ProductCardComponent = ({ product, onAddToList, isInList }: ProductCardPro
     }
   };
   
-  const handleCardNavigation = () => {
-    const navigationId = `${product.store || 'unknown'}|${product.id}`;
-    navigatePreservingSearch(`/product/${navigationId}`);
-  };
+  // Product page navigation disabled - users can only add to cart
+  // const handleCardNavigation = () => {
+  //   const navigationId = `${product.store || 'unknown'}|${product.id}`;
+  //   navigatePreservingSearch(`/product/${navigationId}`);
+  // };
 
   return (
     <Card className="h-full flex flex-col overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 relative group">
       <CardContent 
-        className="p-3 flex-grow cursor-pointer" 
-        onClick={handleCardNavigation}
+        className="p-3 flex-grow" 
       >
         <div className="aspect-square w-full overflow-hidden rounded-md mb-3 relative bg-muted">
           <img 
@@ -354,7 +354,7 @@ const Index = () => {
   const searchBarRef = useRef<HTMLDivElement>(null);
   const { activeList, setActiveList } = useGroceryList();
   const [addingToList, setAddingToList] = useState(false);
-  const { navigatePreservingSearch } = useSearchNavigation();
+  // const { navigatePreservingSearch } = useSearchNavigation(); // Disabled - product navigation removed
 
   const featuredStores = [
     {
@@ -914,7 +914,7 @@ const Index = () => {
             />
           </div>
           <Button 
-            onClick={() => navigatePreservingSearch('/grocery-list')}
+            onClick={() => navigate('/grocery-list')}
             variant="outline"
             className="rounded-full h-12 w-12 flex items-center justify-center text-muted-foreground hover:text-primary"
             aria-label={translateUI("Ver lista de compras")}
