@@ -354,8 +354,23 @@ export const searchAutomercadoProducts = async ({ query, page = 1, pageSize = 30
 
     // Transform Algolia hits to Product format
     const validProducts = response.data.hits.map((hit: any): Product => {
-      const storeDetail = hit.storeDetail?.['06'] || {};
-      const price = parseFloat(storeDetail.basePrice) || 0;
+      // Try to get price from any available store, prioritizing store 06
+      let price = 0;
+      const storeDetail = hit.storeDetail || {};
+      
+      // First try store 06 (main store)
+      if (storeDetail['06']?.basePrice) {
+        price = parseFloat(storeDetail['06'].basePrice);
+      } else {
+        // If store 06 doesn't have it, try any other store
+        const storeKeys = Object.keys(storeDetail);
+        for (const storeKey of storeKeys) {
+          if (storeDetail[storeKey]?.basePrice) {
+            price = parseFloat(storeDetail[storeKey].basePrice);
+            break;
+          }
+        }
+      }
       
       return {
         id: hit.objectID || hit.productNumber || `automercado-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,

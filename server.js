@@ -701,41 +701,17 @@ app.post('/api/proxy/automercado/search', async (req, res) => {
     const algoliaAppId = 'FU5XFX7KNL';
     const algoliaApiKey = '113941a18a90ae0f17d602acd16f91b2';
     
-    // Build the Algolia request
+    // Build the Algolia request - NO FILTERS for maximum real-time results
+    // Algolia's search algorithm is smart enough to find relevant products
     const requestBody = {
       requests: [{
         indexName: 'Product_CatalogueV2',
         page: page - 1, // Algolia uses 0-based pages
         hitsPerPage: pageSize,
         query: query,
-        getRankingInfo: true,
-        userToken: '0d9487b4-fd6d-4dc6-bde0-b34aa2e04b42',
-        enablePersonalization: true,
-        facetFilters: [
-          [
-            'categoryPageId:abarrotes',
-            'categoryPageId:bebes-y-ninos',
-            'categoryPageId:bebidas-y-licores',
-            'categoryPageId:carnes-y-pescado',
-            'categoryPageId:coleccionables',
-            'categoryPageId:comidas-preparadas',
-            'categoryPageId:congelados-y-refrigerados',
-            'categoryPageId:cuidado-personal-y-belleza',
-            'categoryPageId:frutas-y-verduras',
-            'categoryPageId:lacteos-y-embutidos',
-            'categoryPageId:limpieza-y-articulos-desechables',
-            'categoryPageId:mascotas',
-            'categoryPageId:panaderia-reposteria-y-tortillas',
-            'categoryPageId:snack-y-golosina',
-            'categoryPageId:tienda-y-hogar'
-          ],
-          ['storeDetail.06.hasInvontory:1']
-        ],
-        facets: [
-          'storeDetail.06.amount',
-          'storeDetail.06.hasInvontory',
-          'storeDetail.06.basePrice'
-        ]
+        getRankingInfo: true
+        // NO facetFilters - let Algolia return all matching products
+        // This ensures we get real-time data for ANY product search
       }]
     };
     
