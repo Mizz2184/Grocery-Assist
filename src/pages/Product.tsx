@@ -702,6 +702,7 @@ const Product = () => {
         console.log("MaxiPali products from API:", result.maxiPaliProducts);
         console.log("MasxMenos products from API:", result.masxMenosProducts);
         console.log("Walmart products from API:", result.walmartProducts);
+        console.log("Automercado products from API:", result.automercadoProducts);
         
         // Filter out products with zero price and ensure correct store assignment
         const validMaxiPaliProducts = result.maxiPaliProducts
@@ -716,9 +717,14 @@ const Product = () => {
           .filter(p => p.price > 0)
           .map(p => ({ ...p, store: 'Walmart' }));  // Ensure consistent capitalization
         
+        const validAutomercadoProducts = result.automercadoProducts
+          .filter(p => p.price > 0)
+          .map(p => ({ ...p, store: 'Automercado' }));  // Ensure consistent capitalization
+        
         console.log(`Valid MaxiPali products count: ${validMaxiPaliProducts.length}`);
         console.log(`Valid MasxMenos products count: ${validMasxMenosProducts.length}`);
         console.log(`Valid Walmart products count: ${validWalmartProducts.length}`);
+        console.log(`Valid Automercado products count: ${validAutomercadoProducts.length}`);
         
         // Log the first product from each store if available
         if (validMaxiPaliProducts.length > 0) {
@@ -749,6 +755,16 @@ const Product = () => {
           });
         } else {
           console.log("No valid Walmart products found");
+        }
+        
+        if (validAutomercadoProducts.length > 0) {
+          console.log("First Automercado product:", {
+            name: validAutomercadoProducts[0].name,
+            price: validAutomercadoProducts[0].price,
+            store: validAutomercadoProducts[0].store
+          });
+        } else {
+          console.log("No valid Automercado products found");
         }
 
         // Main function to find best matches across all store products
@@ -861,10 +877,24 @@ const Product = () => {
           }
         };
         
-        // Find the best matches
-        const bestMatches = await findBestMatches(validMaxiPaliProducts.length > 0 ? validMaxiPaliProducts[0] : 
-                         validMasxMenosProducts.length > 0 ? validMasxMenosProducts[0] : 
-                         validWalmartProducts[0]);
+        // Find the best matches - try to get a product from any store
+        const firstAvailableProduct = validMaxiPaliProducts.length > 0 ? validMaxiPaliProducts[0] : 
+                                      validMasxMenosProducts.length > 0 ? validMasxMenosProducts[0] : 
+                                      validWalmartProducts.length > 0 ? validWalmartProducts[0] :
+                                      validAutomercadoProducts.length > 0 ? validAutomercadoProducts[0] : null;
+        
+        if (!firstAvailableProduct) {
+          console.error('No products found in any store!');
+          toast({
+            title: "No products found",
+            description: "Could not find this product in any store.",
+            variant: "destructive"
+          });
+          setLoading(false);
+          return;
+        }
+        
+        const bestMatches = await findBestMatches(firstAvailableProduct);
         
         // Get the best matching products from each store with prefixed IDs to help React distinguish them
         let bestMaxiPaliMatch = bestMatches.maxipali;
