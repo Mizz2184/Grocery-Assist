@@ -72,7 +72,12 @@ export const searchMasxMenosProducts = async ({
     
     // Get all possible translations for the search query
     const searchTerms = getSearchTranslations(query);
-    console.log('Search terms with translations:', searchTerms);
+    console.log('MasxMenos search terms with translations:', searchTerms);
+    
+    // Ensure we have at least the original query
+    if (searchTerms.length === 0) {
+      searchTerms.push(query);
+    }
     
     // Initialize page parameters
     const from = (page - 1) * pageSize;
@@ -103,17 +108,22 @@ export const searchMasxMenosProducts = async ({
     const encodedVariables = encodeURIComponent(JSON.stringify(variables));
     
     // Use server-side proxy to avoid CORS issues
+    const requestBody = {
+      query: searchTerms.join(' '), // Join all terms with spaces for broader search
+      variables: encodedVariables,
+      page,
+      pageSize
+    };
+    
+    console.log('MasxMenos request body:', requestBody);
+    console.log('MasxMenos query string:', requestBody.query);
+    
     const searchResponse = await fetch('/api/proxy/masxmenos/search', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        query: searchTerms.join(' '), // Join all terms with spaces for broader search
-        variables: encodedVariables,
-        page,
-        pageSize
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!searchResponse.ok) {

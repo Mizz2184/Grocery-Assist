@@ -513,9 +513,27 @@ app.get('/api/maxipali/search', async (req, res) => {
 app.post('/api/proxy/masxmenos/search', async (req, res) => {
   try {
     const { query, variables, page = 1, pageSize = 49 } = req.body;
-    console.log('Received MasxMenos search request:', { query, page, pageSize });
+    console.log('Received MasxMenos search request:', { 
+      query, 
+      queryType: typeof query,
+      queryLength: query?.length,
+      queryTrimmed: query?.trim(),
+      page, 
+      pageSize,
+      fullBody: req.body 
+    });
+    
     if (!query || typeof query !== 'string' || query.trim() === '') {
-      return res.status(400).json({ error: 'Query parameter is required' });
+      console.error('MasxMenos search validation failed:', {
+        hasQuery: !!query,
+        queryType: typeof query,
+        queryValue: query,
+        queryTrimmed: query?.trim()
+      });
+      return res.status(400).json({ 
+        error: 'Query parameter is required',
+        received: { query, type: typeof query }
+      });
     }
     
     // Use VTEX catalog API (simpler and more reliable than GraphQL)
