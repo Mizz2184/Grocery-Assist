@@ -782,6 +782,125 @@ app.post('/api/proxy/automercado/search', async (req, res) => {
   }
 });
 
+// Automercado bulk scrape endpoint - retrieves all products
+app.get('/api/proxy/automercado/scrape-all', async (req, res) => {
+  try {
+    const { page = 0, hitsPerPage = 1000 } = req.query;
+    console.log('Received Automercado bulk scrape request:', { page, hitsPerPage });
+    
+    // Algolia API configuration for Automercado
+    const algoliaUrl = 'https://fu5xfx7knl-dsn.algolia.net/1/indexes/*/queries';
+    const algoliaAppId = 'FU5XFX7KNL';
+    const algoliaApiKey = '113941a18a90ae0f17d602acd16f91b2';
+    
+    // Build the Algolia request for bulk retrieval
+    const requestBody = {
+      requests: [{
+        indexName: 'Product_CatalogueV2',
+        page: parseInt(page),
+        hitsPerPage: parseInt(hitsPerPage),
+        getRankingInfo: true,
+        facets: [
+          'categoryPageId',
+          'storeDetail.*.hasInvontory',
+          'storeDetail.*.basePrice',
+          'storeDetail.*.amount'
+        ],
+        facetFilters: [
+          [
+            'categoryPageId:abarrotes',
+            'categoryPageId:bebes-y-ninos',
+            'categoryPageId:bebidas-y-licores',
+            'categoryPageId:carnes-y-pescado',
+            'categoryPageId:coleccionables',
+            'categoryPageId:comidas-preparadas',
+            'categoryPageId:congelados-y-refrigerados',
+            'categoryPageId:cuidado-personal-y-belleza',
+            'categoryPageId:frutas-y-verduras',
+            'categoryPageId:lacteos-y-embutidos',
+            'categoryPageId:limpieza-y-articulos-desechables',
+            'categoryPageId:mascotas',
+            'categoryPageId:panaderia-reposteria-y-tortillas',
+            'categoryPageId:snack-y-golosina',
+            'categoryPageId:tienda-y-hogar'
+          ],
+          ['storeDetail.06.hasInvontory:1']
+        ],
+        attributesToRetrieve: [
+          'objectID',
+          'name',
+          'brand',
+          'description',
+          'slug',
+          'unit',
+          'categories',
+          'categoryPageId',
+          'storeDetail',
+          'image',
+          'images',
+          'ecomDescription',
+          'productNumber',
+          'imageUrl',
+          'supplier'
+        ]
+      }]
+    };
+    
+    console.log(`Calling Automercado Algolia API for bulk scrape - page ${page}, hitsPerPage ${hitsPerPage}`);
+    
+    // Call the Algolia API
+    const apiResponse = await axios.post(algoliaUrl, requestBody, {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-Algolia-Application-Id': algoliaAppId,
+        'X-Algolia-API-Key': algoliaApiKey,
+        'X-Algolia-Agent': 'Algolia for JavaScript (4.24.0); Browser (lite)'
+      },
+      timeout: 30000 // Longer timeout for bulk requests
+    });
+
+    const result = apiResponse.data?.results?.[0] || {};
+    const hits = result.hits || [];
+    const nbHits = result.nbHits || 0;
+    const nbPages = result.nbPages || 0;
+    
+    console.log(`Automercado bulk scrape response:`, {
+      currentPage: page,
+      hitsInPage: hits.length,
+      totalHits: nbHits,
+      totalPages: nbPages
+    });
+    
+    // Return comprehensive data including pagination info
+    return res.json({
+      hits: hits,
+      pagination: {
+        page: parseInt(page),
+        hitsPerPage: parseInt(hitsPerPage),
+        totalHits: nbHits,
+        totalPages: nbPages,
+        hasMore: parseInt(page) < nbPages - 1
+      },
+      facets: result.facets || {},
+      processingTimeMS: result.processingTimeMS || 0
+    });
+  } catch (error) {
+    console.error('Automercado bulk scrape API error:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status
+    });
+    
+    res.status(error.response?.status || 500).json({ 
+      error: 'Failed to scrape Automercado products',
+      details: error.message,
+      status: error.response?.status || 500,
+      serverMessage: error.response?.data?.message || 'Unknown error'
+    });
+  }
+});
+
 // Walmart API proxy endpoint
 app.post('/api/proxy/walmart/search', async (req, res) => {
   try {
