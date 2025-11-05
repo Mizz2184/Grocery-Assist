@@ -425,8 +425,9 @@ export const compareProductPrices = async (
   maxiPaliProducts: Product[],
   masxMenosProducts: Product[],
   walmartProducts: Product[],
+  automercadoProducts: Product[],
   bestPrice: {
-    store: 'MaxiPali' | 'MasxMenos' | 'Walmart',
+    store: 'MaxiPali' | 'MasxMenos' | 'Walmart' | 'Automercado',
     price: number,
     savings: number,
     savingsPercentage: number
@@ -476,6 +477,7 @@ export const compareProductPrices = async (
     let maxiPaliProducts: Product[] = [];
     let masxMenosProducts: Product[] = [];
     let walmartProducts: Product[] = [];
+    let automercadoProducts: Product[] = [];
     
     // FIXED: Always search both stores, but remember the original store for display logic
     // Instead of skipping the original store search, we'll store its products separately
@@ -490,23 +492,27 @@ export const compareProductPrices = async (
       - Original store: ${normalizedOriginalStore}`);
     
     // Search in all stores concurrently
-    const [maxiPaliResponse, masxMenosResponse, walmartResponse] = await Promise.all([
+    const [maxiPaliResponse, masxMenosResponse, walmartResponse, automercadoResponse] = await Promise.all([
       searchMaxiPaliProducts({ query: searchQuery }),
       searchMasxMenosProducts({ query: searchQuery }),
-      searchWalmartProducts({ query: searchQuery })
+      searchWalmartProducts({ query: searchQuery }),
+      searchAutomercadoProducts({ query: searchQuery })
     ]);
     
     console.log("MaxiPali raw API response:", maxiPaliResponse);
     console.log("MasxMenos raw API response:", masxMenosResponse);
     console.log("Walmart raw API response:", walmartResponse);
+    console.log("Automercado raw API response:", automercadoResponse);
     
     maxiPaliProducts = maxiPaliResponse.products.map(p => ({...p, store: 'MaxiPali' as const}));
     masxMenosProducts = masxMenosResponse.products.map(p => ({...p, store: 'MasxMenos' as const}));
     walmartProducts = walmartResponse.products.map(p => ({...p, store: 'Walmart' as const}));
+    automercadoProducts = automercadoResponse.products.map(p => ({...p, store: 'Automercado' as const}));
     
     console.log("After mapping - MaxiPali products:", maxiPaliProducts);
     console.log("After mapping - MasxMenos products:", masxMenosProducts);
     console.log("After mapping - Walmart products:", walmartProducts);
+    console.log("After mapping - Automercado products:", automercadoProducts);
     
     // If one store has no results, try alternative search strategies
     const searchStrategies = [simplifiedName, keywordName, categorySearch].filter(s => s && s !== searchQuery);
@@ -553,7 +559,7 @@ export const compareProductPrices = async (
     }
     
     // Log the results
-    console.log(`Found ${maxiPaliProducts.length} MaxiPali products, ${masxMenosProducts.length} MasxMenos products, and ${walmartProducts.length} Walmart products`);
+    console.log(`Found ${maxiPaliProducts.length} MaxiPali products, ${masxMenosProducts.length} MasxMenos products, ${walmartProducts.length} Walmart products, and ${automercadoProducts.length} Automercado products`);
     if (maxiPaliProducts.length > 0) {
       console.log(`First MaxiPali product: ${maxiPaliProducts[0].name}, price: ${maxiPaliProducts[0].price}, store: ${maxiPaliProducts[0].store}`);
       console.log(`MaxiPali products details:`, maxiPaliProducts);
@@ -568,11 +574,12 @@ export const compareProductPrices = async (
     }
     
     // If no products found in any store, return null for best price
-    if (maxiPaliProducts.length === 0 && masxMenosProducts.length === 0 && walmartProducts.length === 0) {
+    if (maxiPaliProducts.length === 0 && masxMenosProducts.length === 0 && walmartProducts.length === 0 && automercadoProducts.length === 0) {
       return {
         maxiPaliProducts,
         masxMenosProducts,
         walmartProducts,
+        automercadoProducts,
         bestPrice: null
       };
     }
@@ -581,6 +588,7 @@ export const compareProductPrices = async (
     maxiPaliProducts = maxiPaliProducts.map(p => ({...p, store: 'MaxiPali' as const}));
     masxMenosProducts = masxMenosProducts.map(p => ({...p, store: 'MasxMenos' as const}));
     walmartProducts = walmartProducts.map(p => ({...p, store: 'Walmart' as const}));
+    automercadoProducts = automercadoProducts.map(p => ({...p, store: 'Automercado' as const}));
     
     // Find the lowest price product in each store
     const cheapestMaxiPaliProduct = maxiPaliProducts.length > 0
@@ -596,6 +604,11 @@ export const compareProductPrices = async (
     const cheapestWalmartProduct = walmartProducts.length > 0
       ? walmartProducts.reduce((cheapest, current) => 
           current.price < cheapest.price ? current : cheapest, walmartProducts[0])
+      : null;
+      
+    const cheapestAutomercadoProduct = automercadoProducts.length > 0
+      ? automercadoProducts.reduce((cheapest, current) => 
+          current.price < cheapest.price ? current : cheapest, automercadoProducts[0])
       : null;
     
     // Determine best price among all stores
@@ -619,6 +632,11 @@ export const compareProductPrices = async (
       cheapestStore = 'Walmart';
     }
     
+    if (cheapestAutomercadoProduct && (!cheapestProduct || cheapestAutomercadoProduct.price < cheapestProduct.price)) {
+      cheapestProduct = cheapestAutomercadoProduct;
+      cheapestStore = 'Automercado';
+    }
+    
     if (cheapestProduct && cheapestStore) {
       // Calculate savings compared to the next cheapest option
       let nextCheapestPrice = Infinity;
@@ -635,10 +653,14 @@ export const compareProductPrices = async (
         nextCheapestPrice = Math.min(nextCheapestPrice, cheapestWalmartProduct.price);
       }
       
+      if (cheapestStore !== 'Automercado' && cheapestAutomercadoProduct) {
+        nextCheapestPrice = Math.min(nextCheapestPrice, cheapestAutomercadoProduct.price);
+      }
+      
       // If we don't have a second option for comparison, there's no savings
       if (nextCheapestPrice === Infinity) {
         bestPrice = {
-          store: cheapestStore as 'MaxiPali' | 'MasxMenos' | 'Walmart',
+          store: cheapestStore as 'MaxiPali' | 'MasxMenos' | 'Walmart' | 'Automercado',
           price: cheapestProduct.price,
           savings: 0,
           savingsPercentage: 0
@@ -648,7 +670,7 @@ export const compareProductPrices = async (
         const savingsPercentage = Math.round((savings / nextCheapestPrice) * 100);
         
         bestPrice = {
-          store: cheapestStore as 'MaxiPali' | 'MasxMenos' | 'Walmart',
+          store: cheapestStore as 'MaxiPali' | 'MasxMenos' | 'Walmart' | 'Automercado',
           price: cheapestProduct.price,
           savings,
           savingsPercentage
@@ -660,6 +682,7 @@ export const compareProductPrices = async (
       maxiPaliProducts,
       masxMenosProducts,
       walmartProducts,
+      automercadoProducts,
       bestPrice
     };
   } catch (error) {
@@ -668,6 +691,7 @@ export const compareProductPrices = async (
       maxiPaliProducts: [],
       masxMenosProducts: [],
       walmartProducts: [],
+      automercadoProducts: [],
       bestPrice: null
     };
   }
