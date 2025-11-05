@@ -71,12 +71,13 @@ export const searchMasxMenosProducts = async ({
     }
     
     // Get all possible translations for the search query
-    const searchTerms = getSearchTranslations(query);
+    let searchTerms = getSearchTranslations(query);
     console.log('MasxMenos search terms with translations:', searchTerms);
     
     // Ensure we have at least the original query
-    if (searchTerms.length === 0) {
-      searchTerms.push(query);
+    if (searchTerms.length === 0 || searchTerms.join(' ').trim() === '') {
+      searchTerms = [query];
+      console.log('MasxMenos: Using original query as fallback:', query);
     }
     
     // Initialize page parameters
