@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ShoppingCart, Search as SearchIcon, Scan, Filter, ArrowLeft, Minus, Plus, Store } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { searchMaxiPaliProducts, searchMasxMenosProducts, searchWalmartProducts, searchAutomercadoProducts } from "@/lib/services";
+import { searchMaxiPaliProducts, searchMasxMenosProducts, searchWalmartProducts, searchAutomercadoProducts, connectToVoiceAgent } from "@/lib/services";
 import { 
   getOrCreateDefaultList, 
   addProductToGroceryList,
@@ -345,6 +345,8 @@ const Index = () => {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [storeFilter, setStoreFilter] = useState<'all' | 'MaxiPali' | 'MasxMenos' | 'Walmart' | 'Automercado'>('all');
   const [showBanner, setShowBanner] = useState(true);
+  const [isVoiceAgentActive, setIsVoiceAgentActive] = useState(false);
+  const [voiceConnection, setVoiceConnection] = useState<any>(null);
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -750,6 +752,122 @@ const Index = () => {
     }
   };
   
+  const handleVoiceAgentToggle = async (shouldActivate: boolean) => {
+    if (shouldActivate) {
+      // Start voice agent
+      if (!user) {
+        toast({
+          title: translateUI("Se requiere iniciar sesión"),
+          description: translateUI("Por favor inicie sesión para usar el asistente de voz."),
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        setIsVoiceAgentActive(true);
+        toast({
+          title: translateUI("Asistente de voz activado"),
+          description: translateUI("Hable ahora para buscar productos o agregarlos a su lista."),
+        });
+
+        // Import the voice agent service
+        const { connectToVoiceAgent } = await import('@/lib/services');
+        
+        const connection = await connectToVoiceAgent(
+          user.id,
+          (text, isFinal) => {
+            // Handle transcript updates
+            if (isFinal) {
+              console.log('Final transcript:', text);
+            }
+          },
+          (text) => {
+            // Handle agent responses
+            console.log('Agent response:', text);
+          }
+        );
+
+        setVoiceConnection(connection);
+      } catch (error) {
+        console.error('Error starting voice agent:', error);
+        setIsVoiceAgentActive(false);
+        toast({
+          title: translateUI("Error"),
+          description: translateUI("No se pudo iniciar el asistente de voz. Por favor intente de nuevo."),
+          variant: "destructive",
+        });
+      }
+    } else {
+      // Stop voice agent
+      try {
+        if (voiceConnection) {
+          await voiceConnection.disconnect();
+          setVoiceConnection(null);
+        }
+        setIsVoiceAgentActive(false);
+        toast({
+          title: translateUI("Asistente de voz desactivado"),
+          description: translateUI("El asistente de voz se ha desconectado."),
+        });
+      } catch (error) {
+        console.error('Error stopping voice agent:', error);
+        setIsVoiceAgentActive(false);
+        setVoiceConnection(null);
+      }
+    }
+  };
+
+  // Listen for voice agent product additions
+  useEffect(() => {
+    const handleVoiceProductAdd = async (event: CustomEvent) => {
+      const { name, store, price } = event.detail;
+      
+      // Search for the product to get full details
+      try {
+        let searchFunction;
+        switch (store) {
+          case 'MaxiPali':
+            searchFunction = searchMaxiPaliProducts;
+            break;
+          case 'MasxMenos':
+            searchFunction = searchMasxMenosProducts;
+            break;
+          case 'Walmart':
+            searchFunction = searchWalmartProducts;
+            break;
+          case 'Automercado':
+            searchFunction = searchAutomercadoProducts;
+            break;
+          default:
+            return;
+        }
+
+        const results = await searchFunction({ query: name, page: 1, pageSize: 1 });
+        if (results.products && results.products.length > 0) {
+          const product = results.products[0];
+          await handleAddToList(product);
+        }
+      } catch (error) {
+        console.error('Error adding product from voice agent:', error);
+      }
+    };
+
+    window.addEventListener('voice-agent-add-product', handleVoiceProductAdd as EventListener);
+    return () => {
+      window.removeEventListener('voice-agent-add-product', handleVoiceProductAdd as EventListener);
+    };
+  }, [user]);
+
+  // Cleanup voice connection on unmount
+  useEffect(() => {
+    return () => {
+      if (voiceConnection) {
+        voiceConnection.disconnect().catch(console.error);
+      }
+    };
+  }, [voiceConnection]);
+
   const handleAddScannedProduct = async (product: ProductType) => {
     if (!user) {
       toast({
@@ -911,6 +1029,8 @@ const Index = () => {
               expanded 
               onQueryChange={setQuery}
               isSearching={isSearching}
+              onVoiceAgentToggle={handleVoiceAgentToggle}
+              isVoiceAgentActive={isVoiceAgentActive}
               className="search-bar transition-all duration-300"
             />
           </div>
