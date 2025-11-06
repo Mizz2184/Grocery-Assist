@@ -60,14 +60,15 @@ const ProductGrid = ({ products, onAddToList, isProductInList }: ProductGridProp
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full pr-2">
       <AutoSizer disableHeight className="w-full">
         {({ width }) => {
           // Determine column count based on width (e.g., md breakpoint = 768px)
           const isDesktop = width >= 768;
           const columnCount = isDesktop ? 4 : 2;
           const gap = 16; 
-          const cardWidth = (width - gap * (columnCount - 1)) / columnCount;
+          const padding = 8; // Add padding to prevent right-side cutoff
+          const cardWidth = (width - gap * (columnCount - 1) - padding * 2) / columnCount;
           const rowCount = Math.ceil(products.length / columnCount);
           // Adjust aspect ratio slightly for potentially narrower cards on desktop
           const cardHeight = cardWidth * (isDesktop ? 1.5 : 1.6); 
