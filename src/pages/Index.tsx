@@ -186,14 +186,14 @@ const ProductCardComponent = ({ product, onAddToList, isInList }: ProductCardPro
           {translateText(product.brand) || translateText('Marca desconocida')}
         </p>
       </CardContent>
-      <CardFooter className="p-3 pt-0 mt-auto flex items-center justify-between">
+      <CardFooter className="p-3 pt-0 pb-4 mt-auto flex items-center justify-between">
         <div className="font-semibold text-sm text-primary">
           {formatPrice(product.price)}
         </div>
         <Button 
           variant={isInList ? "secondary" : "default"}
           size="icon"
-          className="rounded-full h-8 w-8"
+          className="rounded-full h-8 w-8 mb-1"
           onClick={handleAddClick}
           disabled={isAdding || isInList}
           aria-label={isInList ? translateUI("En la Lista") : translateUI("Agregar")}
