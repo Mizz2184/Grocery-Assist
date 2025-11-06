@@ -109,17 +109,17 @@ export const searchMasxMenosProducts = async ({
     const encodedVariables = encodeURIComponent(JSON.stringify(variables));
     
     // Use server-side proxy to avoid CORS issues
-    const joinedQuery = searchTerms.join(' ');
+    // MasxMenos API doesn't handle multi-word queries well, so use only the first term
+    const finalQuery = searchTerms[0] || query;
     console.log('🔍 MasxMenos DEBUG:', {
       originalQuery: query,
       searchTerms: searchTerms,
-      joinedQuery: joinedQuery,
-      joinedQueryLength: joinedQuery.length,
-      joinedQueryTrimmed: joinedQuery.trim()
+      finalQuery: finalQuery,
+      finalQueryLength: finalQuery.length
     });
     
     const requestBody = {
-      query: joinedQuery, // Join all terms with spaces for broader search
+      query: finalQuery, // Use first search term only (MasxMenos doesn't support multi-word)
       variables: encodedVariables,
       page,
       pageSize
