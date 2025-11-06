@@ -70,8 +70,8 @@ const ProductGrid = ({ products, onAddToList, isProductInList }: ProductGridProp
           const padding = 8; // Add padding to prevent right-side cutoff
           const cardWidth = (width - gap * (columnCount - 1) - padding * 2) / columnCount;
           const rowCount = Math.ceil(products.length / columnCount);
-          // Adjust aspect ratio slightly for potentially narrower cards on desktop
-          const cardHeight = cardWidth * (isDesktop ? 1.5 : 1.6); 
+          // Increase height ratio on mobile to prevent button cutoff
+          const cardHeight = cardWidth * (isDesktop ? 1.5 : 1.7); 
 
           return (
             <FixedSizeGrid
@@ -108,9 +108,9 @@ const ProductGridCell = ({ columnIndex, rowIndex, style, data }: any) => {
   const product = products[index];
 
   // Apply the style provided by FixedSizeGrid (width, height, positioning)
-  // REMOVED internal padding to prevent clipping
+  // Add extra bottom padding to prevent button cutoff
   return (
-    <div style={style} className="flex items-stretch p-[8px]"> {/* Apply padding using className instead */} 
+    <div style={style} className="flex items-stretch px-[8px] pt-[8px] pb-[12px]"> {/* Extra bottom padding for button */} 
       <ProductCardComponent 
         product={product} 
         onAddToList={onAddToList} 
