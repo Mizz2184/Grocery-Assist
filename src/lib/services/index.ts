@@ -109,15 +109,24 @@ export const searchMasxMenosProducts = async ({
     const encodedVariables = encodeURIComponent(JSON.stringify(variables));
     
     // Use server-side proxy to avoid CORS issues
+    const joinedQuery = searchTerms.join(' ');
+    console.log('🔍 MasxMenos DEBUG:', {
+      originalQuery: query,
+      searchTerms: searchTerms,
+      joinedQuery: joinedQuery,
+      joinedQueryLength: joinedQuery.length,
+      joinedQueryTrimmed: joinedQuery.trim()
+    });
+    
     const requestBody = {
-      query: searchTerms.join(' '), // Join all terms with spaces for broader search
+      query: joinedQuery, // Join all terms with spaces for broader search
       variables: encodedVariables,
       page,
       pageSize
     };
     
-    console.log('MasxMenos request body:', requestBody);
-    console.log('MasxMenos query string:', requestBody.query);
+    console.log('📦 MasxMenos request body:', requestBody);
+    console.log('📝 MasxMenos query string:', requestBody.query);
     
     const searchResponse = await fetch('/api/proxy/masxmenos/search', {
       method: 'POST',
