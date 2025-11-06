@@ -126,6 +126,16 @@
   @apply bg-gray-400 dark:bg-gray-600;
 }
 
+/* Hide scrollbar for search results */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;
