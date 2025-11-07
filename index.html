@@ -14,5 +14,13 @@
     <div id="root"></div>
     <!-- Remove external script that might be causing issues -->
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Register Service Worker for push notifications
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js')
+          .then(registration => console.log('Service Worker registered:', registration))
+          .catch(error => console.error('Service Worker registration failed:', error));
+      }
+    </script>
   </body>
 </html>

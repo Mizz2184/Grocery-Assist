@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { useTheme } from '@/context/ThemeContext';
 import { Laptop, Moon, Sun, Globe, Languages, LogOut, User } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { NotificationSettings } from '@/components/NotificationSettings';
 
 const Settings = () => {
   const { user, signOut } = useAuth();
@@ -120,30 +121,7 @@ const Settings = () => {
         </Card>
 
         {/* Notifications Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Notifications</CardTitle>
-            <CardDescription>
-              Configure how you receive notifications and updates
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span>Push notifications</span>
-              <Switch
-                checked={notifications}
-                onCheckedChange={setNotifications}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Email updates</span>
-              <Switch
-                checked={emailUpdates}
-                onCheckedChange={setEmailUpdates}
-              />
-            </div>
-          </CardContent>
-        </Card>
+        <NotificationSettings />
 
         {/* Language Settings */}
         <Card>

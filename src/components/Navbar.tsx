@@ -2,6 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { TranslationToggle } from "@/components/TranslationToggle";
 import { ExchangeRateDisplay } from "@/components/ExchangeRateDisplay";
+import { NotificationBell } from "@/components/NotificationBell";
 import { Link, useLocation } from "react-router-dom";
 import { 
   Search, 
@@ -269,6 +270,7 @@ export const Navbar = () => {
           <div className="flex items-center gap-2">
             <TranslationToggle />
             <ThemeToggle />
+            {user && <NotificationBell />}
           </div>
           
           {user ? (
@@ -390,7 +392,7 @@ export const Navbar = () => {
       {/* Mobile Menu */}
       {isMenuOpen && (
         <div className="fixed inset-0 w-full h-full bg-background z-40 flex flex-col pt-20 pb-6 px-6 md:hidden">
-          {/* Add Close Button for Mobile Menu Overlay */}
+            {/* Add Close Button for Mobile Menu Overlay */}
           <Button 
             variant="ghost" 
             size="icon" 
@@ -404,8 +406,11 @@ export const Navbar = () => {
           <div className="flex flex-col gap-4 mt-4">
             {/* Exchange rate in mobile menu */}
             <div className="flex items-center justify-between mb-4">
-              <TranslationToggle />
-              <ThemeToggle />
+              <div className="flex items-center gap-2">
+                <TranslationToggle />
+                <ThemeToggle />
+              </div>
+              {user && <NotificationBell />}
             </div>
             
             {/* User info for mobile */}

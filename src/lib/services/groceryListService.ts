@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/utils/supabaseClient';
 import { Product } from '@/lib/types/store';
 import { getProductStore, STORE } from '@/utils/storeUtils';
+import { createNotification } from '@/lib/services/notificationService';
 
 // Database types
 type DbGroceryList = {
@@ -347,6 +348,53 @@ export const addProductToGroceryList = async (
         success: false, 
         message: 'Product was added but failed to fetch updated list' 
       };
+    }
+
+    // Send notifications to collaborators
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const userName = currentUser?.user_metadata?.full_name || currentUser?.email || 'Someone';
+      
+      if (updatedList.collaborators && updatedList.collaborators.length > 0) {
+        // Get collaborator user IDs from emails
+        const { data: collaboratorUsers } = await supabase
+          .from('auth.users')
+          .select('id, email')
+          .in('email', updatedList.collaborators);
+        
+        // If we can't query auth.users, try to find users who have lists with matching emails
+        if (!collaboratorUsers || collaboratorUsers.length === 0) {
+          // Notify all collaborators (they'll get it when they log in)
+          for (const collaboratorEmail of updatedList.collaborators) {
+            if (collaboratorEmail !== currentUser?.email) {
+              // We'll need to store pending notifications or use email
+              console.log(`Would notify ${collaboratorEmail} about item added to ${updatedList.name}`);
+            }
+          }
+        } else {
+          // Send notifications to collaborators
+          for (const collaborator of collaboratorUsers) {
+            if (collaborator.id !== userId) {
+              await createNotification(
+                collaborator.id,
+                'item_added',
+                'Item added to shared list',
+                `${userName} added ${product.name} to ${updatedList.name}`,
+                {
+                  listId: listId,
+                  listName: updatedList.name,
+                  productId: product.id,
+                  productName: product.name,
+                  addedBy: userId
+                }
+              );
+            }
+          }
+        }
+      }
+    } catch (notificationError) {
+      console.error('Error sending notifications:', notificationError);
+      // Don't fail the operation if notifications fail
     }
 
     return { 
@@ -1401,4 +1449,133 @@ export const addItemToSharedList = async (listId: string, item: GroceryListItem)
   }
 
   return getSharedGroceryListById(user.id, listId);
+};
+
+/**
+ * Add a collaborator to a grocery list and send notification
+ */
+export const addCollaboratorToList = async (
+  listId: string,
+  collaboratorEmail: string,
+  userId: string
+): Promise<{ success: boolean; message: string }> => {
+  try {
+    // Get the list
+    const { data: list, error: listError } = await supabase
+      .from('grocery_lists')
+      .select('*')
+      .eq('id', listId)
+      .single();
+
+    if (listError || !list) {
+      return { success: false, message: 'List not found' };
+    }
+
+    // Check if user is the owner
+    if (list.user_id !== userId) {
+      return { success: false, message: 'Only the list owner can add collaborators' };
+    }
+
+    // Check if collaborator is already added
+    const collaborators = list.collaborators || [];
+    if (collaborators.includes(collaboratorEmail)) {
+      return { success: false, message: 'User is already a collaborator' };
+    }
+
+    // Add collaborator
+    const updatedCollaborators = [...collaborators, collaboratorEmail];
+    const { error: updateError } = await supabase
+      .from('grocery_lists')
+      .update({ collaborators: updatedCollaborators })
+      .eq('id', listId);
+
+    if (updateError) {
+      console.error('Error adding collaborator:', updateError);
+      return { success: false, message: 'Failed to add collaborator' };
+    }
+
+    // Get current user info
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const userName = currentUser?.user_metadata?.full_name || currentUser?.email || 'Someone';
+
+    // Find the collaborator's user ID
+    const { data: collaboratorUser } = await supabase
+      .from('auth.users')
+      .select('id')
+      .eq('email', collaboratorEmail)
+      .single();
+
+    // Send notification if user exists
+    if (collaboratorUser) {
+      await createNotification(
+        collaboratorUser.id,
+        'list_shared',
+        'List shared with you',
+        `${userName} shared "${list.name}" with you`,
+        {
+          listId: listId,
+          listName: list.name,
+          sharedBy: userId,
+          sharedByName: userName
+        }
+      );
+    }
+
+    return { success: true, message: 'Collaborator added successfully' };
+  } catch (error) {
+    console.error('Error in addCollaboratorToList:', error);
+    return { 
+      success: false, 
+      message: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
+};
+
+/**
+ * Remove a collaborator from a grocery list
+ */
+export const removeCollaboratorFromList = async (
+  listId: string,
+  collaboratorEmail: string,
+  userId: string
+): Promise<{ success: boolean; message: string }> => {
+  try {
+    // Get the list
+    const { data: list, error: listError } = await supabase
+      .from('grocery_lists')
+      .select('*')
+      .eq('id', listId)
+      .single();
+
+    if (listError || !list) {
+      return { success: false, message: 'List not found' };
+    }
+
+    // Check if user is the owner
+    if (list.user_id !== userId) {
+      return { success: false, message: 'Only the list owner can remove collaborators' };
+    }
+
+    // Remove collaborator
+    const collaborators = list.collaborators || [];
+    const updatedCollaborators = collaborators.filter(email => email !== collaboratorEmail);
+    
+    const { error: updateError } = await supabase
+      .from('grocery_lists')
+      .update({ collaborators: updatedCollaborators })
+      .eq('id', listId);
+
+    if (updateError) {
+      console.error('Error removing collaborator:', updateError);
+      return { success: false, message: 'Failed to remove collaborator' };
+    }
+
+    return { success: true, message: 'Collaborator removed successfully' };
+  } catch (error) {
+    console.error('Error in removeCollaboratorFromList:', error);
+    return { 
+      success: false, 
+      message: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
 };

@@ -1,6 +1,7 @@
 import { Product, ProductSearchParams, ProductSearchResponse } from "@/lib/types/store";
 import { getSearchTranslations } from "@/utils/translations";
 import axios from "axios";
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export const searchMaxiPaliProducts = async ({ 
   query, 
@@ -733,3 +734,269 @@ export const compareProductPrices = async (
     };
   }
 };
+
+// Google Gemini Live Voice Agent Service
+export interface VoiceAgentConnection {
+  session: any;
+  disconnect: () => void;
+  sendAudio: (audioData: ArrayBuffer) => void;
+  isReady: () => boolean;
+}
+
+/**
+ * Connect to Google Gemini Live voice agent
+ */
+export async function connectToGeminiVoiceAgent(
+  onMessage: (message: any) => void,
+  onError: (error: Error) => void,
+  onReady?: () => void
+): Promise<VoiceAgentConnection> {
+  try {
+    const apiKey = import.meta.env.VITE_GOOGLE_GEMINI_API_KEY;
+    
+    if (!apiKey) {
+      throw new Error('Google Gemini API key not configured');
+    }
+
+    const ai = new GoogleGenerativeAI(apiKey);
+    const model = 'gemini-2.5-flash-native-audio-preview-09-2025';
+    const config = { 
+      responseModalities: ['AUDIO'],
+      systemInstruction: `You are a helpful voice AI assistant for a grocery shopping app called Grocery Assist.
+      Your role is to help users locate products from grocery stores in Costa Rica (MaxiPali, MasxMenos, Walmart, and Automercado).
+      
+      When a user asks about a product:
+      1. Acknowledge their request
+      2. Tell them you're searching across all stores
+      3. Provide information about which stores have the product and their prices
+      4. Recommend the best price if multiple stores carry it
+      5. Ask if they want to add it to their grocery list
+      
+      For example, if they ask "Where can I buy Vegan Queso?", respond with:
+      "Let me search for Vegan Queso across all our stores... I found it at MaxiPali for 2,500 colones and at Walmart for 2,300 colones. Walmart has the best price. Would you like me to add it to your grocery list?"
+      
+      Be conversational, friendly, and helpful. Keep responses concise and natural.
+      Always mention the store name and price when discussing products.
+      Prices are in Costa Rican Colones (₡).
+      
+      When you need to search for a product, respond with a JSON object in this format:
+      {"action": "search", "query": "product name"}
+      
+      When you need to add a product to the list, respond with:
+      {"action": "add_to_list", "product": {"name": "product name", "store": "store name", "price": price}}`
+    };
+
+    console.log('Connecting to Google Gemini Live...');
+
+    const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+    
+    console.log('Connecting to Google Gemini Live via WebSocket...');
+    
+    const ws = new WebSocket(wsUrl);
+    let isConnected = false;
+
+    return new Promise((resolve, reject) => {
+      ws.onopen = () => {
+        console.log('Gemini Live WebSocket connection opened');
+        isConnected = true;
+        
+        // Send initial setup message
+        const setupMessage = {
+          setup: {
+            model: 'models/gemini-2.0-flash-exp',
+            generationConfig: {
+              responseModalities: ['AUDIO'],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: 'Puck'
+                  }
+                }
+              }
+            },
+            systemInstruction: {
+              parts: [
+                {
+                  text: `You are a helpful voice AI assistant for a grocery shopping app called Grocery Assist. Your role is to help users locate products from grocery stores in Costa Rica (MaxiPali, MasxMenos, Walmart, and Automercado).`
+                },
+                {
+                  text: `When a user asks about a product: 1. Acknowledge their request 2. Tell them you're searching across all stores 3. Provide information about which stores have the product and their prices 4. Recommend the best price if multiple stores carry it 5. Ask if they want to add it to their grocery list`
+                },
+                {
+                  text: `Be conversational, friendly, and helpful. Keep responses concise and natural. Always mention the store name and price when discussing products. Prices are in Costa Rican Colones.`
+                }
+              ]
+            }
+          }
+        };
+        
+        ws.send(JSON.stringify(setupMessage));
+        console.log('Sent setup message to Gemini Live');
+        
+        // Wait a bit for the server to process setup before allowing audio
+        setTimeout(() => {
+          console.log('Gemini Live is ready to receive audio');
+          if (onReady) {
+            onReady();
+          }
+        }, 500);
+        
+        resolve({
+          session: ws,
+          isReady: () => ws.readyState === WebSocket.OPEN && isConnected,
+          disconnect: () => {
+            console.log('Disconnecting Gemini Live WebSocket');
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.close();
+            }
+          },
+          sendAudio: (audioData: ArrayBuffer) => {
+            if (ws.readyState === WebSocket.OPEN) {
+              // Convert ArrayBuffer to base64
+              const uint8Array = new Uint8Array(audioData);
+              let binary = '';
+              const chunkSize = 0x8000; // 32KB chunks to avoid call stack size exceeded
+              
+              for (let i = 0; i < uint8Array.length; i += chunkSize) {
+                const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+                binary += String.fromCharCode.apply(null, Array.from(chunk));
+              }
+              
+              const base64Audio = btoa(binary);
+              
+              const audioMessage = {
+                realtime_input: {
+                  media_chunks: [{
+                    data: base64Audio,
+                    mime_type: 'audio/webm;codecs=opus'
+                  }]
+                }
+              };
+              
+              ws.send(JSON.stringify(audioMessage));
+              console.log('Sent audio chunk:', audioData.byteLength, 'bytes');
+            } else {
+              console.warn('WebSocket not open, cannot send audio');
+            }
+          },
+        });
+      };
+
+      ws.onmessage = async (event) => {
+        try {
+          let data;
+          
+          // Check if the data is a Blob (binary data)
+          if (event.data instanceof Blob) {
+            const text = await event.data.text();
+            data = JSON.parse(text);
+          } else {
+            // Handle as text
+            data = JSON.parse(event.data);
+          }
+          
+          console.log('Gemini message:', data);
+          onMessage(data);
+        } catch (error) {
+          console.error('Error parsing Gemini message:', error, 'Raw data:', event.data);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('Gemini WebSocket error:', error);
+        const err = new Error('WebSocket connection error');
+        onError(err);
+        if (!isConnected) {
+          reject(err);
+        }
+      };
+
+      ws.onclose = (event) => {
+        console.log('Gemini WebSocket closed:', event.code, event.reason);
+        if (!isConnected) {
+          reject(new Error('WebSocket connection closed before establishing'));
+        }
+      };
+    });    
+    return {
+      session,
+      disconnect: () => {
+        console.log('Disconnecting Gemini Live session');
+        session.close();
+      },
+      sendAudio: (audioData: ArrayBuffer) => {
+        // Send audio data to Gemini
+        session.send({ audio: audioData });
+      },
+    };
+  } catch (error) {
+    console.error('Error connecting to Gemini Live:', error);
+    throw error;
+  }
+}
+
+/**
+ * Search for products and return results for voice agent
+ */
+export async function searchProductsForVoiceAgent(query: string): Promise<string> {
+  try {
+    console.log(`Voice agent searching for: ${query}`);
+    
+    // Search across all stores
+    const [maxipaliResults, masxmenosResults, walmartResults, automercadoResults] = await Promise.allSettled([
+      searchMaxiPaliProducts({ query, page: 1, pageSize: 3 }),
+      searchMasxMenosProducts({ query, page: 1, pageSize: 3 }),
+      searchWalmartProducts({ query, page: 1, pageSize: 3 }),
+      searchAutomercadoProducts({ query, page: 1, pageSize: 3 }),
+    ]);
+
+    const results: Array<{ store: string; products: Product[] }> = [];
+
+    if (maxipaliResults.status === 'fulfilled' && maxipaliResults.value.products.length > 0) {
+      results.push({ store: 'MaxiPali', products: maxipaliResults.value.products.slice(0, 2) });
+    }
+    if (masxmenosResults.status === 'fulfilled' && masxmenosResults.value.products.length > 0) {
+      results.push({ store: 'MasxMenos', products: masxmenosResults.value.products.slice(0, 2) });
+    }
+    if (walmartResults.status === 'fulfilled' && walmartResults.value.products.length > 0) {
+      results.push({ store: 'Walmart', products: walmartResults.value.products.slice(0, 2) });
+    }
+    if (automercadoResults.status === 'fulfilled' && automercadoResults.value.products.length > 0) {
+      results.push({ store: 'Automercado', products: automercadoResults.value.products.slice(0, 2) });
+    }
+
+    if (results.length === 0) {
+      return `I couldn't find "${query}" in any of our stores. Could you try a different search term?`;
+    }
+
+    // Format results for voice response
+    let response = `I found "${query}" in the following stores: `;
+    const storeResults: string[] = [];
+    let bestPrice = Infinity;
+    let bestStore = '';
+
+    results.forEach(({ store, products }) => {
+      if (products.length > 0) {
+        const product = products[0];
+        const price = product.price;
+        storeResults.push(`${store} for ${price.toLocaleString()} colones`);
+        
+        if (price < bestPrice) {
+          bestPrice = price;
+          bestStore = store;
+        }
+      }
+    });
+
+    response += storeResults.join(', ');
+    
+    if (bestStore) {
+      response += `. ${bestStore} has the best price. Would you like me to add it to your grocery list?`;
+    }
+
+    return response;
+  } catch (error) {
+    console.error('Error searching products for voice agent:', error);
+    return `I encountered an error while searching for "${query}". Please try again.`;
+  }
+}
