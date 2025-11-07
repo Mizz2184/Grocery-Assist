@@ -962,7 +962,8 @@ const GroceryList = () => {
                       <ShareGroceryList 
                         listId={activeList.id} 
                         userId={user?.id || ''} 
-                        listName={activeList.name} 
+                        listName={activeList.name}
+                        collaborators={activeList.collaborators || []}
                       />
                     )}
                     {(activeList.createdBy === user?.id || activeList.hasEditPermission) && (

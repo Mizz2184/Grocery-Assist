@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, Check, Share2, Plus } from "lucide-react";
+import { Copy, Check, Share2, Plus, X, Users } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -11,16 +11,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { addCollaborator } from "@/lib/services/groceryListService";
+import { addCollaborator, removeCollaboratorFromList, addCollaboratorToList } from "@/lib/services/groceryListService";
 import { useToast } from "@/components/ui/use-toast";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { diagnoseSharedList } from "@/utils/debugUtils";
+import { Badge } from "@/components/ui/badge";
 
-export function ShareGroceryList({ listId, userId, listName }: { 
+export function ShareGroceryList({ listId, userId, listName, collaborators = [] }: { 
   listId: string; 
   userId: string;
   listName: string;
+  collaborators?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
@@ -28,6 +30,8 @@ export function ShareGroceryList({ listId, userId, listName }: {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
   const [listStatus, setListStatus] = useState<{exists: boolean, error?: string} | null>(null);
+  const [currentCollaborators, setCurrentCollaborators] = useState<string[]>(collaborators);
+  const [removing, setRemoving] = useState<string | null>(null);
 
   const shareUrl = `${window.location.origin}/shared-list/${listId}`;
 
@@ -64,33 +68,20 @@ export function ShareGroceryList({ listId, userId, listName }: {
     setSharing(true);
     
     try {
-      // First, verify the list exists in the database
-      await verifyListExists();
+      // Use the new addCollaboratorToList function
+      const result = await addCollaboratorToList(listId, email.trim(), userId);
       
-      if (listStatus?.error) {
-        toast({
-          title: "Error",
-          description: listStatus.error,
-          variant: "destructive",
-        });
-        setSharing(false);
-        return;
-      }
-      
-      // Proceed with sharing
-      const result = await addCollaborator(userId, listId, email);
-      
-      if (result) {
+      if (result.success) {
         toast({
           title: "List shared",
           description: `Successfully shared "${listName}" with ${email}`,
         });
+        setCurrentCollaborators([...currentCollaborators, email.trim()]);
         setEmail("");
-        setOpen(false);
       } else {
         toast({
           title: "Error",
-          description: "Failed to share the list. Please try again.",
+          description: result.message,
           variant: "destructive",
         });
       }
@@ -143,6 +134,40 @@ export function ShareGroceryList({ listId, userId, listName }: {
       setListStatus({ exists: false, error: "Failed to verify list existence" });
     }
   };
+  
+  const handleRemoveCollaborator = async (collaboratorEmail: string) => {
+    setRemoving(collaboratorEmail);
+    try {
+      const result = await removeCollaboratorFromList(listId, collaboratorEmail, userId);
+      
+      if (result.success) {
+        toast({
+          title: "Collaborator removed",
+          description: `Removed ${collaboratorEmail} from the list`,
+        });
+        setCurrentCollaborators(currentCollaborators.filter(email => email !== collaboratorEmail));
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error removing collaborator:", error);
+      toast({
+        title: "Error",
+        description: "Failed to remove collaborator",
+        variant: "destructive",
+      });
+    } finally {
+      setRemoving(null);
+    }
+  };
+  
+  useEffect(() => {
+    setCurrentCollaborators(collaborators);
+  }, [collaborators]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -187,6 +212,32 @@ export function ShareGroceryList({ listId, userId, listName }: {
             </Button>
           </div>
           
+          {/* Current Collaborators */}
+          {currentCollaborators.length > 0 && (
+            <div>
+              <Label className="text-xs text-muted-foreground flex items-center gap-2">
+                <Users className="h-3 w-3" />
+                Current Collaborators ({currentCollaborators.length})
+              </Label>
+              <div className="mt-2 space-y-2">
+                {currentCollaborators.map((collaboratorEmail) => (
+                  <div key={collaboratorEmail} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                    <span className="text-sm">{collaboratorEmail}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveCollaborator(collaboratorEmail)}
+                      disabled={removing === collaboratorEmail}
+                      className="h-7 w-7 p-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
           <div>
             <Label htmlFor="collaborator" className="text-xs text-muted-foreground">
               Add a collaborator with edit permissions
@@ -198,6 +249,7 @@ export function ShareGroceryList({ listId, userId, listName }: {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleShare()}
                 className="flex-1"
               />
               <Button 

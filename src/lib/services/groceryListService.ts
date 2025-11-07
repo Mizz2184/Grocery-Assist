@@ -354,41 +354,43 @@ export const addProductToGroceryList = async (
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       const userName = currentUser?.user_metadata?.full_name || currentUser?.email || 'Someone';
+      const currentUserEmail = currentUser?.email;
       
       if (updatedList.collaborators && updatedList.collaborators.length > 0) {
-        // Get collaborator user IDs from emails
-        const { data: collaboratorUsers } = await supabase
-          .from('auth.users')
-          .select('id, email')
-          .in('email', updatedList.collaborators);
-        
-        // If we can't query auth.users, try to find users who have lists with matching emails
-        if (!collaboratorUsers || collaboratorUsers.length === 0) {
-          // Notify all collaborators (they'll get it when they log in)
-          for (const collaboratorEmail of updatedList.collaborators) {
-            if (collaboratorEmail !== currentUser?.email) {
-              // We'll need to store pending notifications or use email
-              console.log(`Would notify ${collaboratorEmail} about item added to ${updatedList.name}`);
-            }
-          }
-        } else {
-          // Send notifications to collaborators
-          for (const collaborator of collaboratorUsers) {
-            if (collaborator.id !== userId) {
-              await createNotification(
-                collaborator.id,
-                'item_added',
-                'Item added to shared list',
-                `${userName} added ${product.name} to ${updatedList.name}`,
-                {
-                  listId: listId,
-                  listName: updatedList.name,
-                  productId: product.id,
-                  productName: product.name,
-                  addedBy: userId
-                }
-              );
-            }
+        // For each collaborator email, find their user ID by looking up grocery lists they own
+        for (const collaboratorEmail of updatedList.collaborators) {
+          // Skip if it's the current user
+          if (collaboratorEmail === currentUserEmail) continue;
+          
+          // Find user ID by looking for lists they own with this email
+          const { data: userLists } = await supabase
+            .from('grocery_lists')
+            .select('user_id')
+            .eq('user_id', collaboratorEmail)
+            .limit(1);
+          
+          // If we can't find by user_id (which is actually the auth user id), 
+          // we need to use a Supabase Edge Function or RPC to get user ID from email
+          // For now, let's use a workaround: call a database function
+          const { data: userData, error: userError } = await supabase
+            .rpc('get_user_id_by_email', { user_email: collaboratorEmail });
+          
+          if (!userError && userData) {
+            await createNotification(
+              userData,
+              'item_added',
+              'Item added to shared list',
+              `${userName} added ${product.name} to ${updatedList.name}`,
+              {
+                listId: listId,
+                listName: updatedList.name,
+                productId: product.id,
+                productName: product.name,
+                addedBy: userId
+              }
+            );
+          } else {
+            console.log(`Could not find user ID for ${collaboratorEmail}, notification not sent`);
           }
         }
       }
@@ -1498,17 +1500,14 @@ export const addCollaboratorToList = async (
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     const userName = currentUser?.user_metadata?.full_name || currentUser?.email || 'Someone';
 
-    // Find the collaborator's user ID
-    const { data: collaboratorUser } = await supabase
-      .from('auth.users')
-      .select('id')
-      .eq('email', collaboratorEmail)
-      .single();
+    // Find the collaborator's user ID using the database function
+    const { data: collaboratorUserId, error: userError } = await supabase
+      .rpc('get_user_id_by_email', { user_email: collaboratorEmail });
 
     // Send notification if user exists
-    if (collaboratorUser) {
+    if (!userError && collaboratorUserId) {
       await createNotification(
-        collaboratorUser.id,
+        collaboratorUserId,
         'list_shared',
         'List shared with you',
         `${userName} shared "${list.name}" with you`,
@@ -1519,6 +1518,8 @@ export const addCollaboratorToList = async (
           sharedByName: userName
         }
       );
+    } else {
+      console.log(`Could not find user with email ${collaboratorEmail} for notification`);
     }
 
     return { success: true, message: 'Collaborator added successfully' };

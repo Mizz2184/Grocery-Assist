@@ -147,6 +147,26 @@ EXECUTE FUNCTION update_updated_at_column();
 -- Enable Realtime for notifications table
 ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
 
+-- Helper function to get user ID by email (for notifications)
+-- This function needs to be created as a security definer function
+CREATE OR REPLACE FUNCTION public.get_user_id_by_email(user_email TEXT)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  user_uuid UUID;
+BEGIN
+  -- Query the auth.users table to get the user ID
+  SELECT id INTO user_uuid
+  FROM auth.users
+  WHERE email = user_email
+  LIMIT 1;
+  
+  RETURN user_uuid;
+END;
+$$;
+
 -- Grant necessary permissions
 GRANT ALL ON public.notifications TO authenticated;
 GRANT ALL ON public.notification_preferences TO authenticated;
