@@ -214,21 +214,22 @@ export function ShareGroceryList({ listId, userId, listName, collaborators = [] 
           
           {/* Current Collaborators */}
           {currentCollaborators.length > 0 && (
-            <div>
-              <Label className="text-xs text-muted-foreground flex items-center gap-2">
-                <Users className="h-3 w-3" />
+            <div className="border rounded-lg p-3 bg-muted/30">
+              <Label className="text-sm font-semibold flex items-center gap-2 mb-3">
+                <Users className="h-4 w-4" />
                 Current Collaborators ({currentCollaborators.length})
               </Label>
-              <div className="mt-2 space-y-2">
+              <div className="space-y-2">
                 {currentCollaborators.map((collaboratorEmail) => (
-                  <div key={collaboratorEmail} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                  <div key={collaboratorEmail} className="flex items-center justify-between p-2 rounded-md bg-background border hover:bg-accent/50 transition-colors">
                     <span className="text-sm">{collaboratorEmail}</span>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleRemoveCollaborator(collaboratorEmail)}
                       disabled={removing === collaboratorEmail}
-                      className="h-7 w-7 p-0"
+                      className="h-7 w-7 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                      title="Remove collaborator"
                     >
                       <X className="h-4 w-4" />
                     </Button>
