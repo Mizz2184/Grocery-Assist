@@ -5,7 +5,7 @@ import { stores } from "@/utils/storeData";
 import { useAuth } from "@/hooks/useAuth";
 import { useSearch } from "@/context/SearchContext";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Search as SearchIcon, Scan, Filter, ArrowLeft, Minus, Plus, Store } from "lucide-react";
+import { ShoppingCart, Search as SearchIcon, Scan, Filter, ArrowLeft, Minus, Plus, Store, X, Check } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { searchMaxiPaliProducts, searchMasxMenosProducts, searchWalmartProducts, searchAutomercadoProducts, connectToGeminiVoiceAgent } from "@/lib/services";
@@ -136,13 +136,22 @@ const ProductCardComponent = ({ product, onAddToList, isInList }: ProductCardPro
 
   const handleAddClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    
+    // If not showing quantity input yet, show it first
+    if (!showQuantityInput && !isInList) {
+      setShowQuantityInput(true);
+      return;
+    }
+    
+    // Otherwise, add to list with selected quantity
     setIsAdding(true);
     try {
       // Add quantity to product before adding to list
       const productWithQuantity = { ...product, quantity };
       await onAddToList(productWithQuantity);
-      // Reset quantity after adding
+      // Reset state after adding
       setQuantity(1);
+      setShowQuantityInput(false);
     } catch (error) {
       console.error("Error adding product in card component:", error);
     } finally {
@@ -160,6 +169,12 @@ const ProductCardComponent = ({ product, onAddToList, isInList }: ProductCardPro
     if (quantity > 1) {
       setQuantity(prev => prev - 1);
     }
+  };
+
+  const handleCancelQuantity = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowQuantityInput(false);
+    setQuantity(1);
   };
   
   // Product page navigation disabled - users can only add to cart
@@ -207,52 +222,75 @@ const ProductCardComponent = ({ product, onAddToList, isInList }: ProductCardPro
           {formatPrice(product.price)}
         </div>
         
-        {/* Quantity selector - only show when not in list */}
-        {!isInList && (
-          <div className="flex items-center gap-1 border rounded-md">
+        {/* Show quantity selector or add button based on state */}
+        {showQuantityInput && !isInList ? (
+          <div className="absolute -bottom-2 -right-2 flex items-center gap-1 bg-background border-2 border-primary rounded-full shadow-lg p-1 animate-in zoom-in-95 duration-200">
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 rounded-l-md rounded-r-none"
+              className="h-8 w-8 rounded-full"
               onClick={decrementQuantity}
               disabled={quantity <= 1}
             >
-              <Minus className="h-3 w-3" />
+              <Minus className="h-4 w-4" />
             </Button>
-            <span className="text-xs font-medium px-2 min-w-[24px] text-center">
+            <span className="text-sm font-semibold px-2 min-w-[32px] text-center">
               {quantity}
             </span>
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 rounded-r-md rounded-l-none"
+              className="h-8 w-8 rounded-full"
               onClick={incrementQuantity}
             >
-              <Plus className="h-3 w-3" />
+              <Plus className="h-4 w-4" />
+            </Button>
+            <div className="h-6 w-px bg-border mx-1" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full hover:bg-destructive/10"
+              onClick={handleCancelQuantity}
+              title="Cancel"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="default"
+              size="icon"
+              className="h-8 w-8 rounded-full"
+              onClick={handleAddClick}
+              disabled={isAdding}
+            >
+              {isAdding ? (
+                <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
             </Button>
           </div>
+        ) : (
+          /* Circular Add Button - positioned at bottom right */
+          <Button 
+            variant={isInList ? "secondary" : "default"}
+            size="icon"
+            className={cn(
+              "absolute -bottom-2 -right-2 h-10 w-10 rounded-full shadow-lg transition-all duration-200",
+              isInList ? "bg-secondary" : "bg-primary hover:scale-110"
+            )}
+            onClick={handleAddClick}
+            disabled={isAdding || isInList}
+            aria-label={isInList ? translateUI("En la Lista") : translateUI("Agregar")}
+          >
+            {isAdding ? (
+              <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
+            ) : isInList ? (
+              <ShoppingCart className="h-5 w-5" />
+            ) : (
+              <Plus className="h-5 w-5" />
+            )}
+          </Button>
         )}
-        
-        {/* Circular Add Button - positioned at bottom right */}
-        <Button 
-          variant={isInList ? "secondary" : "default"}
-          size="icon"
-          className={cn(
-            "absolute -bottom-2 -right-2 h-10 w-10 rounded-full shadow-lg transition-all duration-200",
-            isInList ? "bg-secondary" : "bg-primary hover:scale-110"
-          )}
-          onClick={handleAddClick}
-          disabled={isAdding || isInList}
-          aria-label={isInList ? translateUI("En la Lista") : translateUI("Agregar")}
-        >
-          {isAdding ? (
-            <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
-          ) : isInList ? (
-            <ShoppingCart className="h-5 w-5" />
-          ) : (
-            <Plus className="h-5 w-5" />
-          )}
-        </Button>
       </CardFooter>
     </Card>
   );
