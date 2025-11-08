@@ -4,6 +4,7 @@ import { supabase } from '@/utils/supabaseClient';
 import { Product } from '@/lib/types/store';
 import { getProductStore, STORE } from '@/utils/storeUtils';
 import { createNotification } from '@/lib/services/notificationService';
+import { logActivity } from '@/lib/services/activityService';
 
 // Database types
 type DbGroceryList = {
@@ -350,6 +351,21 @@ export const addProductToGroceryList = async (
       };
     }
 
+    // Log activity
+    await logActivity(
+      listId,
+      userId,
+      'item_added',
+      product.name,
+      itemId,
+      product.id,
+      {
+        quantity,
+        store: product.store,
+        price: product.price
+      }
+    );
+
     // Send notifications to collaborators
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -579,6 +595,21 @@ export const deleteGroceryListItem = async (
     if (error) {
       console.error('Error deleting item from Supabase:', error);
       return false;
+    }
+
+    // Log activity
+    if (listId && userId) {
+      await logActivity(
+        listId,
+        userId,
+        'item_deleted',
+        itemName,
+        itemId,
+        undefined,
+        {
+          listName: listName
+        }
+      );
     }
 
     // Send notifications to collaborators
