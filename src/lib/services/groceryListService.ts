@@ -491,8 +491,42 @@ export const getOrCreateDefaultList = async (userId: string): Promise<GroceryLis
 };
 
 // Add this new function to handle item deletion
-export const deleteGroceryListItem = async (itemId: string): Promise<boolean> => {
+export const deleteGroceryListItem = async (
+  itemId: string, 
+  listId?: string, 
+  userId?: string
+): Promise<boolean> => {
   try {
+    // Get item details before deletion for notification
+    let itemName = 'an item';
+    let listName = 'the list';
+    let listCollaborators: string[] = [];
+    
+    if (listId && userId) {
+      // Get the item details
+      const { data: item } = await supabase
+        .from('grocery_items')
+        .select('product_data')
+        .eq('id', itemId)
+        .single();
+      
+      if (item?.product_data) {
+        itemName = item.product_data.name || itemName;
+      }
+      
+      // Get the list details
+      const { data: list } = await supabase
+        .from('grocery_lists')
+        .select('name, collaborators')
+        .eq('id', listId)
+        .single();
+      
+      if (list) {
+        listName = list.name;
+        listCollaborators = list.collaborators || [];
+      }
+    }
+    
     // First remove from localStorage if present
     try {
       const localLists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
@@ -531,6 +565,64 @@ export const deleteGroceryListItem = async (itemId: string): Promise<boolean> =>
     if (error) {
       console.error('Error deleting item from Supabase:', error);
       return false;
+    }
+
+    // Send notifications to collaborators
+    if (listId && userId && listCollaborators.length > 0) {
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        const userName = currentUser?.user_metadata?.full_name || currentUser?.email || 'Someone';
+        const currentUserEmail = currentUser?.email;
+        
+        for (const collaboratorEmail of listCollaborators) {
+          // Skip if it's the current user
+          if (collaboratorEmail === currentUserEmail) continue;
+          
+          // Get collaborator user ID
+          const { data: collaboratorUserId, error: userError } = await supabase
+            .rpc('get_user_id_by_email', { user_email: collaboratorEmail });
+          
+          if (!userError && collaboratorUserId) {
+            await createNotification(
+              collaboratorUserId,
+              'item_added',
+              'Item removed from shared list',
+              `${userName} removed ${itemName} from ${listName}`,
+              {
+                listId: listId,
+                listName: listName,
+                itemName: itemName,
+                removedBy: userId
+              }
+            );
+          }
+        }
+        
+        // Also notify the list owner if current user is a collaborator
+        const { data: list } = await supabase
+          .from('grocery_lists')
+          .select('user_id')
+          .eq('id', listId)
+          .single();
+        
+        if (list && list.user_id !== userId && list.user_id !== currentUserEmail) {
+          await createNotification(
+            list.user_id,
+            'item_added',
+            'Item removed from shared list',
+            `${userName} removed ${itemName} from ${listName}`,
+            {
+              listId: listId,
+              listName: listName,
+              itemName: itemName,
+              removedBy: userId
+            }
+          );
+        }
+      } catch (notificationError) {
+        console.error('Error sending delete notifications:', notificationError);
+        // Don't fail the deletion if notifications fail
+      }
     }
 
     return true;

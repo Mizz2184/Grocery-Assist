@@ -128,8 +128,8 @@ const handleRemoveListItem = async (sharedList: GroceryListType, user: any, toas
       };
     });
 
-    // Call the API to delete the item
-    const success = await deleteGroceryListItem(itemId);
+    // Call the API to delete the item with listId and userId for notifications
+    const success = await deleteGroceryListItem(itemId, sharedList.id, user?.id);
 
     if (!success) {
       console.error('Error removing item from database');

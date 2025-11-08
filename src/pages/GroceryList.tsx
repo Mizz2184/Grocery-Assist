@@ -479,8 +479,8 @@ const GroceryList = () => {
         });
       }
       
-      // Use the service function
-      const success = await deleteGroceryListItem(itemId);
+      // Use the service function with listId and userId for notifications
+      const success = await deleteGroceryListItem(itemId, listId, user?.id);
         
       if (!success) {
         console.error('Error removing list item from database');
