@@ -950,6 +950,15 @@ const GroceryList = () => {
                     )}
                     <CardDescription>
                       {activeList.items.length} items
+                      {activeList.createdAt && (
+                        <span className="block text-xs text-muted-foreground">
+                          Created {new Date(activeList.createdAt).toLocaleDateString('en-US', { 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric' 
+                          })}
+                        </span>
+                      )}
                       {activeList.createdBy !== user?.id && (
                         <span className="block text-xs">
                           Shared by {activeList.createdBy}

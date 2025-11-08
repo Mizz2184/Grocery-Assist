@@ -759,9 +759,15 @@ const SharedList = () => {
                   <CardTitle className="text-2xl font-bold">{sharedList.name}</CardTitle>
                   <CardDescription>
                     Shared by {sharedList.createdBy}
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Data pulled from Supabase grocery_lists and grocery_items tables
-                    </div>
+                    {sharedList.createdAt && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Created {new Date(sharedList.createdAt).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'short', 
+                          day: 'numeric' 
+                        })}
+                      </div>
+                    )}
                   </CardDescription>
                 </div>
                 
