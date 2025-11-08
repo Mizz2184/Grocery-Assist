@@ -951,11 +951,13 @@ const GroceryList = () => {
                     <CardDescription>
                       {activeList.items.length} items
                       {activeList.createdAt && (
-                        <span className="block text-xs text-muted-foreground">
+                        <span className="block text-xs text-muted-foreground mt-1">
                           Created {new Date(activeList.createdAt).toLocaleDateString('en-US', { 
                             year: 'numeric', 
                             month: 'short', 
-                            day: 'numeric' 
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
                           })}
                         </span>
                       )}
