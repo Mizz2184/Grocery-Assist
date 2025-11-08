@@ -108,9 +108,9 @@ const ProductGridCell = ({ columnIndex, rowIndex, style, data }: any) => {
   const product = products[index];
 
   // Apply the style provided by FixedSizeGrid (width, height, positioning)
-  // Add extra bottom padding to prevent button cutoff
+  // Add extra bottom and right padding to prevent button cutoff
   return (
-    <div style={style} className="flex items-stretch px-[8px] pt-[8px] pb-[12px]"> {/* Extra bottom padding for button */} 
+    <div style={style} className="flex items-stretch px-[8px] pt-[8px] pb-[20px] pr-[16px]"> {/* Extra padding for circular button */} 
       <ProductCardComponent 
         product={product} 
         onAddToList={onAddToList} 
@@ -217,7 +217,7 @@ const ProductCardComponent = ({ product, onAddToList, isInList }: ProductCardPro
           {translateText(product.brand) || translateText('Marca desconocida')}
         </p>
       </CardContent>
-      <CardFooter className="p-3 pt-0 pb-4 mt-auto flex items-center justify-between relative">
+      <CardFooter className="p-3 pt-0 pb-5 pr-4 mt-auto flex items-center justify-between relative">
         <div className="font-semibold text-sm text-primary">
           {formatPrice(product.price)}
         </div>
