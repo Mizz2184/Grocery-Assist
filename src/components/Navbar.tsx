@@ -372,7 +372,8 @@ export const Navbar = () => {
         </nav>
         
         {/* Mobile Navigation */}
-        <div className="flex items-center md:hidden">
+        <div className="flex md:hidden items-center gap-2">
+          {user && <NotificationBell />}
           <Button 
             variant="ghost" 
             size="icon" 
@@ -404,13 +405,10 @@ export const Navbar = () => {
           </Button>
 
           <div className="flex flex-col gap-4 mt-4">
-            {/* Exchange rate in mobile menu */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <TranslationToggle />
-                <ThemeToggle />
-              </div>
-              {user && <NotificationBell />}
+            {/* Theme and translation toggles in mobile menu */}
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <TranslationToggle />
+              <ThemeToggle />
             </div>
             
             {/* User info for mobile */}
