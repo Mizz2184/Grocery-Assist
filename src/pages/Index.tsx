@@ -202,40 +202,45 @@ const ProductCardComponent = ({ product, onAddToList, isInList }: ProductCardPro
           {translateText(product.brand) || translateText('Marca desconocida')}
         </p>
       </CardContent>
-      <CardFooter className="p-3 pt-0 pb-4 mt-auto flex flex-col gap-2">
-        <div className="w-full flex items-center justify-between">
-          <div className="font-semibold text-sm text-primary">
-            {formatPrice(product.price)}
-          </div>
-          {!isInList && (
-            <div className="flex items-center gap-1 border rounded-md">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 rounded-l-md rounded-r-none"
-                onClick={decrementQuantity}
-                disabled={quantity <= 1}
-              >
-                <Minus className="h-3 w-3" />
-              </Button>
-              <span className="text-xs font-medium px-2 min-w-[24px] text-center">
-                {quantity}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 rounded-r-md rounded-l-none"
-                onClick={incrementQuantity}
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
-            </div>
-          )}
+      <CardFooter className="p-3 pt-0 pb-4 mt-auto flex items-center justify-between relative">
+        <div className="font-semibold text-sm text-primary">
+          {formatPrice(product.price)}
         </div>
+        
+        {/* Quantity selector - only show when not in list */}
+        {!isInList && (
+          <div className="flex items-center gap-1 border rounded-md">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 rounded-l-md rounded-r-none"
+              onClick={decrementQuantity}
+              disabled={quantity <= 1}
+            >
+              <Minus className="h-3 w-3" />
+            </Button>
+            <span className="text-xs font-medium px-2 min-w-[24px] text-center">
+              {quantity}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 rounded-r-md rounded-l-none"
+              onClick={incrementQuantity}
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
+        
+        {/* Circular Add Button - positioned at bottom right */}
         <Button 
           variant={isInList ? "secondary" : "default"}
-          size="sm"
-          className="w-full h-8"
+          size="icon"
+          className={cn(
+            "absolute -bottom-2 -right-2 h-10 w-10 rounded-full shadow-lg transition-all duration-200",
+            isInList ? "bg-secondary" : "bg-primary hover:scale-110"
+          )}
           onClick={handleAddClick}
           disabled={isAdding || isInList}
           aria-label={isInList ? translateUI("En la Lista") : translateUI("Agregar")}
@@ -243,15 +248,9 @@ const ProductCardComponent = ({ product, onAddToList, isInList }: ProductCardPro
           {isAdding ? (
             <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
           ) : isInList ? (
-            <>
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              {translateUI("En la Lista")}
-            </>
+            <ShoppingCart className="h-5 w-5" />
           ) : (
-            <>
-              <Plus className="h-4 w-4 mr-2" />
-              {translateUI("Agregar")} {quantity > 1 && `(${quantity})`}
-            </>
+            <Plus className="h-5 w-5" />
           )}
         </Button>
       </CardFooter>
