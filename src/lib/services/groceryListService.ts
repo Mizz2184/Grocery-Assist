@@ -187,6 +187,9 @@ export const addProductToGroceryList = async (
   quantity: number = 1
 ): Promise<{ success: boolean; message?: string; list?: GroceryList }> => {
   try {
+    // Extract quantity from product if it exists, otherwise use the parameter
+    const actualQuantity = (product as any).quantity || quantity;
+    
     // Ensure product has store information properly set using our utility function
     const originalStore = product.store;
     
@@ -195,7 +198,7 @@ export const addProductToGroceryList = async (
     
     // Log the store detection for debugging
     console.log(`addProductToGroceryList: Product ${product.id} store detection - Original: ${originalStore}, Normalized: ${product.store}`);
-    console.log(`Adding product with quantity: ${quantity}`);
+    console.log(`Adding product with quantity: ${actualQuantity}`);
     
     // Add some store-specific validation
     if (product.store === 'Walmart' && originalStore && originalStore.toLowerCase().includes('maxi')) {
@@ -256,14 +259,14 @@ export const addProductToGroceryList = async (
     });
     
     if (existingItem) {
-      console.log(`Product already exists in list (id: ${existingItem.id}), increasing quantity from ${existingItem.quantity} to ${existingItem.quantity + quantity}`);
+      console.log(`Product already exists in list (id: ${existingItem.id}), increasing quantity from ${existingItem.quantity} to ${existingItem.quantity + actualQuantity}`);
       
       // Product exists, update quantity instead of adding a new item
       try {
         const { error } = await supabase
           .from('grocery_items')
           .update({ 
-            quantity: existingItem.quantity + quantity,
+            quantity: existingItem.quantity + actualQuantity,
           })
           .eq('id', existingItem.id);
           
@@ -280,7 +283,7 @@ export const addProductToGroceryList = async (
           if (item.id === existingItem.id) {
             return {
               ...item,
-              quantity: item.quantity + quantity
+              quantity: item.quantity + actualQuantity
             };
           }
           return item;
@@ -309,7 +312,7 @@ export const addProductToGroceryList = async (
       id: itemId,
       list_id: listId,
       product_id: product.id,
-      quantity: quantity, // Ensure we use the explicitly passed quantity parameter
+      quantity: actualQuantity, // Use the quantity from product or parameter
       checked: false,
       product_data: {
         id: product.id,
@@ -326,7 +329,7 @@ export const addProductToGroceryList = async (
     console.log('Inserting item with data:', {
       ...itemData,
       list_id: listId, // explicitly log the list ID
-      quantity: quantity // explicitly log the quantity
+      quantity: actualQuantity // explicitly log the quantity
     });
     
     // Insert the item into the database
@@ -360,7 +363,7 @@ export const addProductToGroceryList = async (
       itemId,
       product.id,
       {
-        quantity,
+        quantity: actualQuantity,
         store: product.store,
         price: product.price
       }
