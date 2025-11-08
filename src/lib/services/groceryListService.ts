@@ -356,27 +356,37 @@ export const addProductToGroceryList = async (
       const userName = currentUser?.user_metadata?.full_name || currentUser?.email || 'Someone';
       const currentUserEmail = currentUser?.email;
       
+      console.log('🔔 Notification Check:', {
+        listName: updatedList.name,
+        collaborators: updatedList.collaborators,
+        currentUserEmail: currentUserEmail,
+        productName: product.name
+      });
+      
       if (updatedList.collaborators && updatedList.collaborators.length > 0) {
-        // For each collaborator email, find their user ID by looking up grocery lists they own
+        console.log(`📧 Processing ${updatedList.collaborators.length} collaborators for notifications`);
+        
+        // For each collaborator email, find their user ID
         for (const collaboratorEmail of updatedList.collaborators) {
+          console.log(`📨 Checking collaborator: ${collaboratorEmail}`);
+          
           // Skip if it's the current user
-          if (collaboratorEmail === currentUserEmail) continue;
+          if (collaboratorEmail === currentUserEmail) {
+            console.log(`⏭️ Skipping current user: ${collaboratorEmail}`);
+            continue;
+          }
           
-          // Find user ID by looking for lists they own with this email
-          const { data: userLists } = await supabase
-            .from('grocery_lists')
-            .select('user_id')
-            .eq('user_id', collaboratorEmail)
-            .limit(1);
-          
-          // If we can't find by user_id (which is actually the auth user id), 
-          // we need to use a Supabase Edge Function or RPC to get user ID from email
-          // For now, let's use a workaround: call a database function
+          // Use database function to get user ID from email
+          console.log(`🔍 Looking up user ID for: ${collaboratorEmail}`);
           const { data: userData, error: userError } = await supabase
             .rpc('get_user_id_by_email', { user_email: collaboratorEmail });
           
+          console.log(`📊 RPC Result:`, { userData, userError });
+          
           if (!userError && userData) {
-            await createNotification(
+            console.log(`✅ Found user ID: ${userData}, creating notification...`);
+            
+            const notificationResult = await createNotification(
               userData,
               'item_added',
               'Item added to shared list',
@@ -389,13 +399,17 @@ export const addProductToGroceryList = async (
                 addedBy: userId
               }
             );
+            
+            console.log(`📬 Notification created:`, notificationResult);
           } else {
-            console.log(`Could not find user ID for ${collaboratorEmail}, notification not sent`);
+            console.error(`❌ Could not find user ID for ${collaboratorEmail}:`, userError);
           }
         }
+      } else {
+        console.log('ℹ️ No collaborators to notify');
       }
     } catch (notificationError) {
-      console.error('Error sending notifications:', notificationError);
+      console.error('💥 Error sending notifications:', notificationError);
       // Don't fail the operation if notifications fail
     }
 

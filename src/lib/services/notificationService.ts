@@ -44,10 +44,14 @@ export const createNotification = async (
   data?: Record<string, any>
 ): Promise<Notification | null> => {
   try {
+    console.log('📝 Creating notification:', { userId, type, title, message, data });
+    
     // Check if user has this notification type enabled
     const preferences = await getNotificationPreferences(userId);
+    console.log('⚙️ User preferences:', preferences);
+    
     if (preferences && !preferences[type]) {
-      console.log(`Notification type ${type} is disabled for user ${userId}`);
+      console.log(`🚫 Notification type ${type} is disabled for user ${userId}`);
       return null;
     }
 
@@ -65,14 +69,14 @@ export const createNotification = async (
       .single();
 
     if (error) {
-      console.error('Error creating notification:', error);
+      console.error('❌ Error creating notification:', error);
       return null;
     }
 
-    console.log('Notification created:', notification);
+    console.log('✅ Notification created successfully:', notification);
     return notification;
   } catch (error) {
-    console.error('Error in createNotification:', error);
+    console.error('💥 Error in createNotification:', error);
     return null;
   }
 };
@@ -314,6 +318,8 @@ export const subscribeToNotifications = (
   userId: string,
   onNotification: (notification: Notification) => void
 ): RealtimeChannel => {
+  console.log('📡 Setting up real-time subscription for user:', userId);
+  
   const channel = supabase
     .channel(`notifications:${userId}`)
     .on(
@@ -325,11 +331,13 @@ export const subscribeToNotifications = (
         filter: `user_id=eq.${userId}`
       },
       (payload) => {
-        console.log('New notification received:', payload);
+        console.log('📨 Real-time notification received:', payload);
         onNotification(payload.new as Notification);
       }
     )
-    .subscribe();
+    .subscribe((status) => {
+      console.log('📡 Subscription status:', status);
+    });
 
   return channel;
 };
