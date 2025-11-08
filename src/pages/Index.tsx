@@ -224,48 +224,48 @@ const ProductCardComponent = ({ product, onAddToList, isInList }: ProductCardPro
         
         {/* Show quantity selector or add button based on state */}
         {showQuantityInput && !isInList ? (
-          <div className="absolute -bottom-2 -right-2 flex items-center gap-1 bg-background border-2 border-primary rounded-full shadow-lg p-1 animate-in zoom-in-95 duration-200">
+          <div className="absolute -bottom-2 -right-2 flex items-center gap-0.5 bg-background border-2 border-primary rounded-full shadow-lg p-0.5 animate-in zoom-in-95 duration-200">
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-full"
+              className="h-7 w-7 rounded-full"
               onClick={decrementQuantity}
               disabled={quantity <= 1}
             >
-              <Minus className="h-4 w-4" />
+              <Minus className="h-3 w-3" />
             </Button>
-            <span className="text-sm font-semibold px-2 min-w-[32px] text-center">
+            <span className="text-xs font-semibold px-1.5 min-w-[24px] text-center">
               {quantity}
             </span>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-full"
+              className="h-7 w-7 rounded-full"
               onClick={incrementQuantity}
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3 w-3" />
             </Button>
-            <div className="h-6 w-px bg-border mx-1" />
+            <div className="h-5 w-px bg-border mx-0.5" />
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-full hover:bg-destructive/10"
+              className="h-7 w-7 rounded-full hover:bg-destructive/10"
               onClick={handleCancelQuantity}
               title="Cancel"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3 w-3" />
             </Button>
             <Button
               variant="default"
               size="icon"
-              className="h-8 w-8 rounded-full"
+              className="h-7 w-7 rounded-full"
               onClick={handleAddClick}
               disabled={isAdding}
             >
               {isAdding ? (
-                <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
+                <span className="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full"></span>
               ) : (
-                <Check className="h-4 w-4" />
+                <Check className="h-3 w-3" />
               )}
             </Button>
           </div>
