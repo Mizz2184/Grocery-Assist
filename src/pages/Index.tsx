@@ -5,7 +5,7 @@ import { stores } from "@/utils/storeData";
 import { useAuth } from "@/hooks/useAuth";
 import { useSearch } from "@/context/SearchContext";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Search as SearchIcon, Scan, Filter, ArrowLeft, Minus, Plus, Store } from "lucide-react";
+import { ShoppingCart, Search as SearchIcon, Scan, Filter, ArrowLeft, Minus, Plus, Store, Check } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { searchMaxiPaliProducts, searchMasxMenosProducts, searchWalmartProducts, searchAutomercadoProducts, connectToGeminiVoiceAgent } from "@/lib/services";
@@ -13,7 +13,8 @@ import {
   getOrCreateDefaultList, 
   addProductToGroceryList,
   syncGroceryListToDatabase,
-  getUserGroceryLists 
+  getUserGroceryLists,
+  updateListItem
 } from '@/lib/services/groceryListService';
 import { Product as ProductType } from "@/lib/types/store";
 import { Button } from "@/components/ui/button";
@@ -130,19 +131,86 @@ const ProductCardComponent = ({ product, onAddToList, isInList }: ProductCardPro
   const { user } = useAuth();
   const [isAdding, setIsAdding] = useState(false);
   const { translateTitle, translateText, translateUI } = useTranslation();
-  // const { navigatePreservingSearch } = useSearchNavigation(); // Disabled - product navigation removed
-  const [showQuantityInput, setShowQuantityInput] = useState(false);
+  const [showQuantitySelector, setShowQuantitySelector] = useState(isInList);
   const [quantity, setQuantity] = useState(1);
+  const [itemId, setItemId] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  // Update showQuantitySelector when isInList changes
+  useEffect(() => {
+    setShowQuantitySelector(isInList);
+  }, [isInList]);
 
   const handleAddClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (showQuantitySelector) return; // Already added, ignore
+    
     setIsAdding(true);
     try {
-      await onAddToList(product);
+      // Add product with quantity 1 initially
+      const productWithQuantity = { ...product, quantity: 1 };
+      await onAddToList(productWithQuantity);
+      
+      // Show quantity selector after successful add
+      setShowQuantitySelector(true);
+      
+      // Get the item ID from the active list
+      const currentActiveList = useGroceryList.getState().activeList;
+      if (currentActiveList) {
+        const addedItem = currentActiveList.items.find(
+          item => item.productId === product.id
+        );
+        if (addedItem) {
+          setItemId(addedItem.id);
+        }
+      }
     } catch (error) {
       console.error("Error adding product in card component:", error);
     } finally {
       setIsAdding(false);
+    }
+  };
+
+  const incrementQuantity = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newQuantity = quantity + 1;
+    setQuantity(newQuantity);
+    await updateQuantityInList(newQuantity);
+  };
+
+  const decrementQuantity = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (quantity > 1) {
+      const newQuantity = quantity - 1;
+      setQuantity(newQuantity);
+      await updateQuantityInList(newQuantity);
+    }
+  };
+
+  const updateQuantityInList = async (newQuantity: number) => {
+    if (!user || !itemId) return;
+    
+    const currentActiveList = useGroceryList.getState().activeList;
+    if (!currentActiveList) return;
+
+    try {
+      const result = await updateListItem(
+        currentActiveList.id,
+        itemId,
+        user.id,
+        { quantity: newQuantity }
+      );
+
+      if (!result.success) {
+        console.error('Failed to update quantity:', result.message);
+        toast({
+          title: translateUI("Error"),
+          description: translateUI("No se pudo actualizar la cantidad"),
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error updating quantity:', error);
     }
   };
   
@@ -186,26 +254,60 @@ const ProductCardComponent = ({ product, onAddToList, isInList }: ProductCardPro
           {translateText(product.brand) || translateText('Marca desconocida')}
         </p>
       </CardContent>
-      <CardFooter className="p-3 pt-0 pb-4 mt-auto flex items-center justify-between">
-        <div className="font-semibold text-sm text-primary">
-          {formatPrice(product.price)}
-        </div>
-        <Button 
-          variant={isInList ? "secondary" : "default"}
-          size="icon"
-          className="rounded-full h-8 w-8 mb-1"
-          onClick={handleAddClick}
-          disabled={isAdding || isInList}
-          aria-label={isInList ? translateUI("En la Lista") : translateUI("Agregar")}
-        >
-          {isAdding ? (
-            <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
-          ) : isInList ? (
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <Plus className="h-4 w-4" />
+      <CardFooter className="p-3 pt-0 pb-4 mt-auto flex flex-col gap-2">
+        <div className="w-full flex items-center justify-between">
+          <div className="font-semibold text-sm text-primary">
+            {formatPrice(product.price)}
+          </div>
+          {showQuantitySelector && (
+            <div className="flex items-center gap-1 border rounded-md">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 rounded-l-md rounded-r-none"
+                onClick={decrementQuantity}
+                disabled={quantity <= 1}
+              >
+                <Minus className="h-3 w-3" />
+              </Button>
+              <span className="text-xs font-medium px-2 min-w-[24px] text-center">
+                {quantity}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 rounded-r-md rounded-l-none"
+                onClick={incrementQuantity}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
           )}
-        </Button>
+        </div>
+        {!showQuantitySelector ? (
+          <Button 
+            variant="default"
+            size="sm"
+            className="w-full h-8"
+            onClick={handleAddClick}
+            disabled={isAdding}
+            aria-label={translateUI("Agregar al Carrito")}
+          >
+            {isAdding ? (
+              <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
+            ) : (
+              <>
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                {translateUI("Agregar al Carrito")}
+              </>
+            )}
+          </Button>
+        ) : (
+          <div className="w-full h-8 flex items-center justify-center text-xs text-muted-foreground">
+            <Check className="h-3 w-3 mr-1" />
+            {translateUI("En el Carrito")}
+          </div>
+        )}
       </CardFooter>
     </Card>
   );
