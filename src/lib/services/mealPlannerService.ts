@@ -140,12 +140,13 @@ export async function getCurrentWeekMealPlan(userId: string, userEmail?: string)
   }
 
   // If no own plan, check for shared plans with this user as collaborator
+  // RLS policies will automatically filter to only show plans where user is a collaborator
   if (userEmail) {
     const { data: sharedPlans, error: sharedError } = await supabase
       .from('meal_plans')
       .select('*')
       .eq('week_start_date', weekStartDate)
-      .contains('collaborators', [userEmail])
+      .neq('user_id', userId) // Exclude own plans (already checked above)
       .order('created_at', { ascending: false })
       .limit(1);
 
@@ -207,12 +208,13 @@ export async function getCurrentWeekMealPlan(userId: string, userEmail?: string)
 
 /**
  * Get all meal plans shared with a user (as collaborator)
+ * RLS policies automatically filter to only show plans where user is a collaborator
  */
-export async function getSharedMealPlans(userEmail: string): Promise<MealPlan[]> {
+export async function getSharedMealPlans(userId: string): Promise<MealPlan[]> {
   const { data, error } = await supabase
     .from('meal_plans')
     .select('*')
-    .contains('collaborators', [userEmail])
+    .neq('user_id', userId) // Only get plans not owned by this user
     .order('week_start_date', { ascending: false });
 
   if (error) {
