@@ -110,8 +110,9 @@ export const searchMasxMenosProducts = async ({
     const encodedVariables = encodeURIComponent(JSON.stringify(variables));
     
     // Use server-side proxy to avoid CORS issues
-    // MasxMenos API doesn't handle multi-word queries well, so use only the first term
-    const finalQuery = searchTerms[0] || query;
+    // MasxMenos API doesn't handle multi-word queries well, so use the Spanish translation
+    // searchTerms[0] = original query, searchTerms[1] = Spanish translation (if available)
+    const finalQuery = searchTerms.length > 1 ? searchTerms[1] : searchTerms[0];
     console.log('🔍 MasxMenos DEBUG:', {
       originalQuery: query,
       searchTerms: searchTerms,
@@ -120,7 +121,7 @@ export const searchMasxMenosProducts = async ({
     });
     
     const requestBody = {
-      query: finalQuery, // Use first search term only (MasxMenos doesn't support multi-word)
+      query: finalQuery, // Use Spanish translation if available
       variables: encodedVariables,
       page,
       pageSize
@@ -236,9 +237,16 @@ export const searchWalmartProducts = async ({ query, page = 1, pageSize = 30 }: 
       };
     }
     
-    console.log(`Sending request to Walmart API endpoint with query: "${query}"`);
+    // Get all possible translations for the search query
+    const searchTerms = getSearchTranslations(query);
+    console.log('Walmart search terms with translations:', searchTerms);
+    
+    // Use the Spanish translation if available, otherwise use original query
+    const translatedQuery = searchTerms.length > 1 ? searchTerms[1] : searchTerms[0];
+    console.log(`Sending request to Walmart API endpoint with translated query: "${translatedQuery}"`);
+    
     const response = await axios.post<WalmartSearchResponse>('/api/proxy/walmart/search', {
-      query,
+      query: translatedQuery,
       page,
       pageSize
     });
@@ -360,9 +368,16 @@ export const searchAutomercadoProducts = async ({ query, page = 1, pageSize = 30
       };
     }
     
-    console.log(`Sending request to Automercado API endpoint with query: "${query}"`);
+    // Get all possible translations for the search query
+    const searchTerms = getSearchTranslations(query);
+    console.log('Automercado search terms with translations:', searchTerms);
+    
+    // Use the Spanish translation if available, otherwise use original query
+    const translatedQuery = searchTerms.length > 1 ? searchTerms[1] : searchTerms[0];
+    console.log(`Sending request to Automercado API endpoint with translated query: "${translatedQuery}"`);
+    
     const response = await axios.post<any>('/api/proxy/automercado/search', {
-      query,
+      query: translatedQuery,
       page,
       pageSize
     });
