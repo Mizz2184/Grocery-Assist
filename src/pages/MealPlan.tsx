@@ -76,7 +76,7 @@ export default function MealPlan() {
 
     try {
       setLoading(true);
-      const plan = await getCurrentWeekMealPlan(user.id);
+      const plan = await getCurrentWeekMealPlan(user.id, user.email);
       
       if (!plan) {
         // Create a new meal plan for this week
@@ -273,6 +273,12 @@ export default function MealPlan() {
           <p className="text-muted-foreground text-base md:text-sm">
             {weekStart.toLocaleDateString('es-ES', { day: 'numeric' })} de {weekStart.toLocaleDateString('es-ES', { month: 'long' })} - {weekEnd.toLocaleDateString('es-ES', { day: 'numeric' })} de {weekEnd.toLocaleDateString('es-ES', { month: 'long' })} de {weekEnd.toLocaleDateString('es-ES', { year: 'numeric' })}
           </p>
+          {mealPlan && user && mealPlan.user_id !== user.id && (
+            <p className="text-sm text-primary mt-2 flex items-center justify-center md:justify-start gap-2">
+              <span>👥</span>
+              <span>{translateUI('Plan compartido')}</span>
+            </p>
+          )}
         </div>
         
         {/* Buttons - Full width on mobile, side by side */}
@@ -285,7 +291,7 @@ export default function MealPlan() {
             <BookOpen className="h-5 w-5 mr-2" />
             {translateUI('Recetas')}
           </Button>
-          {mealPlan && user && (
+          {mealPlan && user && mealPlan.user_id === user.id && (
             <ShareMealPlan
               mealPlanId={mealPlan.id}
               userId={user.id}
