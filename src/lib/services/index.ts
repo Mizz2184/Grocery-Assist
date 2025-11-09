@@ -13,7 +13,11 @@ export const searchMaxiPaliProducts = async ({
     
     // Get all possible translations for the search query
     const searchTerms = getSearchTranslations(query);
-    console.log('Search terms with translations:', searchTerms);
+    console.log('MaxiPali search terms with translations:', searchTerms);
+    
+    // Use the Spanish translation if available, otherwise use original query
+    const translatedQuery = searchTerms.length > 1 ? searchTerms[1] : searchTerms[0];
+    console.log(`Sending request to MaxiPali API endpoint with translated query: "${translatedQuery}"`);
     
     // Use relative path that will be handled by Vite's proxy
     const searchResponse = await fetch('/api/proxy/maxipali/search', {
@@ -22,7 +26,7 @@ export const searchMaxiPaliProducts = async ({
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        query: searchTerms.join(' '), // Join all terms with spaces for broader search
+        query: translatedQuery, // Use Spanish translation if available
         page,
         pageSize
       })
