@@ -55,7 +55,42 @@ const ProductDetail = () => {
       try {
         setLoading(true);
         
-        // Search for the specific product
+        // First, check if product was passed through navigation state
+        const stateProduct = (location.state as any)?.product;
+        if (stateProduct && stateProduct.id === id) {
+          setProduct(stateProduct);
+          
+          // Still fetch related products
+          const brandSearch = stateProduct.brand || stateProduct.name.split(' ')[0];
+          let related: ProductType[] = [];
+          
+          switch (store.toLowerCase()) {
+            case 'walmart':
+              const walmartRelated = await searchWalmartProducts({ query: brandSearch });
+              related = walmartRelated.products;
+              break;
+            case 'maxipali':
+            case 'maxi pali':
+              const maxipaliRelated = await searchMaxiPaliProducts({ query: brandSearch });
+              related = maxipaliRelated.products;
+              break;
+            case 'masxmenos':
+            case 'mas x menos':
+              const masxmenosRelated = await searchMasxMenosProducts({ query: brandSearch });
+              related = masxmenosRelated.products;
+              break;
+            case 'automercado':
+              const automercadoRelated = await searchAutomercadoProducts({ query: brandSearch });
+              related = automercadoRelated.products;
+              break;
+          }
+          
+          setRelatedProducts(related.filter(p => p.id !== id).slice(0, 6));
+          setLoading(false);
+          return;
+        }
+        
+        // If no product in state, search by product name (use id as query since it might be the name)
         let searchResults: ProductType[] = [];
         
         switch (store.toLowerCase()) {
@@ -417,7 +452,12 @@ const ProductDetail = () => {
                 className="cursor-pointer hover:shadow-lg transition-shadow"
                 onClick={() => {
                   const navId = `${relatedProduct.store || 'unknown'}|${relatedProduct.id}`;
-                  navigate(`/product/${navId}`, { state: { from: location.pathname } });
+                  navigate(`/product/${navId}`, { 
+                    state: { 
+                      from: location.pathname,
+                      product: relatedProduct 
+                    } 
+                  });
                 }}
               >
                 <CardContent className="p-3">

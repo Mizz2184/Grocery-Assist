@@ -180,7 +180,12 @@ const ProductCardComponent = ({ product, onAddToList, isInList }: ProductCardPro
   
   const handleCardClick = () => {
     const navigationId = `${product.store || 'unknown'}|${product.id}`;
-    navigate(`/product/${navigationId}`, { state: { from: location.pathname + location.search } });
+    navigate(`/product/${navigationId}`, { 
+      state: { 
+        from: location.pathname + location.search,
+        product: product // Pass the full product data
+      } 
+    });
   };
 
   return (
