@@ -724,6 +724,10 @@ const Index = () => {
           return true;
         });
         
+        // Sort by price: lowest to highest
+        combinedResults.sort((a, b) => a.price - b.price);
+        console.log('Products sorted by price (lowest to highest)');
+        
         const storeTypes = combinedResults.map(p => p.store);
         const uniqueStores = [...new Set(storeTypes)];
         console.log('Store types in combined results:', uniqueStores);
