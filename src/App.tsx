@@ -29,6 +29,8 @@ import PaymentSuccess from "./pages/PaymentSuccess";
 import SharedList from "./pages/SharedList";
 import VerifyEmail from "./pages/VerifyEmail";
 import ExchangeRate from "./pages/ExchangeRate";
+import MealPlan from "./pages/MealPlan";
+import Recipes from "./pages/Recipes";
 
 // Create a reusable component for translating text
 interface TranslatedTextProps {
@@ -288,6 +290,28 @@ function AppContent() {
             <Navbar />
             <main className="flex-1 w-full">
               <SharedList />
+            </main>
+          </div>
+        </ProtectedRouteComponent>
+      } />
+      
+      <Route path="/meal-plan" element={
+        <ProtectedRouteComponent>
+          <div className="min-h-screen flex flex-col pt-20 w-full">
+            <Navbar />
+            <main className="flex-1 w-full">
+              <MealPlan />
+            </main>
+          </div>
+        </ProtectedRouteComponent>
+      } />
+      
+      <Route path="/recipes" element={
+        <ProtectedRouteComponent>
+          <div className="min-h-screen flex flex-col pt-20 w-full">
+            <Navbar />
+            <main className="flex-1 w-full">
+              <Recipes />
             </main>
           </div>
         </ProtectedRouteComponent>

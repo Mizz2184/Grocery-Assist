@@ -162,6 +162,12 @@ export const Navbar = () => {
       path: "/grocery-list" 
     },
     {
+      icon: <span>📅</span>,
+      labelES: "Plan de Comidas",
+      labelEN: "Meal Plan",
+      path: "/meal-plan"
+    },
+    {
       icon: <span>$</span>,
       labelES: "Conversor",
       labelEN: "Currency",
