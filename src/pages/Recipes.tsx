@@ -242,13 +242,13 @@ export default function Recipes() {
                   {recipe.prep_time && (
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
-                      <span>{recipe.prep_time} min prep</span>
+                      <span>{recipe.prep_time} {translateUI('min prep')}</span>
                     </div>
                   )}
                   {recipe.cook_time && (
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
-                      <span>{recipe.cook_time} min cook</span>
+                      <span>{recipe.cook_time} {translateUI('min cook')}</span>
                     </div>
                   )}
                   {recipe.servings && (

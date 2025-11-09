@@ -6,6 +6,7 @@ export interface MealPlan {
   name: string;
   week_start_date: string; // ISO date string
   notes?: string;
+  collaborators?: string[]; // Array of collaborator emails
   created_at: string;
   updated_at: string;
   meals?: Meal[]; // Optional, populated when fetching with meals

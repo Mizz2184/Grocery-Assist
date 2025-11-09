@@ -266,6 +266,12 @@ export const Navbar = () => {
             <ShoppingCart className="w-4 h-4 mr-2" />
             {isTranslated ? "Grocery List" : translateText("Lista de Compras")}
           </Button>
+          <Link to="/meal-plan">
+            <Button variant="ghost" className="rounded-full h-9">
+              <span className="mr-2">📅</span>
+              {isTranslated ? "Meal Plan" : translateText("Plan de Comidas")}
+            </Button>
+          </Link>
           <Link to="/exchange-rate">
             <Button variant="ghost" className="rounded-full h-9">
               <span className="mr-2">$</span>

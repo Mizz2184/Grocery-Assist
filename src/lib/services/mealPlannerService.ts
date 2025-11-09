@@ -78,29 +78,67 @@ export async function getCurrentWeekMealPlan(userId: string): Promise<MealPlan |
   const monday = new Date(today.setDate(diff));
   const weekStartDate = monday.toISOString().split('T')[0];
 
-  const { data, error } = await supabase
+  // First, get the meal plan (get the most recent one if there are duplicates)
+  const { data: mealPlans, error: planError } = await supabase
     .from('meal_plans')
-    .select(`
-      *,
-      meals(
-        *,
-        recipe:recipes(*)
-      )
-    `)
+    .select('*')
     .eq('user_id', userId)
     .eq('week_start_date', weekStartDate)
-    .single();
+    .order('created_at', { ascending: false })
+    .limit(1);
 
-  if (error) {
-    if (error.code === 'PGRST116') {
-      // No meal plan found for this week
-      return null;
-    }
-    console.error('Error fetching current week meal plan:', error);
-    throw error;
+  if (planError) {
+    console.error('Error fetching current week meal plan:', planError);
+    throw planError;
   }
 
-  return data;
+  if (!mealPlans || mealPlans.length === 0) {
+    return null;
+  }
+
+  const mealPlan = mealPlans[0];
+
+  // Then, get the meals with recipes separately
+  const { data: meals, error: mealsError } = await supabase
+    .from('meals')
+    .select(`
+      id,
+      meal_plan_id,
+      day_of_week,
+      meal_type,
+      name,
+      notes,
+      recipe_id,
+      created_at,
+      updated_at,
+      recipes (
+        id,
+        user_id,
+        name,
+        description,
+        instructions,
+        prep_time,
+        cook_time,
+        servings,
+        image_url,
+        is_favorite,
+        created_at,
+        updated_at
+      )
+    `)
+    .eq('meal_plan_id', mealPlan.id)
+    .order('day_of_week')
+    .order('meal_type');
+
+  if (mealsError) {
+    console.error('Error fetching meals:', mealsError);
+    throw mealsError;
+  }
+
+  return {
+    ...mealPlan,
+    meals: meals || []
+  };
 }
 
 /**

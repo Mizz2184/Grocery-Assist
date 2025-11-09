@@ -10,7 +10,14 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 console.log('DIAGNOSTIC: Using Supabase URL:', supabaseUrl);
 console.log('DIAGNOSTIC: Using Supabase Key:', supabaseKey ? 'Key is present' : 'Key is missing');
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  global: {
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    }
+  }
+});
 
 // Verify initialization
 console.log('DIAGNOSTIC: Supabase client initialized:', !!supabase.from, !!supabase.auth);

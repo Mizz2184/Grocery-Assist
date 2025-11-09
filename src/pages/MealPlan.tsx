@@ -44,6 +44,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useGroceryList } from '@/hooks/useGroceryList';
+import { ShareMealPlan } from '@/components/ShareMealPlan';
 
 export default function MealPlan() {
   const { user } = useAuth();
@@ -262,31 +263,45 @@ export default function MealPlan() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">
-            📅 {translateUI('Plan de Comidas')}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-6">
+        {/* Title and Date - Centered on mobile */}
+        <div className="text-center md:text-left">
+          <h1 className="text-3xl md:text-4xl font-bold mb-2 flex items-center justify-center md:justify-start gap-3">
+            <span className="text-4xl md:text-5xl">📅</span>
+            <span>{translateUI('Plan de Comidas')}</span>
           </h1>
-          <p className="text-muted-foreground">
-            {weekStart.toLocaleDateString('es-ES', { month: 'long', day: 'numeric' })} - {weekEnd.toLocaleDateString('es-ES', { month: 'long', day: 'numeric', year: 'numeric' })}
+          <p className="text-muted-foreground text-base md:text-sm">
+            {weekStart.toLocaleDateString('es-ES', { day: 'numeric' })} de {weekStart.toLocaleDateString('es-ES', { month: 'long' })} - {weekEnd.toLocaleDateString('es-ES', { day: 'numeric' })} de {weekEnd.toLocaleDateString('es-ES', { month: 'long' })} de {weekEnd.toLocaleDateString('es-ES', { year: 'numeric' })}
           </p>
         </div>
-        <div className="flex gap-2">
+        
+        {/* Buttons - Full width on mobile, side by side */}
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
           <Button
             variant="outline"
             onClick={() => navigate('/recipes')}
+            className="w-full sm:w-auto text-base py-6 sm:py-2"
           >
-            <BookOpen className="h-4 w-4 mr-2" />
+            <BookOpen className="h-5 w-5 mr-2" />
             {translateUI('Recetas')}
           </Button>
+          {mealPlan && user && (
+            <ShareMealPlan
+              mealPlanId={mealPlan.id}
+              userId={user.id}
+              mealPlanName={mealPlan.name}
+              collaborators={mealPlan.collaborators || []}
+            />
+          )}
           <Button
             onClick={handleAddToGroceryList}
             disabled={addingToGroceryList || !mealPlan?.meals?.some(m => m.recipe_id)}
+            className="w-full sm:w-auto text-base py-6 sm:py-2"
           >
             {addingToGroceryList ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
             ) : (
-              <ShoppingCart className="h-4 w-4 mr-2" />
+              <ShoppingCart className="h-5 w-5 mr-2" />
             )}
             {translateUI('Agregar a Lista')}
           </Button>
