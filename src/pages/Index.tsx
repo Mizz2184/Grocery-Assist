@@ -128,9 +128,10 @@ interface ProductCardProps {
 
 const ProductCardComponent = ({ product, onAddToList, isInList }: ProductCardProps) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [isAdding, setIsAdding] = useState(false);
   const { translateTitle, translateText, translateUI } = useTranslation();
-  // const { navigatePreservingSearch } = useSearchNavigation(); // Disabled - product navigation removed
   const [showQuantityInput, setShowQuantityInput] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
@@ -177,14 +178,16 @@ const ProductCardComponent = ({ product, onAddToList, isInList }: ProductCardPro
     setQuantity(1);
   };
   
-  // Product page navigation disabled - users can only add to cart
-  // const handleCardNavigation = () => {
-  //   const navigationId = `${product.store || 'unknown'}|${product.id}`;
-  //   navigatePreservingSearch(`/product/${navigationId}`);
-  // };
+  const handleCardClick = () => {
+    const navigationId = `${product.store || 'unknown'}|${product.id}`;
+    navigate(`/product/${navigationId}`, { state: { from: location.pathname + location.search } });
+  };
 
   return (
-    <Card className="h-full flex flex-col overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 relative group">
+    <Card 
+      className="h-full flex flex-col overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 relative group cursor-pointer"
+      onClick={handleCardClick}
+    >
       <CardContent 
         className="p-3 flex-grow" 
       >

@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 // Pages
 import Index from "./pages/Index";
 import Product from "./pages/Product";
+import ProductDetail from "./pages/ProductDetail";
 import GroceryList from "./pages/GroceryList";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
@@ -226,12 +227,12 @@ function AppContent() {
         </ProtectedRouteComponent>
       } />
       
-      <Route path="/product/:id" element={
+      <Route path="/product/:productId" element={
         <ProtectedRouteComponent>
           <div className="min-h-screen flex flex-col pt-20 w-full">
             <Navbar />
             <main className="flex-1 w-full">
-              <Product />
+              <ProductDetail />
             </main>
           </div>
         </ProtectedRouteComponent>
