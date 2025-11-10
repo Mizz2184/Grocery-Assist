@@ -221,122 +221,144 @@ function AppContent() {
       {/* Routes that require both auth and payment */}
       <Route path="/home" element={
         <ProtectedRouteComponent>
-          <div className="min-h-screen flex flex-col pt-20 w-full">
-            <Navbar />
-            <main className="flex-1 w-full">
-              <Index />
-            </main>
-          </div>
+          <PaymentRequired>
+            <div className="min-h-screen flex flex-col pt-20 w-full">
+              <Navbar />
+              <main className="flex-1 w-full">
+                <Index />
+              </main>
+            </div>
+          </PaymentRequired>
         </ProtectedRouteComponent>
       } />
       
       <Route path="/product/:productId" element={
         <ProtectedRouteComponent>
-          <div className="min-h-screen flex flex-col pt-20 w-full">
-            <Navbar />
-            <main className="flex-1 w-full">
-              <ProductDetail />
-            </main>
-          </div>
+          <PaymentRequired>
+            <div className="min-h-screen flex flex-col pt-20 w-full">
+              <Navbar />
+              <main className="flex-1 w-full">
+                <ProductDetail />
+              </main>
+            </div>
+          </PaymentRequired>
         </ProtectedRouteComponent>
       } />
       
       <Route path="/grocery-list" element={
         <ProtectedRouteComponent>
-          <div className="min-h-screen flex flex-col pt-20 w-full">
-            <Navbar />
-            <main className="flex-1 w-full">
-              <GroceryList />
-            </main>
-          </div>
+          <PaymentRequired>
+            <div className="min-h-screen flex flex-col pt-20 w-full">
+              <Navbar />
+              <main className="flex-1 w-full">
+                <GroceryList />
+              </main>
+            </div>
+          </PaymentRequired>
         </ProtectedRouteComponent>
       } />
       
       <Route path="/profile" element={
         <ProtectedRouteComponent>
-          <div className="min-h-screen flex flex-col pt-20 w-full">
-            <Navbar />
-            <main className="flex-1 w-full">
-              <Profile />
-            </main>
-          </div>
+          <PaymentRequired>
+            <div className="min-h-screen flex flex-col pt-20 w-full">
+              <Navbar />
+              <main className="flex-1 w-full">
+                <Profile />
+              </main>
+            </div>
+          </PaymentRequired>
         </ProtectedRouteComponent>
       } />
       
       <Route path="/settings" element={
         <ProtectedRouteComponent>
-          <div className="min-h-screen flex flex-col pt-20 w-full">
-            <Navbar />
-            <main className="flex-1 w-full">
-              <Settings />
-            </main>
-          </div>
+          <PaymentRequired>
+            <div className="min-h-screen flex flex-col pt-20 w-full">
+              <Navbar />
+              <main className="flex-1 w-full">
+                <Settings />
+              </main>
+            </div>
+          </PaymentRequired>
         </ProtectedRouteComponent>
       } />
       
       <Route path="/shared-list" element={
         <ProtectedRouteComponent>
-          <div className="min-h-screen flex flex-col pt-20 w-full">
-            <Navbar />
-            <main className="flex-1 w-full">
-              <SharedList />
-            </main>
-          </div>
+          <PaymentRequired>
+            <div className="min-h-screen flex flex-col pt-20 w-full">
+              <Navbar />
+              <main className="flex-1 w-full">
+                <SharedList />
+              </main>
+            </div>
+          </PaymentRequired>
         </ProtectedRouteComponent>
       } />
       
       <Route path="/shared-list/:listId" element={
         <ProtectedRouteComponent>
-          <div className="min-h-screen flex flex-col pt-20 w-full">
-            <Navbar />
-            <main className="flex-1 w-full">
-              <SharedList />
-            </main>
-          </div>
+          <PaymentRequired>
+            <div className="min-h-screen flex flex-col pt-20 w-full">
+              <Navbar />
+              <main className="flex-1 w-full">
+                <SharedList />
+              </main>
+            </div>
+          </PaymentRequired>
         </ProtectedRouteComponent>
       } />
       
       <Route path="/meal-plan" element={
         <ProtectedRouteComponent>
-          <div className="min-h-screen flex flex-col pt-20 w-full">
-            <Navbar />
-            <main className="flex-1 w-full">
-              <MealPlan />
-            </main>
-          </div>
+          <PaymentRequired>
+            <div className="min-h-screen flex flex-col pt-20 w-full">
+              <Navbar />
+              <main className="flex-1 w-full">
+                <MealPlan />
+              </main>
+            </div>
+          </PaymentRequired>
         </ProtectedRouteComponent>
       } />
       
       <Route path="/recipes" element={
         <ProtectedRouteComponent>
-          <div className="min-h-screen flex flex-col pt-20 w-full">
-            <Navbar />
-            <main className="flex-1 w-full">
-              <Recipes />
-            </main>
-          </div>
+          <PaymentRequired>
+            <div className="min-h-screen flex flex-col pt-20 w-full">
+              <Navbar />
+              <main className="flex-1 w-full">
+                <Recipes />
+              </main>
+            </div>
+          </PaymentRequired>
         </ProtectedRouteComponent>
       } />
       
       <Route path="/shared-meal-plan/:mealPlanId" element={
         <ProtectedRouteComponent>
-          <div className="min-h-screen flex flex-col pt-20 w-full">
-            <Navbar />
-            <main className="flex-1 w-full">
-              <SharedMealPlan />
-            </main>
-          </div>
+          <PaymentRequired>
+            <div className="min-h-screen flex flex-col pt-20 w-full">
+              <Navbar />
+              <main className="flex-1 w-full">
+                <SharedMealPlan />
+              </main>
+            </div>
+          </PaymentRequired>
         </ProtectedRouteComponent>
       } />
       
       <Route path="/exchange-rate" element={
         <ProtectedRouteComponent>
-          <div className="min-h-screen flex flex-col pt-20 w-full">
-            <Navbar />
-            <main className="flex-1 w-full">
-              <ExchangeRate />
-            </main>
-          </div>
+          <PaymentRequired>
+            <div className="min-h-screen flex flex-col pt-20 w-full">
+              <Navbar />
+              <main className="flex-1 w-full">
+                <ExchangeRate />
+              </main>
+            </div>
+          </PaymentRequired>
         </ProtectedRouteComponent>
       } />
       
