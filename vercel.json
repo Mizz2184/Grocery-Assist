@@ -23,6 +23,11 @@
       "methods": ["POST"]
     },
     { 
+      "src": "/api/sync-subscription", 
+      "dest": "/api/sync-subscription.js",
+      "methods": ["POST"]
+    },
+    { 
       "src": "/api/(.*)", 
       "dest": "/server.js" 
     },
