@@ -13,6 +13,11 @@
   ],
   "routes": [
     { 
+      "src": "/api/stripe-webhook", 
+      "dest": "/api/stripe-webhook.js",
+      "methods": ["POST"]
+    },
+    { 
       "src": "/api/(.*)", 
       "dest": "/server.js" 
     },
