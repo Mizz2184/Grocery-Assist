@@ -402,5 +402,8 @@ export const manualTranslations: Record<string, string> = {
   "No hay plan de comidas para esta semana": "No meal plan for this week",
   "Crea un nuevo plan para comenzar": "Create a new plan to get started",
   "No se creó un plan para esta semana": "No plan was created for this week",
-  "Crear Plan": "Create Plan"
+  "Crear Plan": "Create Plan",
+  "Anterior": "Previous",
+  "Siguiente": "Next",
+  "Hoy": "Today"
 }; 

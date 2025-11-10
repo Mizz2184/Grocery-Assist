@@ -19,6 +19,7 @@ import {
 import {
   getMealPlanForWeek,
   getCurrentWeekMealPlan,
+  getUserMealPlans,
   createMealPlan,
   getMealPlanIngredients,
   deleteMeal
@@ -63,6 +64,7 @@ export default function MealPlan() {
   const [newMealName, setNewMealName] = useState('');
   const [newMealNotes, setNewMealNotes] = useState('');
   const [addingToGroceryList, setAddingToGroceryList] = useState(false);
+  const [availableWeeks, setAvailableWeeks] = useState<string[]>([]);
 
   useEffect(() => {
     if (!user) {
@@ -70,7 +72,20 @@ export default function MealPlan() {
       return;
     }
     loadMealPlan();
+    loadAvailableWeeks();
   }, [user, currentWeekStart]);
+
+  const loadAvailableWeeks = async () => {
+    if (!user) return;
+    
+    try {
+      const plans = await getUserMealPlans(user.id);
+      const weeks = plans.map(plan => plan.week_start_date);
+      setAvailableWeeks(weeks);
+    } catch (error) {
+      console.error('Error loading available weeks:', error);
+    }
+  };
 
   const goToPreviousWeek = () => {
     const previousWeek = new Date(currentWeekStart);
@@ -86,6 +101,52 @@ export default function MealPlan() {
 
   const goToCurrentWeek = () => {
     setCurrentWeekStart(getWeekStartDate());
+  };
+
+  const handleWeekSelect = (weekStartDate: string) => {
+    const [year, month, day] = weekStartDate.split('-').map(Number);
+    const selectedDate = new Date(year, month - 1, day);
+    setCurrentWeekStart(selectedDate);
+  };
+
+  const generateWeekOptions = () => {
+    // Generate options for past 6 months and future 3 months
+    const options: { value: string; label: string; hasData: boolean }[] = [];
+    const today = new Date();
+    
+    // Go back 6 months
+    const startDate = new Date(today);
+    startDate.setMonth(startDate.getMonth() - 6);
+    
+    // Go forward 3 months
+    const endDate = new Date(today);
+    endDate.setMonth(endDate.getMonth() + 3);
+    
+    // Get Monday of start week
+    let currentDate = new Date(startDate);
+    const dayOfWeek = currentDate.getDay();
+    const diff = currentDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+    currentDate.setDate(diff);
+    
+    while (currentDate <= endDate) {
+      const weekStartISO = formatDateISO(currentDate);
+      const weekEnd = new Date(currentDate);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      
+      const hasData = availableWeeks.includes(weekStartISO);
+      const label = `${currentDate.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('es-ES', { month: 'short', day: 'numeric', year: 'numeric' })}${hasData ? ' ✓' : ''}`;
+      
+      options.push({
+        value: weekStartISO,
+        label,
+        hasData
+      });
+      
+      // Move to next week
+      currentDate.setDate(currentDate.getDate() + 7);
+    }
+    
+    return options.reverse(); // Most recent first
   };
 
   const isCurrentWeek = formatDateISO(currentWeekStart) === formatDateISO(getWeekStartDate());
@@ -298,42 +359,67 @@ export default function MealPlan() {
           </h1>
           
           {/* Week Navigation */}
-          <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={goToPreviousWeek}
-              className="h-8"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
+          <div className="flex flex-col gap-2 mb-2">
+            {/* Week Selector Dropdown */}
+            <div className="flex items-center justify-center md:justify-start gap-2">
+              <Select
+                value={formatDateISO(currentWeekStart)}
+                onValueChange={handleWeekSelect}
+              >
+                <SelectTrigger className="w-[280px] h-9">
+                  <SelectValue>
+                    {weekStart.toLocaleDateString('es-ES', { day: 'numeric' })} de {weekStart.toLocaleDateString('es-ES', { month: 'long' })} - {weekEnd.toLocaleDateString('es-ES', { day: 'numeric' })} de {weekEnd.toLocaleDateString('es-ES', { month: 'long' })} de {weekEnd.toLocaleDateString('es-ES', { year: 'numeric' })}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {generateWeekOptions().map((option) => (
+                    <SelectItem 
+                      key={option.value} 
+                      value={option.value}
+                      className={option.hasData ? 'font-medium' : ''}
+                    >
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             
-            <p className="text-muted-foreground text-sm px-2">
-              {weekStart.toLocaleDateString('es-ES', { day: 'numeric' })} de {weekStart.toLocaleDateString('es-ES', { month: 'long' })} - {weekEnd.toLocaleDateString('es-ES', { day: 'numeric' })} de {weekEnd.toLocaleDateString('es-ES', { month: 'long' })} de {weekEnd.toLocaleDateString('es-ES', { year: 'numeric' })}
-            </p>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={goToNextWeek}
-              className="h-8"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            {/* Arrow Navigation */}
+            <div className="flex items-center justify-center md:justify-start gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToPreviousWeek}
+                className="h-7 px-2"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span className="text-xs ml-1">{translateUI('Anterior')}</span>
+              </Button>
+              
+              {!isCurrentWeek && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToCurrentWeek}
+                  className="h-7 px-2"
+                >
+                  <Calendar className="h-3 w-3 mr-1" />
+                  <span className="text-xs">{translateUI('Hoy')}</span>
+                </Button>
+              )}
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToNextWeek}
+                className="h-7 px-2"
+              >
+                <span className="text-xs mr-1">{translateUI('Siguiente')}</span>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-
-          {/* Current Week Button */}
-          {!isCurrentWeek && (
-            <Button
-              variant="link"
-              size="sm"
-              onClick={goToCurrentWeek}
-              className="text-xs h-6"
-            >
-              <Calendar className="h-3 w-3 mr-1" />
-              {translateUI('Ir a semana actual')}
-            </Button>
-          )}
           
           {mealPlan && user && mealPlan.user_id !== user.id && (
             <p className="text-sm text-primary mt-2 flex items-center justify-center md:justify-start gap-2">
