@@ -99,6 +99,13 @@ async function handleCheckoutSessionCompleted(session) {
   const isSubscription = session.mode === 'subscription';
   const paymentType = isSubscription ? 'SUBSCRIPTION' : 'LIFETIME';
 
+  // Get current period end for subscriptions
+  let currentPeriodEnd = null;
+  if (isSubscription && session.subscription) {
+    const subscription = await stripe.subscriptions.retrieve(session.subscription);
+    currentPeriodEnd = new Date(subscription.current_period_end * 1000).toISOString();
+  }
+
   // Update or insert payment record
   const { error: paymentError } = await supabase
     .from('user_payments')
@@ -110,6 +117,8 @@ async function handleCheckoutSessionCompleted(session) {
       payment_type: paymentType,
       amount: session.amount_total / 100, // Convert from cents
       currency: session.currency,
+      current_period_end: currentPeriodEnd,
+      cancel_at_period_end: false,
       updated_at: new Date().toISOString()
     }, {
       onConflict: 'user_id'
@@ -182,6 +191,8 @@ async function handleSubscriptionUpdate(subscription) {
           stripe_customer_id: subscription.customer,
           stripe_subscription_id: subscription.id,
           payment_type: 'SUBSCRIPTION',
+          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+          cancel_at_period_end: subscription.cancel_at_period_end || false,
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'user_id'

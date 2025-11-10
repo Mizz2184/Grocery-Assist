@@ -18,6 +18,11 @@
       "methods": ["POST"]
     },
     { 
+      "src": "/api/cancel-subscription", 
+      "dest": "/api/cancel-subscription.js",
+      "methods": ["POST"]
+    },
+    { 
       "src": "/api/(.*)", 
       "dest": "/server.js" 
     },

@@ -13,7 +13,9 @@ ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT,
 ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT,
 ADD COLUMN IF NOT EXISTS payment_type TEXT CHECK (payment_type IN ('SUBSCRIPTION', 'LIFETIME')),
 ADD COLUMN IF NOT EXISTS amount DECIMAL(10, 2),
-ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'usd';
+ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'usd',
+ADD COLUMN IF NOT EXISTS current_period_end TIMESTAMP WITH TIME ZONE,
+ADD COLUMN IF NOT EXISTS cancel_at_period_end BOOLEAN DEFAULT FALSE;
 
 -- Add indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_user_payments_stripe_customer 
