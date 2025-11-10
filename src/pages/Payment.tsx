@@ -1,14 +1,14 @@
-// Updated payment page with improved UI and Stripe integration
+// Payment page with monthly subscription and lifetime deal options
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShoppingCart, Check, CreditCard, ArrowRight } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { ShoppingCart, Check, CreditCard, ArrowRight, Zap, Crown, Sparkles } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 import { 
-  APP_PRICE, 
-  PAYMENT_LINK, 
+  PRICING, 
   checkUserPaymentStatus, 
   markUserPaymentPending
 } from "@/lib/stripe/stripe-client";
@@ -67,7 +67,7 @@ const Payment = () => {
     }
   }, [user, loading, toast, navigate]);
 
-  const handlePayment = async () => {
+  const handlePayment = async (planType: 'MONTHLY' | 'LIFETIME') => {
     if (!user) {
       toast({
         title: "Error",
@@ -86,6 +86,17 @@ const Payment = () => {
       return;
     }
 
+    const selectedPlan = PRICING[planType];
+    
+    if (!selectedPlan.paymentLink) {
+      toast({
+        title: "Configuration Error",
+        description: "Payment link not configured. Please contact support.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsProcessing(true);
       setError(null);
@@ -94,7 +105,7 @@ const Payment = () => {
       await markUserPaymentPending(user.id, crypto.randomUUID());
       
       // Redirect directly to Stripe payment link
-      window.location.href = PAYMENT_LINK;
+      window.location.href = selectedPlan.paymentLink;
     } catch (err) {
       console.error('Payment error:', err);
       setError(err instanceof Error ? err.message : 'Failed to process payment');
@@ -133,67 +144,150 @@ const Payment = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
-      <Card className="w-full max-w-md shadow-lg animate-fade-in">
-        <CardHeader className="text-center">
-          <div className="mx-auto p-2 h-20 w-20 bg-primary rounded-full mb-4 flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 p-4 py-12">
+      <div className="w-full max-w-5xl">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <div className="mx-auto p-3 h-20 w-20 bg-gradient-to-br from-primary to-primary/80 rounded-2xl mb-6 flex items-center justify-center shadow-lg">
             <ShoppingCart className="h-10 w-10 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl font-bold">Subscribe to Shop-Assist</CardTitle>
-          <CardDescription>
-            Get full access to price comparisons and save money on your groceries
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent className="space-y-6">
-          <div className="text-center">
-            <p className="text-4xl font-bold">${APP_PRICE}</p>
-            <p className="text-sm text-muted-foreground">One-time payment for lifetime access</p>
-          </div>
-          
-          <div className="space-y-3">
-            <div className="flex items-start gap-2">
-              <Check className="h-5 w-5 text-green-500 mt-0.5" />
-              <div>
-                <p className="font-medium">Compare prices across stores</p>
-                <p className="text-sm text-muted-foreground">Find the best deals on groceries between MaxiPali and MasxMenos</p>
-              </div>
-            </div>
-            
-            <div className="flex items-start gap-2">
-              <Check className="h-5 w-5 text-green-500 mt-0.5" />
-              <div>
-                <p className="font-medium">Create shopping lists</p>
-                <p className="text-sm text-muted-foreground">Organize your shopping and save your favorite products</p>
-              </div>
-            </div>
-            
-            <div className="flex items-start gap-2">
-              <Check className="h-5 w-5 text-green-500 mt-0.5" />
-              <div>
-                <p className="font-medium">Barcode scanning</p>
-                <p className="text-sm text-muted-foreground">Quickly find products with your phone's camera</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-        
-        <CardFooter className="flex flex-col space-y-3">
-          <Button 
-            className="w-full h-12 text-lg gap-2" 
-            onClick={handlePayment}
-            disabled={isProcessing}
-          >
-            <CreditCard className="h-5 w-5" />
-            Pay with Stripe
-            <ArrowRight className="h-5 w-5" />
-          </Button>
-          
-          <p className="text-xs text-center text-muted-foreground pt-2">
-            Secure payment processing by Stripe. Your payment information is never stored on our servers.
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+            Choose Your Plan
+          </h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Get full access to price comparisons, meal planning, and smart grocery shopping
           </p>
-        </CardFooter>
-      </Card>
+        </div>
+
+        {/* Pricing Cards */}
+        <div className="grid md:grid-cols-2 gap-6 mb-8">
+          {/* Monthly Plan */}
+          <Card className="relative overflow-hidden border-2 hover:border-primary/50 transition-all duration-300 hover:shadow-xl">
+            <CardHeader className="text-center pb-8">
+              <div className="mx-auto p-3 h-16 w-16 bg-blue-100 dark:bg-blue-900/30 rounded-xl mb-4 flex items-center justify-center">
+                <Zap className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+              </div>
+              <CardTitle className="text-2xl font-bold">Monthly</CardTitle>
+              <div className="mt-4">
+                <span className="text-5xl font-bold">${PRICING.MONTHLY.price}</span>
+                <span className="text-muted-foreground">/month</span>
+              </div>
+              <CardDescription className="mt-2">
+                Cancel anytime, no commitment
+              </CardDescription>
+            </CardHeader>
+            
+            <CardContent className="space-y-4 pb-6">
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm">Compare prices across all stores</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm">Unlimited meal plans & recipes</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm">Smart grocery lists with sharing</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm">Barcode scanning</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm">Priority customer support</p>
+                </div>
+              </div>
+            </CardContent>
+            
+            <CardFooter>
+              <Button 
+                className="w-full h-12 text-base gap-2" 
+                variant="outline"
+                onClick={() => handlePayment('MONTHLY')}
+                disabled={isProcessing}
+              >
+                <CreditCard className="h-5 w-5" />
+                Start Monthly Plan
+              </Button>
+            </CardFooter>
+          </Card>
+
+          {/* Lifetime Deal */}
+          <Card className="relative overflow-hidden border-2 border-primary shadow-xl hover:shadow-2xl transition-all duration-300">
+            <div className="absolute top-0 right-0 bg-gradient-to-br from-yellow-400 to-orange-500 text-white px-4 py-1 text-sm font-bold rounded-bl-lg flex items-center gap-1">
+              <Crown className="h-4 w-4" />
+              BEST VALUE
+            </div>
+            
+            <CardHeader className="text-center pb-8 pt-12">
+              <div className="mx-auto p-3 h-16 w-16 bg-gradient-to-br from-yellow-100 to-orange-100 dark:from-yellow-900/30 dark:to-orange-900/30 rounded-xl mb-4 flex items-center justify-center">
+                <Sparkles className="h-8 w-8 text-orange-600 dark:text-orange-400" />
+              </div>
+              <CardTitle className="text-2xl font-bold">Lifetime Deal</CardTitle>
+              <div className="mt-4">
+                <span className="text-5xl font-bold">${PRICING.LIFETIME.price}</span>
+                <span className="text-muted-foreground">/once</span>
+              </div>
+              <CardDescription className="mt-2">
+                Pay once, use forever
+              </CardDescription>
+              <Badge variant="secondary" className="mt-3 mx-auto">
+                Save ${((PRICING.MONTHLY.price * 12) - PRICING.LIFETIME.price).toFixed(2)} vs yearly
+              </Badge>
+            </CardHeader>
+            
+            <CardContent className="space-y-4 pb-6">
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm font-medium">Everything in Monthly, plus:</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm">Lifetime access - no recurring fees</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm">All future updates included</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm">Priority feature requests</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm">VIP support channel</p>
+                </div>
+              </div>
+            </CardContent>
+            
+            <CardFooter>
+              <Button 
+                className="w-full h-12 text-base gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70" 
+                onClick={() => handlePayment('LIFETIME')}
+                disabled={isProcessing}
+              >
+                <Crown className="h-5 w-5" />
+                Get Lifetime Access
+                <ArrowRight className="h-5 w-5" />
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center space-y-4">
+          <p className="text-sm text-muted-foreground">
+            🔒 Secure payment processing by Stripe. Your payment information is never stored on our servers.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Questions? Contact us at support@grocery-assist.com
+          </p>
+        </div>
+      </div>
     </div>
   );
 };

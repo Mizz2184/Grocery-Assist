@@ -12,11 +12,29 @@ import {
 // This will be replaced at build time with the actual value
 export const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder';
 
-// Direct payment link that can be used for checkout
-export const PAYMENT_LINK = import.meta.env.VITE_STRIPE_PAYMENT_LINK || 'https://buy.stripe.com/aEUfZTbgNgJGd0s000';
+// Pricing options
+export const PRICING = {
+  MONTHLY: {
+    price: 4.99,
+    priceId: import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID || '',
+    paymentLink: import.meta.env.VITE_STRIPE_MONTHLY_PAYMENT_LINK || '',
+    interval: 'month' as const,
+    label: 'Monthly Subscription',
+    description: '$4.99/month - Cancel anytime'
+  },
+  LIFETIME: {
+    price: 69.99,
+    priceId: import.meta.env.VITE_STRIPE_LIFETIME_PRICE_ID || '',
+    paymentLink: import.meta.env.VITE_STRIPE_LIFETIME_PAYMENT_LINK || '',
+    interval: 'one_time' as const,
+    label: 'Lifetime Deal',
+    description: '$69.99 one-time payment'
+  }
+};
 
-// App subscription price
-export const APP_PRICE = 19.99;
+// Legacy support
+export const PAYMENT_LINK = PRICING.LIFETIME.paymentLink;
+export const APP_PRICE = PRICING.LIFETIME.price;
 
 // Check if a user has paid for access
 export const checkUserPaymentStatus = async (userId: string): Promise<boolean> => {

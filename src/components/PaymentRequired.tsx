@@ -1,24 +1,14 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { checkUserPaymentStatus, PAYMENT_LINK } from "@/lib/stripe/stripe-client";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShoppingCart } from "lucide-react";
+import { checkUserPaymentStatus } from "@/lib/stripe/stripe-client";
 import { isNewUser as dbIsNewUser } from "@/lib/services/userService";
-
-// Flag to indicate if we're in test mode
-const TEST_MODE = true;
 
 interface PaymentRequiredProps {
   children: ReactNode;
 }
 
 const PaymentRequired = ({ children }: PaymentRequiredProps) => {
-  // PAYMENT REQUIREMENT DISABLED - App is free for now
-  // Original implementation is commented out for future use when premium features are re-enabled
-  
-  /* Original payment verification code
   const { user, loading } = useAuth();
   const location = useLocation();
   const [hasPaid, setHasPaid] = useState<boolean | null>(null);
@@ -94,49 +84,12 @@ const PaymentRequired = ({ children }: PaymentRequiredProps) => {
     return <>{children}</>;
   }
 
-  // If the user hasn't paid, show payment required screen
+  // If the user hasn't paid, redirect to payment page
   if (user && hasPaid === false) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="max-w-md w-full">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-              <ShoppingCart className="h-8 w-8 text-primary" />
-            </div>
-            <CardTitle className="text-2xl">
-              {isNewUser ? "Complete Your Registration" : "Payment Required"}
-            </CardTitle>
-            <CardDescription>
-              {isNewUser 
-                ? "Please complete your payment to activate your account and access all features." 
-                : "You need to subscribe to access this feature. Get access to all premium features for just $19.99."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              Your subscription gives you access to:
-            </p>
-            <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
-              <li>Price comparison across multiple stores</li>
-              <li>Grocery list creation and sharing</li>
-              <li>Product tracking and alerts</li>
-            </ul>
-          </CardContent>
-          <CardFooter>
-            <Button 
-              className="w-full"
-              onClick={() => window.location.href = PAYMENT_LINK}
-            >
-              {isNewUser ? "Complete Payment" : "Subscribe Now"}
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    );
+    return <Navigate to="/payment" replace />;
   }
-  */
 
-  // Always render children, bypassing payment verification
+  // User has paid or payment check passed
   return <>{children}</>;
 };
 
