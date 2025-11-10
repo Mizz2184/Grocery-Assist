@@ -34,7 +34,7 @@ const PaymentSuccess = () => {
 
         // Redirect to home after a short delay
         setTimeout(() => {
-          navigate('/');
+          navigate('/home');
         }, 3000);
       } catch (error) {
         console.error('Error processing payment:', error);
@@ -100,10 +100,10 @@ const PaymentSuccess = () => {
             <>
               <p className="mb-4">Redirecting you to the home page to start searching for products...</p>
               <Button 
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/home')}
                 className="gap-2"
               >
-                Go to Search
+                Go to Home
                 <Search className="h-4 w-4" />
               </Button>
             </>

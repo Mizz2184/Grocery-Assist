@@ -51,7 +51,7 @@ Complete guide to set up your Stripe paywall with **Monthly Subscription ($4.99/
 2. Select your **Monthly Subscription** product
 3. Configure:
    - **After payment**: `Redirect to a page`
-   - **Success URL**: `https://yourdomain.com/payment-success`
+   - **Success URL**: `https://shop-assist.vercel.app/payment-success`
    - **Allow promotion codes**: ✅ (recommended)
 4. Click **Create link**
 5. **Copy the payment link URL**
@@ -62,10 +62,12 @@ Complete guide to set up your Stripe paywall with **Monthly Subscription ($4.99/
 2. Select your **Lifetime Access** product
 3. Configure:
    - **After payment**: `Redirect to a page`
-   - **Success URL**: `https://yourdomain.com/payment-success`
+   - **Success URL**: `https://shop-assist.vercel.app/payment-success`
    - **Allow promotion codes**: ✅ (recommended)
 4. Click **Create link**
 5. **Copy the payment link URL**
+
+**IMPORTANT:** Make sure the success URL matches your production domain!
 
 ### Step 3: Update Your .env File
 
