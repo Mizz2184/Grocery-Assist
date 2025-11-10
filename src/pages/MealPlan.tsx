@@ -17,6 +17,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import {
+  getMealPlanForWeek,
   getCurrentWeekMealPlan,
   createMealPlan,
   getMealPlanIngredients,
@@ -71,22 +72,47 @@ export default function MealPlan() {
     loadMealPlan();
   }, [user, currentWeekStart]);
 
+  const goToPreviousWeek = () => {
+    const previousWeek = new Date(currentWeekStart);
+    previousWeek.setDate(previousWeek.getDate() - 7);
+    setCurrentWeekStart(previousWeek);
+  };
+
+  const goToNextWeek = () => {
+    const nextWeek = new Date(currentWeekStart);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    setCurrentWeekStart(nextWeek);
+  };
+
+  const goToCurrentWeek = () => {
+    setCurrentWeekStart(getWeekStartDate());
+  };
+
+  const isCurrentWeek = formatDateISO(currentWeekStart) === formatDateISO(getWeekStartDate());
+
   const loadMealPlan = async () => {
     if (!user) return;
 
     try {
       setLoading(true);
-      const plan = await getCurrentWeekMealPlan(user.id, user.email);
+      const weekStartDate = formatDateISO(currentWeekStart);
+      const plan = await getMealPlanForWeek(user.id, weekStartDate, user.email);
       
       if (!plan) {
-        // Create a new meal plan for this week
-        const weekStartDate = formatDateISO(currentWeekStart);
-        const newPlan = await createMealPlan(user.id, {
-          name: `${translateUI('Plan de Comidas')} - ${weekStartDate}`,
-          week_start_date: weekStartDate,
-          notes: ''
-        });
-        setMealPlan(newPlan);
+        // Only create a new meal plan if viewing current week
+        const isCurrentWeek = formatDateISO(getWeekStartDate()) === weekStartDate;
+        
+        if (isCurrentWeek) {
+          const newPlan = await createMealPlan(user.id, {
+            name: `${translateUI('Plan de Comidas')} - ${weekStartDate}`,
+            week_start_date: weekStartDate,
+            notes: ''
+          });
+          setMealPlan(newPlan);
+        } else {
+          // No meal plan exists for this past/future week
+          setMealPlan(null);
+        }
       } else {
         setMealPlan(plan);
       }
@@ -270,9 +296,45 @@ export default function MealPlan() {
             <span className="text-4xl md:text-5xl">📅</span>
             <span>{translateUI('Plan de Comidas')}</span>
           </h1>
-          <p className="text-muted-foreground text-base md:text-sm">
-            {weekStart.toLocaleDateString('es-ES', { day: 'numeric' })} de {weekStart.toLocaleDateString('es-ES', { month: 'long' })} - {weekEnd.toLocaleDateString('es-ES', { day: 'numeric' })} de {weekEnd.toLocaleDateString('es-ES', { month: 'long' })} de {weekEnd.toLocaleDateString('es-ES', { year: 'numeric' })}
-          </p>
+          
+          {/* Week Navigation */}
+          <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={goToPreviousWeek}
+              className="h-8"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            
+            <p className="text-muted-foreground text-sm px-2">
+              {weekStart.toLocaleDateString('es-ES', { day: 'numeric' })} de {weekStart.toLocaleDateString('es-ES', { month: 'long' })} - {weekEnd.toLocaleDateString('es-ES', { day: 'numeric' })} de {weekEnd.toLocaleDateString('es-ES', { month: 'long' })} de {weekEnd.toLocaleDateString('es-ES', { year: 'numeric' })}
+            </p>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={goToNextWeek}
+              className="h-8"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Current Week Button */}
+          {!isCurrentWeek && (
+            <Button
+              variant="link"
+              size="sm"
+              onClick={goToCurrentWeek}
+              className="text-xs h-6"
+            >
+              <Calendar className="h-3 w-3 mr-1" />
+              {translateUI('Ir a semana actual')}
+            </Button>
+          )}
+          
           {mealPlan && user && mealPlan.user_id !== user.id && (
             <p className="text-sm text-primary mt-2 flex items-center justify-center md:justify-start gap-2">
               <span>👥</span>
@@ -314,9 +376,33 @@ export default function MealPlan() {
         </div>
       </div>
 
+      {/* No Meal Plan Message */}
+      {!mealPlan && !loading && (
+        <Card className="mb-6">
+          <CardContent className="py-8 text-center">
+            <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-lg font-semibold mb-2">
+              {translateUI('No hay plan de comidas para esta semana')}
+            </h3>
+            <p className="text-muted-foreground mb-4">
+              {isCurrentWeek 
+                ? translateUI('Crea un nuevo plan para comenzar')
+                : translateUI('No se creó un plan para esta semana')}
+            </p>
+            {isCurrentWeek && (
+              <Button onClick={() => loadMealPlan()}>
+                <Plus className="h-4 w-4 mr-2" />
+                {translateUI('Crear Plan')}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Weekly Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
-        {DAYS_OF_WEEK.map((day, dayIndex) => (
+      {mealPlan && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
+          {DAYS_OF_WEEK.map((day, dayIndex) => (
           <Card key={dayIndex} className="flex flex-col">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">
@@ -368,7 +454,8 @@ export default function MealPlan() {
             </CardContent>
           </Card>
         ))}
-      </div>
+        </div>
+      )}
 
       {/* Add Meal Dialog */}
       <Dialog open={addMealDialogOpen} onOpenChange={setAddMealDialogOpen}>

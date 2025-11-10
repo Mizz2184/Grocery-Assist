@@ -69,14 +69,9 @@ export async function getMealPlanWithMeals(mealPlanId: string): Promise<MealPlan
 }
 
 /**
- * Get current week's meal plan
+ * Get meal plan for a specific week
  */
-export async function getCurrentWeekMealPlan(userId: string, userEmail?: string): Promise<MealPlan | null> {
-  const today = new Date();
-  const dayOfWeek = today.getDay();
-  const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-  const monday = new Date(today.setDate(diff));
-  const weekStartDate = monday.toISOString().split('T')[0];
+export async function getMealPlanForWeek(userId: string, weekStartDate: string, userEmail?: string): Promise<MealPlan | null> {
 
   // First, try to get the user's own meal plan
   const { data: ownMealPlans, error: ownPlanError } = await supabase
@@ -204,6 +199,19 @@ export async function getCurrentWeekMealPlan(userId: string, userEmail?: string)
 
   // No meal plan found (neither own nor shared)
   return null;
+}
+
+/**
+ * Get current week's meal plan (wrapper for getMealPlanForWeek)
+ */
+export async function getCurrentWeekMealPlan(userId: string, userEmail?: string): Promise<MealPlan | null> {
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+  const monday = new Date(today.setDate(diff));
+  const weekStartDate = monday.toISOString().split('T')[0];
+  
+  return getMealPlanForWeek(userId, weekStartDate, userEmail);
 }
 
 /**

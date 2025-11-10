@@ -395,5 +395,12 @@ export const manualTranslations: Record<string, string> = {
   "No se pudo cargar el plan de comidas compartido": "Could not load shared meal plan",
   "Volver a mis planes": "Back to my plans",
   "Plan compartido": "Shared plan",
-  "Solo lectura": "Read only"
+  "Solo lectura": "Read only",
+  "Ir a semana actual": "Go to current week",
+  "Semana anterior": "Previous week",
+  "Semana siguiente": "Next week",
+  "No hay plan de comidas para esta semana": "No meal plan for this week",
+  "Crea un nuevo plan para comenzar": "Create a new plan to get started",
+  "No se creó un plan para esta semana": "No plan was created for this week",
+  "Crear Plan": "Create Plan"
 }; 
