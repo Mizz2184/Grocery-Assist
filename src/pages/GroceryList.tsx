@@ -885,8 +885,8 @@ const GroceryList = () => {
           <div className="lg:col-span-2 space-y-6">
             {activeList && (
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
+                <CardHeader className="flex flex-col gap-4">
+                  <div className="w-full">
                     {editingListName && activeList.createdBy === user?.id ? (
                       <div className="flex items-center gap-2">
                         <Input
@@ -915,7 +915,7 @@ const GroceryList = () => {
                         </Button>
                       </div>
                     ) : (
-                      <CardTitle className="flex items-center gap-2">
+                      <CardTitle className="flex items-center gap-2 w-full">
                         <span 
                           className={cn(
                             "cursor-default",
@@ -948,27 +948,31 @@ const GroceryList = () => {
                         )}
                       </CardTitle>
                     )}
-                    <CardDescription>
-                      {activeList.items.length} items
-                      {activeList.createdAt && (
-                        <span className="block text-xs text-muted-foreground mt-1">
-                          Created {new Date(activeList.createdAt).toLocaleDateString('en-US', { 
-                            year: 'numeric', 
-                            month: 'short', 
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </span>
-                      )}
-                      {activeList.createdBy !== user?.id && (
-                        <span className="block text-xs">
-                          Shared by {activeList.createdBy}
-                        </span>
-                      )}
-                    </CardDescription>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  
+                  <div className="flex flex-col gap-2">
+                    <CardDescription className="text-base font-medium">
+                      {activeList.items.length} items
+                    </CardDescription>
+                    {activeList.createdAt && (
+                      <CardDescription className="text-xs text-muted-foreground">
+                        Created {new Date(activeList.createdAt).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'short', 
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </CardDescription>
+                    )}
+                    {activeList.createdBy !== user?.id && (
+                      <CardDescription className="text-xs">
+                        Shared by {activeList.createdBy}
+                      </CardDescription>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-2 w-full">
                     {activeList.createdBy === user?.id && (
                       <ShareGroceryList 
                         listId={activeList.id} 
@@ -981,7 +985,7 @@ const GroceryList = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="flex items-center gap-2 shrink-0"
+                        className="flex items-center gap-2"
                         onClick={handleDeleteList}
                       >
                         <Trash2 className="h-4 w-4" />
