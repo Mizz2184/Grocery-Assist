@@ -1,5 +1,5 @@
 import { Product, ProductSearchParams, ProductSearchResponse } from "@/lib/types/store";
-import { getSearchTranslations } from "@/utils/translations";
+import { isEnglishQuery, translateToSpanish } from "@/utils/translations";
 import axios from "axios";
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
@@ -11,13 +11,10 @@ export const searchMaxiPaliProducts = async ({
   try {
     console.log('Searching MaxiPali for:', query);
     
-    // Get all possible translations for the search query
-    const searchTerms = getSearchTranslations(query);
-    console.log('MaxiPali search terms with translations:', searchTerms);
-    
-    // Use the Spanish translation if available, otherwise use original query
-    const translatedQuery = searchTerms.length > 1 ? searchTerms[1] : searchTerms[0];
-    console.log(`Sending request to MaxiPali API endpoint with translated query: "${translatedQuery}"`);
+    // Detect language and translate if English
+    const isEnglish = isEnglishQuery(query);
+    const searchQuery = isEnglish ? translateToSpanish(query) : query;
+    console.log(`Language detected: ${isEnglish ? 'English' : 'Spanish'}, Search query: "${searchQuery}"`);
     
     // Use relative path that will be handled by Vite's proxy
     const searchResponse = await fetch('/api/proxy/maxipali/search', {
@@ -26,7 +23,7 @@ export const searchMaxiPaliProducts = async ({
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        query: translatedQuery, // Use Spanish translation if available
+        query: searchQuery, // Use translated query if English, original if Spanish
         page,
         pageSize
       })
@@ -75,15 +72,10 @@ export const searchMasxMenosProducts = async ({
       };
     }
     
-    // Get all possible translations for the search query
-    let searchTerms = getSearchTranslations(query);
-    console.log('MasxMenos search terms with translations:', searchTerms);
-    
-    // Ensure we have at least the original query
-    if (searchTerms.length === 0 || searchTerms.join(' ').trim() === '') {
-      searchTerms = [query];
-      console.log('MasxMenos: Using original query as fallback:', query);
-    }
+    // Detect language and translate if English
+    const isEnglish = isEnglishQuery(query);
+    const searchQuery = isEnglish ? translateToSpanish(query) : query;
+    console.log(`MasxMenos - Language detected: ${isEnglish ? 'English' : 'Spanish'}, Search query: "${searchQuery}"`);
     
     // Initialize page parameters
     const from = (page - 1) * pageSize;
@@ -97,7 +89,7 @@ export const searchMasxMenosProducts = async ({
       installmentCriteria: "MAX_WITHOUT_INTEREST",
       productOriginVtex: true,
       map: "ft",
-      query: searchTerms.join(' '), // Join all terms with spaces for broader search
+      query: searchQuery, // Use translated query if English, original if Spanish
       orderBy: "OrderByScoreDESC",
       from: from,
       to: to,
@@ -114,18 +106,13 @@ export const searchMasxMenosProducts = async ({
     const encodedVariables = encodeURIComponent(JSON.stringify(variables));
     
     // Use server-side proxy to avoid CORS issues
-    // MasxMenos API doesn't handle multi-word queries well, so use the Spanish translation
-    // searchTerms[0] = original query, searchTerms[1] = Spanish translation (if available)
-    const finalQuery = searchTerms.length > 1 ? searchTerms[1] : searchTerms[0];
     console.log('🔍 MasxMenos DEBUG:', {
       originalQuery: query,
-      searchTerms: searchTerms,
-      finalQuery: finalQuery,
-      finalQueryLength: finalQuery.length
+      queryLength: query.length
     });
     
     const requestBody = {
-      query: finalQuery, // Use Spanish translation if available
+      query: searchQuery, // Use translated query if English, original if Spanish
       variables: encodedVariables,
       page,
       pageSize
@@ -241,16 +228,13 @@ export const searchWalmartProducts = async ({ query, page = 1, pageSize = 30 }: 
       };
     }
     
-    // Get all possible translations for the search query
-    const searchTerms = getSearchTranslations(query);
-    console.log('Walmart search terms with translations:', searchTerms);
-    
-    // Use the Spanish translation if available, otherwise use original query
-    const translatedQuery = searchTerms.length > 1 ? searchTerms[1] : searchTerms[0];
-    console.log(`Sending request to Walmart API endpoint with translated query: "${translatedQuery}"`);
+    // Detect language and translate if English
+    const isEnglish = isEnglishQuery(query);
+    const searchQuery = isEnglish ? translateToSpanish(query) : query;
+    console.log(`Walmart - Language detected: ${isEnglish ? 'English' : 'Spanish'}, Search query: "${searchQuery}"`);
     
     const response = await axios.post<WalmartSearchResponse>('/api/proxy/walmart/search', {
-      query: translatedQuery,
+      query: searchQuery,
       page,
       pageSize
     });
@@ -372,16 +356,13 @@ export const searchAutomercadoProducts = async ({ query, page = 1, pageSize = 30
       };
     }
     
-    // Get all possible translations for the search query
-    const searchTerms = getSearchTranslations(query);
-    console.log('Automercado search terms with translations:', searchTerms);
-    
-    // Use the Spanish translation if available, otherwise use original query
-    const translatedQuery = searchTerms.length > 1 ? searchTerms[1] : searchTerms[0];
-    console.log(`Sending request to Automercado API endpoint with translated query: "${translatedQuery}"`);
+    // Detect language and translate if English
+    const isEnglish = isEnglishQuery(query);
+    const searchQuery = isEnglish ? translateToSpanish(query) : query;
+    console.log(`Automercado - Language detected: ${isEnglish ? 'English' : 'Spanish'}, Search query: "${searchQuery}"`);
     
     const response = await axios.post<any>('/api/proxy/automercado/search', {
-      query: translatedQuery,
+      query: searchQuery,
       page,
       pageSize
     });

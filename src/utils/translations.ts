@@ -397,4 +397,48 @@ export function isTranslation(term1: string, term2: string): boolean {
 
   // Check if they're the same term
   return normalized1 === normalized2;
+}
+
+// Function to detect if a search query is in English or Spanish
+export function isEnglishQuery(query: string): boolean {
+  const normalizedQuery = query.toLowerCase().trim();
+  
+  // Check if the query (or any word in it) is an English key in our translations
+  const words = normalizedQuery.split(/\s+/);
+  
+  for (const word of words) {
+    // If the word is a key in productTranslations, it's English
+    if (productTranslations[word]) {
+      return true;
+    }
+  }
+  
+  // Check if the full query is an English key
+  if (productTranslations[normalizedQuery]) {
+    return true;
+  }
+  
+  return false;
+}
+
+// Function to translate English query to Spanish for store searches
+export function translateToSpanish(query: string): string {
+  const normalizedQuery = query.toLowerCase().trim();
+  
+  // First, try to translate the full query
+  if (productTranslations[normalizedQuery]) {
+    // Return the first Spanish translation
+    return productTranslations[normalizedQuery][0];
+  }
+  
+  // If not found, try word-by-word translation
+  const words = normalizedQuery.split(/\s+/);
+  const translatedWords = words.map(word => {
+    if (productTranslations[word]) {
+      return productTranslations[word][0]; // Use first Spanish translation
+    }
+    return word; // Keep original if no translation found
+  });
+  
+  return translatedWords.join(' ');
 } 
