@@ -12,6 +12,12 @@ import { convertCRCtoUSD } from "@/utils/currencyUtils";
 import { deleteGroceryListItem } from "@/lib/services/groceryListService";
 import { Product as StoreProduct } from "@/lib/types/store";
 import { getProductStore, storeColors as storeColorMap } from "@/utils/storeUtils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface GroceryListItemProps {
   item: GroceryItem;
@@ -66,6 +72,7 @@ export const GroceryListItem = ({
   const [isRemoving, setIsRemoving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [quantity, setQuantity] = useState(item.quantity);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const { toast } = useToast();
 
   // Use product data from the item if it exists
@@ -155,18 +162,21 @@ export const GroceryListItem = ({
   };
   
   return (
+    <>
     <Card 
       className={cn(
-        "flex items-center p-3 gap-3 transition-all",
+        "flex items-center p-3 gap-3 transition-all cursor-pointer hover:bg-accent/50",
         item.checked && "bg-muted/30 dark:bg-muted/10",
         isRemoving && "scale-95 opacity-50"
       )}
+      onClick={() => setIsDetailOpen(true)}
     >
       <Checkbox 
         checked={item.checked}
         onCheckedChange={(checked) => {
           onCheckItem(checked as boolean);
         }}
+        onClick={(e) => e.stopPropagation()}
         className="h-5 w-5 rounded-md data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
       />
       
@@ -228,7 +238,7 @@ export const GroceryListItem = ({
       {renderPrice()}
       
       <div className="flex items-center gap-2">
-        <div className="relative group">
+        <div className="relative group" onClick={(e) => e.stopPropagation()}>
           <Button
             variant="ghost"
             size="sm"
@@ -272,7 +282,10 @@ export const GroceryListItem = ({
           variant="ghost" 
           size="icon" 
           className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-          onClick={handleRemove}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleRemove();
+          }}
           disabled={isRemoving}
           title="Remove item"
           aria-label="Remove item from list"
@@ -281,5 +294,106 @@ export const GroceryListItem = ({
         </Button>
       </div>
     </Card>
+
+    {/* Product Detail Modal */}
+    <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Product Details</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          {/* Product Image */}
+          <div className="w-full aspect-square rounded-lg overflow-hidden bg-secondary flex items-center justify-center">
+            {getProductImage(product) ? (
+              <img 
+                src={getProductImage(product)} 
+                alt={product.name} 
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center text-muted-foreground">
+                <Package className="h-16 w-16 mb-2" />
+                <span className="text-sm">No image available</span>
+              </div>
+            )}
+          </div>
+
+          {/* Product Info */}
+          <div className="space-y-3">
+            <div>
+              <h3 className="font-semibold text-lg">{product.name}</h3>
+              <p className="text-sm text-muted-foreground">{product.brand}</p>
+            </div>
+
+            {/* Store Badge */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Store:</span>
+              <Badge 
+                className={cn(
+                  storeColor ? 
+                    `${storeColor.split(' ')[0]} ${storeColor.split(' ')[1]}` : 
+                    `${getStoreColor(storeName)} text-white`
+                )}
+              >
+                {storeName}
+              </Badge>
+            </div>
+
+            {/* Quantity */}
+            <div className="flex items-center justify-between py-3 border-t border-b">
+              <span className="text-sm font-medium">Quantity:</span>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleQuantityChange(Math.max(1, quantity - 1));
+                  }}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <span className="text-lg font-semibold w-8 text-center">{quantity}</span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleQuantityChange(quantity + 1);
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Price */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Unit Price:</span>
+                <div className="text-right">
+                  <div className="font-medium">₡{formatPrice(itemPrice)}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {formatUSD(convertCRCtoUSD(itemPrice))}
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-between items-center pt-2 border-t">
+                <span className="font-semibold">Total:</span>
+                <div className="text-right">
+                  <div className="font-bold text-lg">₡{formatPrice(totalPrice)}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {formatUSD(totalPriceUSD)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
