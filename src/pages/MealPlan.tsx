@@ -10,27 +10,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
-  ShoppingCart,
-  Loader2,
   Trash2,
-  Edit,
-  BookOpen
+  BookOpen,
+  Loader2
 } from 'lucide-react';
 import {
   getMealPlanForWeek,
-  getCurrentWeekMealPlan,
   getUserMealPlans,
   createMealPlan,
-  getMealPlanIngredients,
   deleteMeal
 } from '@/lib/services/mealPlannerService';
-import { addProductToGroceryList } from '@/lib/services/groceryListService';
-import { 
-  searchMaxiPaliProducts,
-  searchMasxMenosProducts,
-  searchWalmartProducts,
-  searchAutomercadoProducts
-} from '@/lib/services';
 import type { MealPlan, Meal, RecipeIngredient } from '@/lib/types/mealPlanner';
 import {
   DAYS_OF_WEEK,
@@ -45,7 +34,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useGroceryList } from '@/hooks/useGroceryList';
 import { ShareMealPlan } from '@/components/ShareMealPlan';
 
 export default function MealPlan() {
@@ -53,7 +41,6 @@ export default function MealPlan() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { translateUI } = useTranslation();
-  const { activeList } = useGroceryList();
 
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,7 +50,6 @@ export default function MealPlan() {
   const [selectedMealType, setSelectedMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('dinner');
   const [newMealName, setNewMealName] = useState('');
   const [newMealNotes, setNewMealNotes] = useState('');
-  const [addingToGroceryList, setAddingToGroceryList] = useState(false);
   const [availableWeeks, setAvailableWeeks] = useState<string[]>([]);
 
   useEffect(() => {
@@ -160,20 +146,8 @@ export default function MealPlan() {
       const plan = await getMealPlanForWeek(user.id, weekStartDate, user.email);
       
       if (!plan) {
-        // Only create a new meal plan if viewing current week
-        const isCurrentWeek = formatDateISO(getWeekStartDate()) === weekStartDate;
-        
-        if (isCurrentWeek) {
-          const newPlan = await createMealPlan(user.id, {
-            name: `${translateUI('Plan de Comidas')} - ${weekStartDate}`,
-            week_start_date: weekStartDate,
-            notes: ''
-          });
-          setMealPlan(newPlan);
-        } else {
-          // No meal plan exists for this past/future week
-          setMealPlan(null);
-        }
+        // No meal plan exists for this week yet
+        setMealPlan(null);
       } else {
         setMealPlan(plan);
       }
@@ -237,93 +211,6 @@ export default function MealPlan() {
         description: translateUI('No se pudo eliminar la comida'),
         variant: 'destructive'
       });
-    }
-  };
-
-  const handleAddToGroceryList = async () => {
-    if (!mealPlan || !user || !activeList) {
-      toast({
-        title: translateUI('Error'),
-        description: translateUI('Por favor selecciona una lista de compras primero'),
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    try {
-      setAddingToGroceryList(true);
-      
-      // Get all ingredients from the meal plan
-      const ingredients = await getMealPlanIngredients(mealPlan.id);
-      
-      if (ingredients.length === 0) {
-        toast({
-          title: translateUI('Sin Ingredientes'),
-          description: translateUI('No hay ingredientes para agregar. Agrega recetas a tus comidas primero.'),
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      let addedCount = 0;
-      let failedCount = 0;
-
-      // Search for each ingredient and add to grocery list
-      for (const ingredient of ingredients) {
-        try {
-          const searchTerm = ingredient.product_search_term || ingredient.ingredient_name;
-          
-          // Search in all stores
-          const [maxipali, masxmenos, walmart, automercado] = await Promise.all([
-            searchMaxiPaliProducts({ query: searchTerm, pageSize: 1 }),
-            searchMasxMenosProducts({ query: searchTerm, pageSize: 1 }),
-            searchWalmartProducts({ query: searchTerm, pageSize: 1 }),
-            searchAutomercadoProducts({ query: searchTerm, pageSize: 1 })
-          ]);
-
-          // Get the first available product
-          const allProducts = [
-            ...(maxipali.products || []),
-            ...(masxmenos.products || []),
-            ...(walmart.products || []),
-            ...(automercado.products || [])
-          ];
-
-          if (allProducts.length > 0) {
-            // Sort by price and get the cheapest
-            allProducts.sort((a, b) => a.price - b.price);
-            const product = allProducts[0];
-
-            await addProductToGroceryList(activeList.id, user.id, {
-              ...product,
-              quantity: ingredient.quantity || 1
-            });
-            addedCount++;
-          } else {
-            failedCount++;
-            console.log(`No product found for: ${searchTerm}`);
-          }
-        } catch (error) {
-          console.error(`Error adding ingredient ${ingredient.ingredient_name}:`, error);
-          failedCount++;
-        }
-      }
-
-      toast({
-        title: translateUI('Ingredientes Agregados'),
-        description: translateUI(`Se agregaron ${addedCount} productos a tu lista. ${failedCount > 0 ? `${failedCount} no se encontraron.` : ''}`)
-      });
-
-      navigate('/grocery-list');
-    } catch (error) {
-      console.error('Error adding to grocery list:', error);
-      toast({
-        title: translateUI('Error'),
-        description: translateUI('No se pudieron agregar los ingredientes'),
-        variant: 'destructive'
-      });
-    } finally {
-      setAddingToGroceryList(false);
     }
   };
 
@@ -447,18 +334,6 @@ export default function MealPlan() {
               collaborators={mealPlan.collaborators || []}
             />
           )}
-          <Button
-            onClick={handleAddToGroceryList}
-            disabled={addingToGroceryList || !mealPlan?.meals?.some(m => m.recipe_id)}
-            className="w-full sm:w-auto text-base py-6 sm:py-2"
-          >
-            {addingToGroceryList ? (
-              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-            ) : (
-              <ShoppingCart className="h-5 w-5 mr-2" />
-            )}
-            {translateUI('Agregar a Lista')}
-          </Button>
         </div>
       </div>
 
@@ -471,16 +346,26 @@ export default function MealPlan() {
               {translateUI('No hay plan de comidas para esta semana')}
             </h3>
             <p className="text-muted-foreground mb-4">
-              {isCurrentWeek 
-                ? translateUI('Crea un nuevo plan para comenzar')
-                : translateUI('No se creó un plan para esta semana')}
+              {translateUI('Crea un nuevo plan para esta semana')}
             </p>
-            {isCurrentWeek && (
-              <Button onClick={() => loadMealPlan()}>
-                <Plus className="h-4 w-4 mr-2" />
-                {translateUI('Crear Plan')}
-              </Button>
-            )}
+            <Button onClick={async () => {
+              if (!user) return;
+              const weekStartDate = formatDateISO(currentWeekStart);
+              const newPlan = await createMealPlan(user.id, {
+                name: `${translateUI('Plan de Comidas')} - ${weekStartDate}`,
+                week_start_date: weekStartDate,
+                notes: ''
+              });
+              setMealPlan(newPlan);
+              await loadAvailableWeeks();
+              toast({
+                title: translateUI('Plan Creado'),
+                description: translateUI('Tu plan de comidas ha sido creado exitosamente')
+              });
+            }}>
+              <Plus className="h-4 w-4 mr-2" />
+              {translateUI('Crear Plan')}
+            </Button>
           </CardContent>
         </Card>
       )}
