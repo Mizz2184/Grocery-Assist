@@ -15,20 +15,20 @@ export const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KE
 // Pricing options
 export const PRICING = {
   MONTHLY: {
-    price: 4.99,
+    price: 2.99,
     priceId: import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID || '',
     paymentLink: import.meta.env.VITE_STRIPE_MONTHLY_PAYMENT_LINK || '',
     interval: 'month' as const,
     label: 'Monthly Subscription',
-    description: '$4.99/month - Cancel anytime'
+    description: '$2.99/month - Cancel anytime'
   },
   LIFETIME: {
-    price: 69.99,
+    price: 34.99,
     priceId: import.meta.env.VITE_STRIPE_LIFETIME_PRICE_ID || '',
     paymentLink: import.meta.env.VITE_STRIPE_LIFETIME_PAYMENT_LINK || '',
     interval: 'one_time' as const,
     label: 'Lifetime Deal',
-    description: '$69.99 one-time payment'
+    description: '$34.99 one-time payment'
   }
 };
 
