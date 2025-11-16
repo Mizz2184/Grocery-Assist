@@ -106,8 +106,7 @@ const Login = () => {
       setError(null);
       // Clear search state before login attempt
       // clearSearch();
-      
-      console.log("Attempting login with:", email);
+
       const { error } = await signInWithEmail(email, password);
       
       if (error) {

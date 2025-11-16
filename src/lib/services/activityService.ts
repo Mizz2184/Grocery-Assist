@@ -32,7 +32,6 @@ export const logActivity = async (
   metadata?: Record<string, any>
 ): Promise<Activity | null> => {
   try {
-    console.log('📝 Logging activity:', { listId, userId, action, itemName });
 
     const { data, error } = await supabase
       .from('grocery_list_activity')
@@ -53,7 +52,6 @@ export const logActivity = async (
       return null;
     }
 
-    console.log('✅ Activity logged:', data);
     return data;
   } catch (error) {
     console.error('💥 Error in logActivity:', error);

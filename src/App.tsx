@@ -374,7 +374,7 @@ export default function App() {
   useEffect(() => {
     // Fetch the exchange rate in the background
     fetchCurrentExchangeRate().then(rate => {
-      console.log(`Exchange rate loaded: ${rate} USD per CRC`);
+
     }).catch(error => {
       console.error('Failed to load initial exchange rate:', error);
     });

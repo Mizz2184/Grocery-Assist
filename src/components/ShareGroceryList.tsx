@@ -99,8 +99,7 @@ export function ShareGroceryList({ listId, userId, listName, collaborators = [] 
   
   const verifyListExists = async () => {
     try {
-      console.log(`Verifying list exists: ${listId}`);
-      
+
       // Check if the list exists in the database
       const { data, error } = await supabase
         .from('grocery_lists')
@@ -120,14 +119,13 @@ export function ShareGroceryList({ listId, userId, listName, collaborators = [] 
         
         // In dev mode, run diagnostic
         if (import.meta.env.DEV) {
-          console.log("Running diagnostics on list...");
+
           await diagnoseSharedList(listId);
         }
         
         return;
       }
-      
-      console.log(`List verified: ${data.id} - ${data.name}`);
+
       setListStatus({ exists: true });
     } catch (error) {
       console.error("Verification error:", error);

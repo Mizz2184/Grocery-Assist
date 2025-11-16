@@ -518,7 +518,7 @@ const Index = () => {
 
   useEffect(() => {
     if (scrollPosition > 0 && searchResultsRef.current) {
-      console.log(`Restoring scroll position to ${scrollPosition}px`);
+
       setTimeout(() => {
         window.scrollTo({
           top: scrollPosition,
@@ -532,7 +532,7 @@ const Index = () => {
     return () => {
       if (query && searchResults.length > 0) {
         const finalScroll = window.scrollY;
-        console.log(`Index.tsx: Component unmounting, saving final scroll position ${finalScroll}px to sessionStorage.`);
+
         sessionStorage.setItem('search_scroll_position', finalScroll.toString());
       }
     };
@@ -542,12 +542,12 @@ const Index = () => {
     const fetchUserLists = async () => {
       if (!user) {
         setProductsInList(new Set());
-        console.log('No user logged in, clearing productsInList');
+
         return;
       }
 
       try {
-        console.log('Fetching user lists to build productsInList for user:', user.id);
+
         const lists = await getUserGroceryLists(user.id);
         const productIds = new Set<string>();
         
@@ -556,8 +556,7 @@ const Index = () => {
             productIds.add(item.productId);
           });
         });
-        
-        console.log('Updated productsInList, now contains', productIds.size, 'products');
+
         setProductsInList(productIds);
       } catch (error) {
         console.error('Error fetching user lists:', error);
@@ -570,7 +569,7 @@ const Index = () => {
   const isProductInList = (productId: string, store: string) => {
     try {
       if (productsInList.has(productId)) {
-        console.log(`isProductInList: Found product ${productId} in productsInList Set`);
+
         return true;
       }
       
@@ -582,8 +581,7 @@ const Index = () => {
         
         for (const item of list.items) {
           if (item.productId === productId) {
-            console.log(`isProductInList: Found product ${productId} in localStorage lists`);
-            
+
             setProductsInList(prev => new Set([...prev, productId]));
             return true;
           }
@@ -622,100 +620,92 @@ const Index = () => {
 
   const handleSearch = async (searchQuery: string) => {
     if (!searchQuery) return;
-    
-    console.log('Performing product search for:', searchQuery);
+
     setIsSearching(true);
     
     setQuery(searchQuery);
 
     try {
-      console.log('Starting parallel store searches...');
+
       const [maxiPaliResults, masxMenosResults, walmartResults, automercadoResults] = await Promise.all([
         searchMaxiPaliProducts({ query: searchQuery }),
         searchMasxMenosProducts({ query: searchQuery }),
         searchWalmartProducts({ query: searchQuery }),
         searchAutomercadoProducts({ query: searchQuery })
       ]);
-      console.log('All store API searches completed');
 
-      console.log('=== DEBUG SEARCH RESPONSES ===');
-      console.log('MaxiPali response structure:', JSON.stringify(maxiPaliResults).substring(0, 200) + '...');
-      console.log('MasxMenos response structure:', JSON.stringify(masxMenosResults).substring(0, 200) + '...');
-      console.log('Walmart response structure:', JSON.stringify(walmartResults).substring(0, 200) + '...');
-      console.log('Automercado response structure:', JSON.stringify(automercadoResults).substring(0, 200) + '...');
+
+
 
       let combinedResults: ProductType[] = [];
       let totalProductCount = 0;
       
       if (maxiPaliResults && maxiPaliResults.products && maxiPaliResults.products.length > 0) {
-        console.log(`Adding ${maxiPaliResults.products.length} MaxiPali products`);
+
         const maxiPaliWithStore = maxiPaliResults.products.map(p => ({
           ...p,
           store: 'MaxiPali' as const
         }));
         combinedResults = [...combinedResults, ...maxiPaliWithStore];
         totalProductCount += maxiPaliResults.products.length;
-        console.log(`Found ${maxiPaliResults.products.length} MaxiPali products`);
+
       } else {
-        console.log('No MaxiPali products found');
+
       }
       
       if (masxMenosResults && masxMenosResults.products && masxMenosResults.products.length > 0) {
-        console.log(`Adding ${masxMenosResults.products.length} MasxMenos products`);
+
         const masxMenosWithStore = masxMenosResults.products.map(p => ({
           ...p,
           store: 'MasxMenos' as const
         }));
         combinedResults = [...combinedResults, ...masxMenosWithStore];
         totalProductCount += masxMenosResults.products.length;
-        console.log(`Found ${masxMenosResults.products.length} MasxMenos products`);
+
       } else {
-        console.log('No MasxMenos products found');
+
       }
       
       if (walmartResults && walmartResults.products && walmartResults.products.length > 0) {
-        console.log(`Adding ${walmartResults.products.length} Walmart products`);
+
         const walmartWithStore = walmartResults.products.map(p => ({
           ...p,
           store: 'Walmart' as const
         }));
-        
-        console.log('Walmart product examples:');
+
         walmartResults.products.slice(0, 2).forEach((p, i) => {
-          console.log(`Walmart product ${i}: id=${p.id}, name=${p.name}, price=${p.price}, store=${p.store}`);
+
         });
         
         combinedResults = [...combinedResults, ...walmartWithStore];
         totalProductCount += walmartResults.products.length;
-        console.log(`Found ${walmartResults.products.length} Walmart products`);
+
       } else {
-        console.log('No Walmart products found or results are invalid');
-        console.log('Walmart results structure:', walmartResults);
+
       }
       
       if (automercadoResults && automercadoResults.products && automercadoResults.products.length > 0) {
-        console.log(`Adding ${automercadoResults.products.length} Automercado products`);
+
         const automercadoWithStore = automercadoResults.products.map(p => ({
           ...p,
           store: 'Automercado' as const
         }));
         combinedResults = [...combinedResults, ...automercadoWithStore];
         totalProductCount += automercadoResults.products.length;
-        console.log(`Found ${automercadoResults.products.length} Automercado products`);
+
       } else {
-        console.log('No Automercado products found');
+
       }
       
       if (combinedResults.length === 0) {
-        console.log('No products found across any store');
+
         toast({
           title: translateUI("No Se Encontraron Resultados"),
           description: translateUI(`No pudimos encontrar productos que coincidan con "${searchQuery}"`),
           variant: "destructive"
         });
       } else {
-        console.log(`Found ${combinedResults.length} total products, by store count: MaxiPali=${maxiPaliResults.products?.length || 0}, MasxMenos=${masxMenosResults.products?.length || 0}, Walmart=${walmartResults.products?.length || 0}, Automercado=${automercadoResults.products?.length || 0}`);
-        
+
         combinedResults = combinedResults.filter(product => {
           if (!product.id || !product.name || typeof product.price !== 'number') {
             console.error('Invalid product found in results:', product);
@@ -726,35 +716,21 @@ const Index = () => {
         
         // Sort by price: lowest to highest
         combinedResults.sort((a, b) => a.price - b.price);
-        console.log('Products sorted by price (lowest to highest)');
-        
+
         const storeTypes = combinedResults.map(p => p.store);
         const uniqueStores = [...new Set(storeTypes)];
-        console.log('Store types in combined results:', uniqueStores);
-        
-        console.log('Sample of combined results (first 2 products):', 
-          combinedResults.slice(0, 2).map(p => ({
-            id: p.id,
-            name: p.name,
-            store: p.store,
-            price: p.price
-          }))
-        );
-        
+
         toast({
           title: translateUI(`Se Encontraron ${totalProductCount} Productos`),
           description: translateUI(`Mostrando resultados para "${searchQuery}"`)
         });
       }
-      
-      console.log(`Index.tsx/handleSearch: Saving query="${searchQuery}" and ${combinedResults.length} results DIRECTLY to sessionStorage BEFORE updating context.`);
+
       sessionStorage.setItem('search_query', searchQuery);
       sessionStorage.setItem('search_results', JSON.stringify(combinedResults));
-      
-      console.log(`About to set ${combinedResults.length} search results in context.`);
+
       setSearchResults(combinedResults);
-      console.log('Set search results called with', combinedResults.length, 'products');
-      
+
     } catch (error) {
       console.error('Error during search:', error);
       toast({
@@ -762,8 +738,7 @@ const Index = () => {
         description: translateUI("Ocurrió un error durante la búsqueda. Por favor intenta de nuevo."),
         variant: "destructive"
       });
-      
-      console.log('Index.tsx/handleSearch: Clearing sessionStorage due to search error.');
+
       sessionStorage.removeItem('search_results');
       sessionStorage.removeItem('search_query');
     } finally {
@@ -898,15 +873,14 @@ const Index = () => {
         };
 
         recorder.onstop = () => {
-          console.log('Recording stopped');
+
           stream.getTracks().forEach(track => track.stop());
         };
         
         // Connect to Gemini Live
         const connection = await connectToGeminiVoiceAgent(
           async (message) => {
-            console.log('Received message from Gemini:', message);
-            
+
             // Handle different message types
             if (message.text) {
               // Check if it's a JSON command
@@ -926,7 +900,7 @@ const Index = () => {
                 }
               } catch (e) {
                 // Not a JSON command, just a regular response
-                console.log('Gemini response:', message.text);
+
               }
             }
             
@@ -950,7 +924,7 @@ const Index = () => {
           },
           // onReady callback - start recording when connection is ready
           () => {
-            console.log('Connection ready, starting audio recording...');
+
             connectionReady = true;
             pendingConnection = connection;
             
@@ -1066,23 +1040,21 @@ const Index = () => {
     }
     
     try {
-      console.log('Adding scanned product to list:', product);
-      
+
       const currentActiveList = useGroceryList.getState().activeList;
       let targetList;
       
       if (currentActiveList) {
-        console.log('Using active list for scanned product:', currentActiveList.name);
+
         targetList = currentActiveList;
       } else {
       const defaultList = await getOrCreateDefaultList(user.id);
-        console.log('No active list, using default list for scanned product:', defaultList.name);
+
         targetList = defaultList;
       }
       
       const result = await addProductToGroceryList(targetList.id, user.id, product);
-      console.log('Result of adding scanned product:', result);
-      
+
       if (!result.success) {
         toast({
           title: translateUI("Error"),
@@ -1122,29 +1094,19 @@ const Index = () => {
 
   useEffect(() => {
     if (filteredResults && filteredResults.length > 0) {
-      console.log('Current filter:', storeFilter);
-      console.log('Product count to be displayed:', filteredResults.length);
-      console.log('Store counts in filteredResults:', {
-        'Walmart': filteredResults.filter(p => p.store === 'Walmart').length,
-        'MaxiPali': filteredResults.filter(p => p.store === 'MaxiPali').length,
-        'MasxMenos': filteredResults.filter(p => p.store === 'MasxMenos').length,
-        'Automercado': filteredResults.filter(p => p.store === 'Automercado').length
-      });
+
     }
   }, [filteredResults, storeFilter]);
 
   const handleStoreFilterChange = (value: string) => {
-    console.log(`Changing store filter from ${storeFilter} to ${value}`);
-    
+
     setStoreFilter(value as 'all' | 'MaxiPali' | 'MasxMenos' | 'Walmart' | 'Automercado');
     
     if (value !== 'all' && searchResults.length > 0) {
       const expectedCount = searchResults.filter(p => 
         String(p.store).trim().toLowerCase() === value.toLowerCase()
       ).length;
-      
-      console.log(`Selected filter: ${value}. Expected products matching this filter: ${expectedCount}`);
-      
+
       const exactMatches = searchResults.filter(p => p.store === value).length;
       if (exactMatches !== expectedCount) {
         console.warn(`Store case sensitivity issue detected. Exact matches: ${exactMatches}, 
@@ -1165,7 +1127,7 @@ const Index = () => {
   };
 
   useEffect(() => {
-    console.log('Index page mounted, activeList:', activeList?.id, activeList?.name);
+
   }, []);
 
   useEffect(() => {
@@ -1255,7 +1217,7 @@ const Index = () => {
                 <Select
                 value={storeFilter} 
                   onValueChange={(value) => {
-                    console.log(`Store selection changed to: ${value}`);
+
                     handleStoreFilterChange(value);
                   }}
                 >

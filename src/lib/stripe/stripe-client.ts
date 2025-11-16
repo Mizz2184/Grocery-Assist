@@ -56,7 +56,7 @@ export const markUserPaymentPending = async (userId: string, sessionId: string):
       timestamp: Date.now()
     };
     localStorage.setItem(`payment_pending_${userId}`, JSON.stringify(pendingData));
-    console.log('Set pending payment status for user:', userId, 'with session:', sessionId);
+
   } catch (error) {
     console.error('Error marking payment as pending:', error);
   }
@@ -69,7 +69,7 @@ export const markUserAsPaid = async (userId: string): Promise<void> => {
     // For backwards compatibility during transition
     localStorage.removeItem(`payment_pending_${userId}`);
     localStorage.setItem(`payment_status_${userId}`, PAYMENT_STATUS.PAID);
-    console.log('Set paid status for user:', userId);
+
   } catch (error) {
     console.error('Error marking user as paid:', error);
   }
@@ -83,7 +83,7 @@ export const clearPaymentStatus = async (userId: string): Promise<void> => {
     // For backwards compatibility during transition
     localStorage.removeItem(`payment_status_${userId}`);
     localStorage.removeItem(`payment_pending_${userId}`);
-    console.log('Cleared payment status for user:', userId);
+
   } catch (error) {
     console.error('Error clearing payment status:', error);
   }

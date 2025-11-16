@@ -16,22 +16,16 @@ export const STORE = {
 export type STORE = typeof STORE[keyof typeof STORE];
 
 // Enable for debugging store detection issues
-const DEBUG = true;
+const DEBUG = false;
 
 export function getProductStore(product: any): STORE {
   if (!product) {
-    if (DEBUG) console.log('getProductStore: No product provided');
     return STORE.UNKNOWN;
   }
 
   // Normalize store name to handle case differences, extra spaces, etc.
   let storeName = (product.store || '').toString().toLowerCase().trim();
   
-  if (DEBUG) {
-    console.log(`getProductStore for product ${product.id || 'unknown'} (${product.name || 'unnamed'})`);
-    console.log(`Original store property: "${product.store || 'none'}"`);
-    console.log(`Normalized store: "${storeName}"`);
-  }
 
   // Check for exact store matches first - this has highest priority
   if (storeName === 'walmart') return STORE.WALMART;
@@ -44,50 +38,41 @@ export function getProductStore(product: any): STORE {
   // Check URL for store indicators
   const url = (product.url || '').toString().toLowerCase();
   if (url.includes('walmart.')) {
-    if (DEBUG) console.log(`Store detected from URL as Walmart: ${url}`);
     return STORE.WALMART;
   }
   if (url.includes('maxipali.')) {
-    if (DEBUG) console.log(`Store detected from URL as MaxiPali: ${url}`);
     return STORE.MAXIPALI;
   }
   if (url.includes('masxmenos.')) {
-    if (DEBUG) console.log(`Store detected from URL as MasxMenos: ${url}`);
     return STORE.MASXMENOS;
   }
   if (url.includes('pricesmart.')) {
-    if (DEBUG) console.log(`Store detected from URL as PriceSmart: ${url}`);
     return STORE.PRICESMART;
   }
   if (url.includes('automercado.')) {
-    if (DEBUG) console.log(`Store detected from URL as Automercado: ${url}`);
     return STORE.AUTOMERCADO;
   }
 
   // Check productType for Walmart indicators
   const productType = (product.productType || '').toString().toLowerCase();
   if (productType.includes('walmart')) {
-    if (DEBUG) console.log(`Store detected from productType as Walmart: ${productType}`);
     return STORE.WALMART;
   }
 
   // Check product attributes for Walmart indicators
   if (product.attributes) {
     if (product.attributes.seller && product.attributes.seller.toLowerCase().includes('walmart')) {
-      if (DEBUG) console.log(`Store detected from seller attribute as Walmart`);
       return STORE.WALMART;
     }
   }
 
   // Broader checks for partial matches, with specific rules to avoid confusion
   if (storeName.includes('walmart')) {
-    if (DEBUG) console.log(`Store detected as Walmart from partial match in store name`);
     return STORE.WALMART;
   }
 
   // Only check for masxmenos if not already identified as Walmart
   if (storeName.includes('mas x menos') || storeName.includes('masxmenos')) {
-    if (DEBUG) console.log(`Store detected as MasxMenos from partial match in store name`);
     return STORE.MASXMENOS;
   }
 
@@ -95,31 +80,26 @@ export function getProductStore(product: any): STORE {
   // This avoids the common issue where Walmart products are misidentified as MaxiPali
   if ((storeName.includes('maxi') || storeName.includes('pali')) && 
       !storeName.includes('walmart')) {
-    if (DEBUG) console.log(`Store detected as MaxiPali from partial match in store name`);
     return STORE.MAXIPALI;
   }
 
   // Check if the product is from Automercado
   if (storeName.includes('auto') || storeName.includes('mercado')) {
-    if (DEBUG) console.log(`Store detected as Automercado from partial match in store name`);
     return STORE.AUTOMERCADO;
   }
 
   // Check if the product is from PriceSmart
   if (storeName.includes('price') || storeName.includes('smart')) {
-    if (DEBUG) console.log(`Store detected as PriceSmart from partial match in store name`);
     return STORE.PRICESMART;
   }
 
   // Check the product's source, description or other properties for store indicators
   const description = (product.description || '').toString().toLowerCase();
   if (description.includes('walmart')) {
-    if (DEBUG) console.log(`Store detected as Walmart from description`);
     return STORE.WALMART;
   }
 
   // Final fallback
-  if (DEBUG) console.log(`Store could not be determined, using UNKNOWN`);
   return STORE.UNKNOWN;
 }
 

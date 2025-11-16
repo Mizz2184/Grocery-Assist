@@ -39,8 +39,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   // Debug product data when it changes
   useEffect(() => {
     if (product) {
-      console.log('Product in BarcodeScannerModal:', product);
-      console.log('Product price type:', typeof product.price, 'value:', product.price);
+
     }
   }, [product]);
 
@@ -51,19 +50,15 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
     setSearchStatus("Buscando en MaxiPali y MasxMenos...");
 
     try {
-      console.log('Detected EAN:', detectedEan);
-      
+
       const result = await searchProductByBarcode(detectedEan);
-      console.log('API response result:', result);
-      
+
       if (result.success && result.product) {
         // The price should already be properly handled in the service
         const finalProduct = {
           ...result.product
         };
-        
-        console.log('Final product with price:', finalProduct.price, 'type:', typeof finalProduct.price);
-        
+
         setProduct(finalProduct);
         
         toast({
@@ -126,8 +121,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
 
   // Render price with currency conversion
   const renderPrice = (price: number | undefined) => {
-    console.log('Rendering price:', price, 'type:', typeof price);
-    
+
     // Check if price is valid (not undefined, null, 0, or NaN)
     if (price === undefined || price === null || price === 0 || isNaN(price)) {
       return <span className="text-muted-foreground italic">

@@ -44,14 +44,12 @@ export const createNotification = async (
   data?: Record<string, any>
 ): Promise<Notification | null> => {
   try {
-    console.log('📝 Creating notification:', { userId, type, title, message, data });
-    
+
     // Check if user has this notification type enabled
     const preferences = await getNotificationPreferences(userId);
-    console.log('⚙️ User preferences:', preferences);
-    
+
     if (preferences && !preferences[type]) {
-      console.log(`🚫 Notification type ${type} is disabled for user ${userId}`);
+
       return null;
     }
 
@@ -73,7 +71,6 @@ export const createNotification = async (
       return null;
     }
 
-    console.log('✅ Notification created successfully:', notification);
     return notification;
   } catch (error) {
     console.error('💥 Error in createNotification:', error);
@@ -318,8 +315,7 @@ export const subscribeToNotifications = (
   userId: string,
   onNotification: (notification: Notification) => void
 ): RealtimeChannel => {
-  console.log('📡 Setting up real-time subscription for user:', userId);
-  
+
   const channel = supabase
     .channel(`notifications:${userId}`)
     .on(
@@ -331,12 +327,12 @@ export const subscribeToNotifications = (
         filter: `user_id=eq.${userId}`
       },
       (payload) => {
-        console.log('📨 Real-time notification received:', payload);
+
         onNotification(payload.new as Notification);
       }
     )
     .subscribe((status) => {
-      console.log('📡 Subscription status:', status);
+
     });
 
   return channel;
@@ -424,8 +420,7 @@ export const subscribeToPushNotifications = async (
     // Subscribe to push notifications
     // Note: You'll need to generate VAPID keys and configure this
     // For now, this is a placeholder
-    console.log('Service worker ready for push notifications');
-    
+
     return true;
   } catch (error) {
     console.error('Error subscribing to push notifications:', error);

@@ -133,8 +133,7 @@ export const signInWithGoogle = async () => {
 };
 
 export const signInWithEmail = async (email: string, password: string) => {
-  console.log("Attempting to sign in with email:", email);
-  
+
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -171,8 +170,7 @@ export const signInWithEmail = async (email: string, password: string) => {
         };
       }
     }
-    
-    console.log("Sign in response:", { success: !!data?.session, user: data?.user?.id });
+
     return { data, error };
   } catch (err) {
     console.error("Unexpected error during sign in:", err);
@@ -186,12 +184,10 @@ export const signInWithEmail = async (email: string, password: string) => {
 };
 
 export const signUpWithEmail = async (email: string, password: string, metadata?: { full_name?: string }) => {
-  console.log("Starting email sign-up process", { email, metadata });
-  
+
   // Ensure the redirect URL is properly set
   const redirectUrl = `${window.location.origin}/auth/callback`;
-  console.log("Using redirect URL:", redirectUrl);
-  
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -200,9 +196,7 @@ export const signUpWithEmail = async (email: string, password: string, metadata?
       emailRedirectTo: redirectUrl
     }
   });
-  
-  console.log("Sign-up response:", { data, error });
-  
+
   return { data, error };
 };
 
@@ -235,24 +229,15 @@ export const subscribeToAuthChanges = (callback: (event: 'SIGNED_IN' | 'SIGNED_O
 export const parseVerificationLink = (link: string) => {
   try {
     // Log the link for debugging
-    console.log("Verification link received:", link);
-    
+
     // Parse the URL
     const url = new URL(link);
-    console.log("Parsed URL parts:", {
-      origin: url.origin,
-      pathname: url.pathname,
-      search: url.search,
-      hash: url.hash
-    });
-    
+
     // Extract token from the link
     const token = url.searchParams.get('token');
     const type = url.searchParams.get('type');
     const email = url.searchParams.get('email');
-    
-    console.log("Verification parameters:", { token, type, email });
-    
+
     return { token, type, email, isValid: !!token && !!type };
   } catch (error) {
     console.error("Error parsing verification link:", error);
@@ -263,8 +248,7 @@ export const parseVerificationLink = (link: string) => {
 // Add a function to manually confirm email
 export const manuallyConfirmEmail = async (userId: string, adminPassword: string = ""): Promise<boolean> => {
   try {
-    console.log(`Attempting to manually confirm email for user ID: ${userId}`);
-    
+
     const { data, error } = await supabase.rpc('admin_confirm_user_by_id', {
       user_id_to_confirm: userId,
       admin_key: import.meta.env.VITE_ADMIN_PASSWORD || ''
@@ -274,8 +258,7 @@ export const manuallyConfirmEmail = async (userId: string, adminPassword: string
       console.error('Error manually confirming email:', error);
       return false;
     }
-    
-    console.log('Email manually confirmed successfully');
+
     return true;
   } catch (error) {
     console.error('Error in manuallyConfirmEmail:', error);
@@ -286,8 +269,7 @@ export const manuallyConfirmEmail = async (userId: string, adminPassword: string
 // Add this new function
 export const confirmUserWithoutEmail = async (email: string): Promise<boolean> => {
   try {
-    console.log("Attempting direct confirmation for:", email);
-    
+
     // Try using the admin function if available
     const { data, error } = await supabase.rpc('admin_confirm_user', {
       target_email: email,

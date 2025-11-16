@@ -15,8 +15,7 @@ let useLocalStorageFallback = false;
  */
 export const ensureUserPaymentsTable = async (): Promise<boolean> => {
   try {
-    console.log('Checking if user_payments table exists');
-    
+
     // First check if we have admin privileges
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData?.session) {
@@ -31,8 +30,7 @@ export const ensureUserPaymentsTable = async (): Promise<boolean> => {
       console.error('Error creating user_payments table:', error);
       return false;
     }
-    
-    console.log('User payments table is ready');
+
     return true;
   } catch (error) {
     console.error('Failed to ensure user_payments table exists:', error);
@@ -45,8 +43,7 @@ export const ensureUserPaymentsTable = async (): Promise<boolean> => {
  */
 export const createUserPaymentRecord = async (userId: string, status: string = PAYMENT_STATUS.NONE): Promise<boolean> => {
   try {
-    console.log(`Attempting to create/update payment record for user: ${userId} with status: ${status}`);
-    
+
     // First, check if the user has a session (required for RLS policies)
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData?.session) {
@@ -88,7 +85,7 @@ export const createUserPaymentRecord = async (userId: string, status: string = P
     }
     
     if (existingRecord) {
-      console.log('Updating existing payment record');
+
       // Update existing record
       const { error } = await supabase
         .from('user_payments')
@@ -103,7 +100,7 @@ export const createUserPaymentRecord = async (userId: string, status: string = P
         return false;
       }
     } else {
-      console.log('Creating new payment record');
+
       // Create new record - convert userId to UUID if needed
       const { error } = await supabase
         .from('user_payments')
@@ -119,8 +116,7 @@ export const createUserPaymentRecord = async (userId: string, status: string = P
         return false;
       }
     }
-    
-    console.log(`Successfully set user ${userId} payment status to ${status}`);
+
     return true;
   } catch (error) {
     console.error('Error in createUserPaymentRecord:', error);
@@ -222,7 +218,7 @@ export const getPaymentSessionId = async (userId: string): Promise<string | null
  * Marks a user as a new user that needs to complete payment
  */
 export const markUserAsNew = async (userId: string): Promise<boolean> => {
-  console.log(`Marking user ${userId} as new`);
+
   return createUserPaymentRecord(userId, PAYMENT_STATUS.NONE);
 };
 
@@ -292,7 +288,7 @@ export const directVerifyUser = async (email: string, adminPassword: string): Pr
 ensureUserPaymentsTable()
   .then(success => {
     if (success) {
-      console.log('User payments system initialized');
+
     } else {
       console.warn('Using localStorage for user payments as fallback');
       useLocalStorageFallback = true;

@@ -14,15 +14,14 @@ export const PriceComparison = ({
   compareStores = false 
 }: PriceComparisonProps) => {
   // Add debug logging to see incoming price data
-  console.log("PriceComparison received prices:", prices);
-  
+
   // Normalize store IDs to lowercase for case-insensitive comparison
   const normalizedPrices = prices.map(price => {
     const normalized = {
       ...price,
       storeId: price.storeId.toLowerCase()
     };
-    console.log(`Normalized price: ${price.storeId} → ${normalized.storeId}, price: ${normalized.price}`);
+
     return normalized;
   });
 
@@ -30,8 +29,6 @@ export const PriceComparison = ({
   const hasMaxiPali = normalizedPrices.some(p => p.storeId === 'maxipali');
   const hasMasxMenos = normalizedPrices.some(p => p.storeId === 'masxmenos');
   const hasWalmart = normalizedPrices.some(p => p.storeId === 'walmart');
-  
-  console.log(`Store presence check - MaxiPali: ${hasMaxiPali}, MasxMenos: ${hasMasxMenos}, Walmart: ${hasWalmart}`);
 
   // Remove prices that are exactly 0 for sorting purposes
   const validPrices = normalizedPrices.filter(p => p.price > 0);
@@ -42,10 +39,10 @@ export const PriceComparison = ({
   const highestPrice = sortedPrices.length > 0 ? sortedPrices[sortedPrices.length - 1] : null;
   
   if (lowestPrice) {
-    console.log(`Lowest price: ${lowestPrice.storeId}, ${lowestPrice.price}`);
+
   }
   if (highestPrice) {
-    console.log(`Highest price: ${highestPrice.storeId}, ${highestPrice.price}`);
+
   }
 
   // Format number with commas and 2 decimal places
@@ -91,8 +88,6 @@ export const PriceComparison = ({
     if (b.storeId === 'masxmenos') return 1;
     return 0;
   });
-  
-  console.log("Ordered prices for display:", orderedPrices.map(p => `${p.storeId}: ${p.price}`));
 
   return (
     <div className="space-y-2">

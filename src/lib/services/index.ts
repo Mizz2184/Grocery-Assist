@@ -9,13 +9,11 @@ export const searchMaxiPaliProducts = async ({
   pageSize = 49
 }: ProductSearchParams): Promise<ProductSearchResponse> => {
   try {
-    console.log('Searching MaxiPali for:', query);
-    
+
     // Detect language and translate if English
     const isEnglish = isEnglishQuery(query);
     const searchQuery = isEnglish ? translateToSpanish(query) : query;
-    console.log(`Language detected: ${isEnglish ? 'English' : 'Spanish'}, Search query: "${searchQuery}"`);
-    
+
     // Use relative path that will be handled by Vite's proxy
     const searchResponse = await fetch('/api/proxy/maxipali/search', {
       method: 'POST',
@@ -59,8 +57,7 @@ export const searchMasxMenosProducts = async ({
   pageSize = 49
 }: ProductSearchParams): Promise<ProductSearchResponse> => {
   try {
-    console.log('[FIXED v2] Searching MasxMenos for:', query);
-    
+
     // If no query is provided, return empty results
     if (!query || query.trim() === '') {
       return {
@@ -75,8 +72,7 @@ export const searchMasxMenosProducts = async ({
     // Detect language and translate if English
     const isEnglish = isEnglishQuery(query);
     const searchQuery = isEnglish ? translateToSpanish(query) : query;
-    console.log(`MasxMenos - Language detected: ${isEnglish ? 'English' : 'Spanish'}, Search query: "${searchQuery}"`);
-    
+
     // Initialize page parameters
     const from = (page - 1) * pageSize;
     const to = from + pageSize;
@@ -106,21 +102,14 @@ export const searchMasxMenosProducts = async ({
     const encodedVariables = encodeURIComponent(JSON.stringify(variables));
     
     // Use server-side proxy to avoid CORS issues
-    console.log('🔍 MasxMenos DEBUG:', {
-      originalQuery: query,
-      queryLength: query.length
-    });
-    
+
     const requestBody = {
       query: searchQuery, // Use translated query if English, original if Spanish
       variables: encodedVariables,
       page,
       pageSize
     };
-    
-    console.log('📦 MasxMenos request body:', requestBody);
-    console.log('📝 MasxMenos query string:', requestBody.query);
-    
+
     const searchResponse = await fetch('/api/proxy/masxmenos/search', {
       method: 'POST',
       headers: {
@@ -150,16 +139,7 @@ export const searchMasxMenosProducts = async ({
         
         // Debug logging for first product
         if (product.productId === (data.data?.productSearch?.products || [])[0]?.productId) {
-          console.log('MasxMenos first product debug:', {
-            productName: product.productName,
-            hasItems: !!product.items,
-            itemsLength: product.items?.length,
-            hasSellers: !!item?.sellers,
-            sellersLength: item?.sellers?.length,
-            hasCommertialOffer: !!seller?.commertialOffer,
-            price: price,
-            rawPrice: seller?.commertialOffer?.Price
-          });
+
         }
         
         // Get the first image URL
@@ -181,9 +161,7 @@ export const searchMasxMenosProducts = async ({
           barcode: item?.ean || '',
         };
       });
-    
-    console.log(`MasxMenos found ${data.data?.productSearch?.products?.length || 0} products, mapped to ${products.length} items`);
-    
+
     return {
       products,
       total: data.data?.productSearch?.products?.length || 0,
@@ -214,11 +192,10 @@ interface WalmartSearchResponse {
 
 export const searchWalmartProducts = async ({ query, page = 1, pageSize = 30 }: ProductSearchParams): Promise<ProductSearchResponse> => {
   try {
-    console.log(`Searching Walmart products with query "${query}"`);
-    
+
     // Make sure we have a valid query
     if (!query || query.trim() === '') {
-      console.log('Empty query provided to searchWalmartProducts, returning empty results');
+
       return {
         products: [],
         total: 0,
@@ -231,19 +208,11 @@ export const searchWalmartProducts = async ({ query, page = 1, pageSize = 30 }: 
     // Detect language and translate if English
     const isEnglish = isEnglishQuery(query);
     const searchQuery = isEnglish ? translateToSpanish(query) : query;
-    console.log(`Walmart - Language detected: ${isEnglish ? 'English' : 'Spanish'}, Search query: "${searchQuery}"`);
-    
+
     const response = await axios.post<WalmartSearchResponse>('/api/proxy/walmart/search', {
       query: searchQuery,
       page,
       pageSize
-    });
-
-    console.log('Walmart API response:', {
-      status: response.status,
-      hasData: !!response.data,
-      hasProducts: !!(response.data && response.data.products),
-      productCount: response.data?.products?.length || 0
     });
 
     if (response.status !== 200) {
@@ -269,8 +238,7 @@ export const searchWalmartProducts = async ({ query, page = 1, pageSize = 30 }: 
       // This ensures Walmart products use the EXACT same store name throughout the app
       
       // Debug log for each product
-      console.log(`Processing Walmart product: id=${product.id}, name=${product.name}, price=${product.price}, store=${product.store || 'undefined'}`);
-      
+
       // Only include properties that are part of the Product type
       const normalizedProduct: Product = {
         id: product.id || `walmart-api-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -297,20 +265,16 @@ export const searchWalmartProducts = async ({ query, page = 1, pageSize = 30 }: 
       };
       
       // Log the store value after normalization to ensure consistency 
-      console.log(`Normalized Walmart product: id=${normalizedProduct.id}, store=${normalizedProduct.store}`);
-      
+
       return normalizedProduct;
     });
 
-    console.log(`Processed ${validProducts.length} valid Walmart products`);
-    
     // Filter out any products with zero or invalid prices
     const filteredProducts = validProducts.filter(p => p.price > 0);
-    console.log(`Filtered to ${filteredProducts.length} Walmart products with valid prices`);
-    
+
     // Log the final products we're returning
     if (filteredProducts.length > 0) {
-      console.log('First Walmart product being returned:', JSON.stringify(filteredProducts[0]));
+
     } else {
       console.warn('No Walmart products to return after filtering');
     }
@@ -343,10 +307,9 @@ export const searchWalmartProducts = async ({ query, page = 1, pageSize = 30 }: 
 
 export const searchAutomercadoProducts = async ({ query, page = 1, pageSize = 30 }: ProductSearchParams): Promise<ProductSearchResponse> => {
   try {
-    console.log(`Searching Automercado products with query "${query}"`);
-    
+
     if (!query || query.trim() === '') {
-      console.log('Empty query provided to searchAutomercadoProducts, returning empty results');
+
       return {
         products: [],
         total: 0,
@@ -359,19 +322,11 @@ export const searchAutomercadoProducts = async ({ query, page = 1, pageSize = 30
     // Detect language and translate if English
     const isEnglish = isEnglishQuery(query);
     const searchQuery = isEnglish ? translateToSpanish(query) : query;
-    console.log(`Automercado - Language detected: ${isEnglish ? 'English' : 'Spanish'}, Search query: "${searchQuery}"`);
-    
+
     const response = await axios.post<any>('/api/proxy/automercado/search', {
       query: searchQuery,
       page,
       pageSize
-    });
-
-    console.log('Automercado API response:', {
-      status: response.status,
-      hasData: !!response.data,
-      hasHits: !!(response.data && response.data.hits),
-      hitCount: response.data?.hits?.length || 0
     });
 
     if (response.status !== 200) {
@@ -422,10 +377,8 @@ export const searchAutomercadoProducts = async ({ query, page = 1, pageSize = 30
       };
     }).filter((p: Product) => p.price > 0);
 
-    console.log(`Processed ${validProducts.length} valid Automercado products`);
-    
     if (validProducts.length > 0) {
-      console.log('First Automercado product being returned:', JSON.stringify(validProducts[0]));
+
     } else {
       console.warn('No Automercado products to return after filtering');
     }
@@ -474,9 +427,7 @@ export const compareProductPrices = async (
   try {
     // Normalize the original store for better matching
     const normalizedOriginalStore = originalStore?.toLowerCase() || 'unknown';
-    
-    console.log(`Comparing prices for product: ${productName}, original store: ${originalStore || 'unknown'} (normalized: ${normalizedOriginalStore})`);
-    
+
     // Search query - use barcode if available, otherwise use product name
     const searchQuery = productName;
     
@@ -504,13 +455,7 @@ export const compareProductPrices = async (
     const categoryMatch = productName.match(/(leche|arroz|frijol|pasta|cereal|aceite|atun|cafe|azucar|sal)/i);
     const categoryText = categoryMatch ? categoryMatch[0] : '';
     const categorySearch = [categoryText, attributeText].filter(Boolean).join(' ');
-    
-    console.log(`Search strategies:
-      - Original query: "${searchQuery}"
-      - Simplified name: "${simplifiedName}"
-      - Keyword name: "${keywordName}"
-      - Category search: "${categorySearch}"`);
-    
+
     // If the product is from a specific store, we need to search for it in the other store
     let maxiPaliProducts: Product[] = [];
     let masxMenosProducts: Product[] = [];
@@ -522,13 +467,7 @@ export const compareProductPrices = async (
     const searchMaxiPali = true;
     const searchMasxMenos = true;
     const searchWalmart = true;
-    
-    console.log(`Search configuration: 
-      - Search MaxiPali: ${searchMaxiPali}
-      - Search MasxMenos: ${searchMasxMenos}
-      - Search Walmart: ${searchWalmart}
-      - Original store: ${normalizedOriginalStore}`);
-    
+
     // Search in all stores concurrently
     const [maxiPaliResponse, masxMenosResponse, walmartResponse, automercadoResponse] = await Promise.all([
       searchMaxiPaliProducts({ query: searchQuery }),
@@ -536,22 +475,12 @@ export const compareProductPrices = async (
       searchWalmartProducts({ query: searchQuery }),
       searchAutomercadoProducts({ query: searchQuery })
     ]);
-    
-    console.log("MaxiPali raw API response:", maxiPaliResponse);
-    console.log("MasxMenos raw API response:", masxMenosResponse);
-    console.log("Walmart raw API response:", walmartResponse);
-    console.log("Automercado raw API response:", automercadoResponse);
-    
+
     maxiPaliProducts = maxiPaliResponse.products.map(p => ({...p, store: 'MaxiPali' as const}));
     masxMenosProducts = masxMenosResponse.products.map(p => ({...p, store: 'MasxMenos' as const}));
     walmartProducts = walmartResponse.products.map(p => ({...p, store: 'Walmart' as const}));
     automercadoProducts = automercadoResponse.products.map(p => ({...p, store: 'Automercado' as const}));
-    
-    console.log("After mapping - MaxiPali products:", maxiPaliProducts);
-    console.log("After mapping - MasxMenos products:", masxMenosProducts);
-    console.log("After mapping - Walmart products:", walmartProducts);
-    console.log("After mapping - Automercado products:", automercadoProducts);
-    
+
     // If one store has no results, try alternative search strategies
     const searchStrategies = [simplifiedName, keywordName, categorySearch].filter(s => s && s !== searchQuery);
     
@@ -561,54 +490,51 @@ export const compareProductPrices = async (
       
       // Try MaxiPali if needed
       if (maxiPaliProducts.length === 0) {
-        console.log(`Trying alternative strategy for MaxiPali: "${strategy}"`);
+
         const altResponse = await searchMaxiPaliProducts({ query: strategy });
         maxiPaliProducts = altResponse.products.map(p => ({...p, store: 'MaxiPali' as const}));
         
         if (maxiPaliProducts.length > 0) {
-          console.log(`Found ${maxiPaliProducts.length} MaxiPali products using strategy: "${strategy}"`);
+
           break; // Found results, no need to try more strategies
         }
       }
       
       // Try MasxMenos if needed
       if (masxMenosProducts.length === 0) {
-        console.log(`Trying alternative strategy for MasxMenos: "${strategy}"`);
+
         const altResponse = await searchMasxMenosProducts({ query: strategy });
         masxMenosProducts = altResponse.products.map(p => ({...p, store: 'MasxMenos' as const}));
         
         if (masxMenosProducts.length > 0) {
-          console.log(`Found ${masxMenosProducts.length} MasxMenos products using strategy: "${strategy}"`);
+
           break; // Found results, no need to try more strategies
         }
       }
       
       // Try Walmart if needed
       if (walmartProducts.length === 0) {
-        console.log(`Trying alternative strategy for Walmart: "${strategy}"`);
+
         const altResponse = await searchWalmartProducts({ query: strategy });
         walmartProducts = altResponse.products.map(p => ({...p, store: 'Walmart' as const}));
         
         if (walmartProducts.length > 0) {
-          console.log(`Found ${walmartProducts.length} Walmart products using strategy: "${strategy}"`);
+
           break; // Found results, no need to try more strategies
         }
       }
     }
     
     // Log the results
-    console.log(`Found ${maxiPaliProducts.length} MaxiPali products, ${masxMenosProducts.length} MasxMenos products, ${walmartProducts.length} Walmart products, and ${automercadoProducts.length} Automercado products`);
+
     if (maxiPaliProducts.length > 0) {
-      console.log(`First MaxiPali product: ${maxiPaliProducts[0].name}, price: ${maxiPaliProducts[0].price}, store: ${maxiPaliProducts[0].store}`);
-      console.log(`MaxiPali products details:`, maxiPaliProducts);
+
     }
     if (masxMenosProducts.length > 0) {
-      console.log(`First MasxMenos product: ${masxMenosProducts[0].name}, price: ${masxMenosProducts[0].price}, store: ${masxMenosProducts[0].store}`);
-      console.log(`MasxMenos products details:`, masxMenosProducts);
+
     }
     if (walmartProducts.length > 0) {
-      console.log(`First Walmart product: ${walmartProducts[0].name}, price: ${walmartProducts[0].price}, store: ${walmartProducts[0].store}`);
-      console.log(`Walmart products details:`, walmartProducts);
+
     }
     
     // If no products found in any store, return null for best price
@@ -786,18 +712,14 @@ export async function connectToGeminiVoiceAgent(
       {"action": "add_to_list", "product": {"name": "product name", "store": "store name", "price": price}}`
     };
 
-    console.log('Connecting to Google Gemini Live...');
-
     const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
-    
-    console.log('Connecting to Google Gemini Live via WebSocket...');
-    
+
     const ws = new WebSocket(wsUrl);
     let isConnected = false;
 
     return new Promise((resolve, reject) => {
       ws.onopen = () => {
-        console.log('Gemini Live WebSocket connection opened');
+
         isConnected = true;
         
         // Send initial setup message
@@ -831,11 +753,10 @@ export async function connectToGeminiVoiceAgent(
         };
         
         ws.send(JSON.stringify(setupMessage));
-        console.log('Sent setup message to Gemini Live');
-        
+
         // Wait a bit for the server to process setup before allowing audio
         setTimeout(() => {
-          console.log('Gemini Live is ready to receive audio');
+
           if (onReady) {
             onReady();
           }
@@ -845,7 +766,7 @@ export async function connectToGeminiVoiceAgent(
           session: ws,
           isReady: () => ws.readyState === WebSocket.OPEN && isConnected,
           disconnect: () => {
-            console.log('Disconnecting Gemini Live WebSocket');
+
             if (ws.readyState === WebSocket.OPEN) {
               ws.close();
             }
@@ -874,7 +795,7 @@ export async function connectToGeminiVoiceAgent(
               };
               
               ws.send(JSON.stringify(audioMessage));
-              console.log('Sent audio chunk:', audioData.byteLength, 'bytes');
+
             } else {
               console.warn('WebSocket not open, cannot send audio');
             }
@@ -894,8 +815,7 @@ export async function connectToGeminiVoiceAgent(
             // Handle as text
             data = JSON.parse(event.data);
           }
-          
-          console.log('Gemini message:', data);
+
           onMessage(data);
         } catch (error) {
           console.error('Error parsing Gemini message:', error, 'Raw data:', event.data);
@@ -912,7 +832,7 @@ export async function connectToGeminiVoiceAgent(
       };
 
       ws.onclose = (event) => {
-        console.log('Gemini WebSocket closed:', event.code, event.reason);
+
         if (!isConnected) {
           reject(new Error('WebSocket connection closed before establishing'));
         }
@@ -921,7 +841,7 @@ export async function connectToGeminiVoiceAgent(
     return {
       session,
       disconnect: () => {
-        console.log('Disconnecting Gemini Live session');
+
         session.close();
       },
       sendAudio: (audioData: ArrayBuffer) => {
@@ -940,8 +860,7 @@ export async function connectToGeminiVoiceAgent(
  */
 export async function searchProductsForVoiceAgent(query: string): Promise<string> {
   try {
-    console.log(`Voice agent searching for: ${query}`);
-    
+
     // Search across all stores
     const [maxipaliResults, masxmenosResults, walmartResults, automercadoResults] = await Promise.allSettled([
       searchMaxiPaliProducts({ query, page: 1, pageSize: 3 }),

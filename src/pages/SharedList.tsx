@@ -198,9 +198,7 @@ const SharedList = () => {
       try {
         setLoading(true);
         setError(null);
-        
-        console.log("Fetching shared list with userId:", user?.id || 'anonymous');
-        
+
         // First verify if the list exists
         const listExists = await verifyListExists(listId);
         if (!listExists) {
@@ -237,8 +235,7 @@ const SharedList = () => {
             description: "Sign in to add collaborators or edit this list if you have permission.",
           });
         }
-        
-        console.log("Shared list fetched successfully", list);
+
       } catch (err: any) {
         console.error("Error fetching shared list:", err);
         setError(err.message || "Failed to load the shared grocery list");

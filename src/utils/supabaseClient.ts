@@ -7,8 +7,6 @@ const supabaseUrl = 'https://rcmuzstcirbulftnbcth.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjbXV6c3RjaXJidWxmdG5iY3RoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA4ODMxMTUsImV4cCI6MjA1NjQ1OTExNX0.0pg6_Qfawu96RnUft9kEQdqPrLvJk5OQ414jKNF0_Kc';
 
 // Log the values being used
-console.log('DIAGNOSTIC: Using Supabase URL:', supabaseUrl);
-console.log('DIAGNOSTIC: Using Supabase Key:', supabaseKey ? 'Key is present' : 'Key is missing');
 
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   global: {
@@ -20,7 +18,6 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
 });
 
 // Verify initialization
-console.log('DIAGNOSTIC: Supabase client initialized:', !!supabase.from, !!supabase.auth);
 
 // Export auth methods for convenience
 export const auth = {
@@ -52,8 +49,7 @@ export const sendCollaboratorInvite = async (
   collaboratorEmail: string
 ): Promise<boolean> => {
   try {
-    console.log(`Sending invitation email to ${collaboratorEmail} for list ${listName} (${listId})`);
-    
+
     // Create sharing link
     const shareUrl = `${window.location.origin}/shared-list/${listId}`;
     
@@ -62,22 +58,13 @@ export const sendCollaboratorInvite = async (
     try {
       const { data: { user } } = await supabase.auth.getUser();
       senderName = user?.user_metadata?.full_name || user?.email || 'Someone';
-      console.log('Sender info:', { userId, senderName });
+
     } catch (userError) {
       console.error('Error getting user info:', userError);
     }
 
     // Call your edge function directly
     try {
-      console.log('Calling email function with payload:', {
-        to: collaboratorEmail,
-        subject: `${senderName} shared a grocery list with you`,
-        templateId: "cm94uidld3tgyttmo1v4gkfdr",
-        data: {
-          Username: senderName,
-          Grocerylist: shareUrl
-        }
-      });
 
       const response = await fetch('https://rcmuzstcirbulftnbcth.supabase.co/functions/v1/email-function', {
         method: 'POST',
@@ -97,19 +84,17 @@ export const sendCollaboratorInvite = async (
       });
       
       const responseData = await response.text();
-      console.log('Email function response:', response.status, responseData);
-      
+
       if (!response.ok) {
         throw new Error(`Failed to send email: ${responseData}`);
       }
-      
-      console.log('Successfully sent invitation email');
+
       return true;
     } catch (emailError) {
       console.error('Error sending invitation email:', emailError);
       
       // Fallback: Store in database
-      console.log('Falling back to database storage');
+
       try {
         const { error: insertError } = await supabase
           .from('invitations')
@@ -128,8 +113,7 @@ export const sendCollaboratorInvite = async (
           console.error('Error storing invitation:', insertError);
           return false;
         }
-        
-        console.log('Stored invitation in database');
+
         return true;
       } catch (dbError) {
         console.error('Database error:', dbError);

@@ -15,19 +15,14 @@ export const useSearchNavigation = () => {
   const saveSearchState = useCallback(() => {
     // Only save if we have meaningful data
     if (query || searchResults.length > 0) {
-      console.log('useSearchNavigation: Directly saving search state to sessionStorage BEFORE navigation...', {
-        query,
-        resultsCount: searchResults.length,
-        scrollPosition
-      });
-      
+
       // Direct synchronous write to sessionStorage
       sessionStorage.setItem('search_query', query);
       sessionStorage.setItem('search_results', JSON.stringify(searchResults));
       sessionStorage.setItem('search_scroll_position', scrollPosition.toString());
-      console.log('useSearchNavigation: Direct save complete.');
+
     } else {
-      console.log('useSearchNavigation: Skipping direct save, state is empty.');
+
     }
   }, [query, searchResults, scrollPosition]);
 
@@ -36,7 +31,7 @@ export const useSearchNavigation = () => {
     to: string, 
     options?: { replace?: boolean }
   ) => {
-    console.log('useSearchNavigation: Calling saveSearchState before navigating...');
+
     saveSearchState();
     navigate(to, options);
   }, [navigate, saveSearchState]);
@@ -50,14 +45,9 @@ export const useSearchNavigation = () => {
     sessionStorage.setItem('restore_search_on_return', 'true');
     
     // Log what we're saving before navigation
-    console.log('Navigating back to search with state to restore:', {
-      query,
-      resultsCount: searchResults.length,
-      scrollPosition
-    });
-    
+
     // Make sure search state is freshly saved before navigation
-    console.log('useSearchNavigation: Calling saveSearchState before navigating back...');
+
     saveSearchState();
     
     // Navigate to the home/search page

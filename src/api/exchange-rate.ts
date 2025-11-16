@@ -25,7 +25,7 @@ export async function fetchExchangeRate(): Promise<number> {
     // The API returns an object with crc property containing exchange rates
     if (data && typeof data === 'object' && data.crc && data.crc.usd) {
       const crcToUsd = data.crc.usd;
-      console.log('CRC to USD exchange rate:', crcToUsd);
+
       return crcToUsd;
     }
     

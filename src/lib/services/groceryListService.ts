@@ -26,8 +26,6 @@ type DbGroceryItem = {
 };
 
 // Diagnostic log to check Supabase connection at module load time
-console.log('DIAGNOSTIC: groceryListService.ts loaded, Supabase client initialized:', 
-  !!supabase?.from);
 
 // Get user's grocery lists
 export const getUserGroceryLists = async (userId: string): Promise<GroceryList[]> => {
@@ -98,8 +96,7 @@ export const getUserGroceryLists = async (userId: string): Promise<GroceryList[]
         ownerName: list.user_id === userId ? 'You' : 'Shared List'
       };
     });
-    
-    console.log('Transformed lists:', result.length);
+
     return result;
   } catch (error) {
     console.error('Error in getUserGroceryLists:', error);
@@ -197,9 +194,7 @@ export const addProductToGroceryList = async (
     product.store = getProductStore(product);
     
     // Log the store detection for debugging
-    console.log(`addProductToGroceryList: Product ${product.id} store detection - Original: ${originalStore}, Normalized: ${product.store}`);
-    console.log(`Adding product with quantity: ${actualQuantity}`);
-    
+
     // Add some store-specific validation
     if (product.store === 'Walmart' && originalStore && originalStore.toLowerCase().includes('maxi')) {
       console.warn(`Potential store mismatch detected! Product has Walmart attributes but MaxiPali name: ${product.id}. Will use Walmart.`);
@@ -224,9 +219,7 @@ export const addProductToGroceryList = async (
         // Now check if stores match using our normalized store detection
         const itemStore = getProductStore(item.productData);
         const newItemStore = getProductStore(product);
-        
-        console.log(`addProductToGroceryList: Comparing stores for duplicate check - List item: ${itemStore}, New item: ${newItemStore}`);
-        
+
         // Check for exact match
         if (itemStore === newItemStore) {
           return true;
@@ -243,13 +236,13 @@ export const addProductToGroceryList = async (
           
           // Both MaxiPali
           if (!itemStoreLower.includes('menos') && !newItemStoreLower.includes('menos')) {
-            console.log(`addProductToGroceryList: Both items appear to be MaxiPali products`);
+
             return true;
           }
           
           // Both MasxMenos
           if (itemStoreLower.includes('menos') && newItemStoreLower.includes('menos')) {
-            console.log(`addProductToGroceryList: Both items appear to be MasxMenos products`);
+
             return true;
           }
         }
@@ -259,8 +252,7 @@ export const addProductToGroceryList = async (
     });
     
     if (existingItem) {
-      console.log(`Product already exists in list (id: ${existingItem.id}), increasing quantity from ${existingItem.quantity} to ${existingItem.quantity + actualQuantity}`);
-      
+
       // Product exists, update quantity instead of adding a new item
       try {
         const { error } = await supabase
@@ -326,12 +318,6 @@ export const addProductToGroceryList = async (
       created_at: now
     };
 
-    console.log('Inserting item with data:', {
-      ...itemData,
-      list_id: listId, // explicitly log the list ID
-      quantity: actualQuantity // explicitly log the quantity
-    });
-    
     // Insert the item into the database
     const { error: insertError } = await supabase
       .from('grocery_items')
@@ -374,37 +360,25 @@ export const addProductToGroceryList = async (
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       const userName = currentUser?.user_metadata?.full_name || currentUser?.email || 'Someone';
       const currentUserEmail = currentUser?.email;
-      
-      console.log('🔔 Notification Check:', {
-        listName: updatedList.name,
-        collaborators: updatedList.collaborators,
-        currentUserEmail: currentUserEmail,
-        productName: product.name
-      });
-      
+
       if (updatedList.collaborators && updatedList.collaborators.length > 0) {
-        console.log(`📧 Processing ${updatedList.collaborators.length} collaborators for notifications`);
-        
+
         // For each collaborator email, find their user ID
         for (const collaboratorEmail of updatedList.collaborators) {
-          console.log(`📨 Checking collaborator: ${collaboratorEmail}`);
-          
+
           // Skip if it's the current user
           if (collaboratorEmail === currentUserEmail) {
-            console.log(`⏭️ Skipping current user: ${collaboratorEmail}`);
+
             continue;
           }
           
           // Use database function to get user ID from email
-          console.log(`🔍 Looking up user ID for: ${collaboratorEmail}`);
+
           const { data: userData, error: userError } = await supabase
             .rpc('get_user_id_by_email', { user_email: collaboratorEmail });
-          
-          console.log(`📊 RPC Result:`, { userData, userError });
-          
+
           if (!userError && userData) {
-            console.log(`✅ Found user ID: ${userData}, creating notification...`);
-            
+
             const notificationResult = await createNotification(
               userData,
               'item_added',
@@ -418,14 +392,13 @@ export const addProductToGroceryList = async (
                 addedBy: userId
               }
             );
-            
-            console.log(`📬 Notification created:`, notificationResult);
+
           } else {
             console.error(`❌ Could not find user ID for ${collaboratorEmail}:`, userError);
           }
         }
       } else {
-        console.log('ℹ️ No collaborators to notify');
+
       }
     } catch (notificationError) {
       console.error('💥 Error sending notifications:', notificationError);
@@ -582,7 +555,7 @@ export const deleteGroceryListItem = async (
       localStorage.setItem('grocery_lists', JSON.stringify(updatedLists));
       
       if (itemFound) {
-        console.log(`Item ${itemId} removed from localStorage`);
+
       }
     } catch (localStorageError) {
       console.error('Error updating localStorage:', localStorageError);
@@ -683,13 +656,9 @@ export const deleteGroceryListItem = async (
 // Get grocery list by ID with permission check
 export const getSharedGroceryListById = async (userId: string, listId: string): Promise<GroceryList | undefined> => {
   try {
-    console.log(`Getting shared grocery list: listId=${listId}, userId=${userId}`);
-    
+
     // Log Supabase client status
-    console.log('DIAGNOSTIC: Supabase client check:', { 
-      isInitialized: !!supabase?.from,
-      hasAuthMethod: !!supabase?.auth,
-      hasGroceryListsTable: !!supabase?.from('grocery_lists')
+
     });
     
     // Validate listId format
@@ -709,58 +678,36 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
         console.error('Error getting user data:', userError);
       } else {
         userEmail = userData?.user?.email?.toLowerCase() || "";
-        console.log('User email for permission check:', userEmail);
+
       }
     } else {
-      console.log('Anonymous user is viewing the list (view-only access)');
+
     }
     
     // Try direct connection to check if list exists
-    console.log('DIAGNOSTIC: Making a direct database check of grocery_lists table');
+
     try {
       // First check if we can connect to Supabase at all
       const { data: testData, error: testError } = await supabase
         .from('grocery_lists')
         .select('count')
         .limit(1);
-        
-      console.log('DIAGNOSTIC: Basic Supabase connection test:', {
-        success: !testError,
-        error: testError ? testError.message : null,
-        hasData: !!testData
-      });
-      
+
       // Now try to get the specific list
       const { data: directCheck, error: directError } = await supabase
         .from('grocery_lists')
         .select('id, name, user_id, created_at, collaborators')
         .eq('id', listId);
-        
-      console.log('DIAGNOSTIC: Direct check results:', { 
-        success: !directError, 
-        foundRecords: directCheck?.length || 0,
-        error: directError ? directError.message : null,
-        data: directCheck ? JSON.stringify(directCheck) : null,
-        listId: listId
-      });
-      
+
       if (directCheck && directCheck.length > 0) {
-        console.log('DIAGNOSTIC: List found via direct check:', {
-          id: directCheck[0].id,
-          name: directCheck[0].name,
-          userId: directCheck[0].user_id,
-          createdAt: directCheck[0].created_at,
-          collaborators: directCheck[0].collaborators
-        });
+
       } else {
-        console.log('DIAGNOSTIC: List NOT found via direct check');
+
       }
     } catch (diagnosticError) {
       console.error('DIAGNOSTIC: Error during direct check:', diagnosticError);
     }
-    
-    console.log('Fetching grocery list from Supabase table: grocery_lists');
-    
+
     // Fetch full list details from grocery_lists table - allow access to anyone with the link
     const { data: list, error: listError } = await supabase
       .from('grocery_lists')
@@ -778,15 +725,11 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
       console.error('Grocery list not found:', listId);
       
       // Check if the supabase instance is properly initialized
-      console.log('DIAGNOSTIC: Checking Supabase configuration...');
-      console.log('DIAGNOSTIC: Supabase URL available:', !!(import.meta.env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL));
-      console.log('DIAGNOSTIC: Supabase Key available:', !!(import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY));
-      
+
+
       throw new Error('The grocery list does not exist or may have been deleted.');
     }
-    
-    console.log('Successfully retrieved grocery list:', list.name);
-    
+
     // Check if user is owner or collaborator for edit permissions
     const isOwner = !isAnonymous && userId === list.user_id;
     const isCollaborator = userEmail && list.collaborators && 
@@ -794,10 +737,9 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
                           list.collaborators.some(email => email.toLowerCase() === userEmail);
     
     hasEditPermission = isOwner || isCollaborator;
-    console.log(`User permissions: isAnonymous=${isAnonymous}, isOwner=${isOwner}, isCollaborator=${isCollaborator}, hasEditPermission=${hasEditPermission}`);
-    
+
     // Fetch items for the list from grocery_items table
-    console.log(`Fetching items for list ${listId} from grocery_items table...`);
+
     const { data: items, error: itemsError } = await supabase
       .from('grocery_items')
       .select('*')
@@ -807,12 +749,10 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
       console.error('Error fetching grocery items:', itemsError);
       throw new Error('Could not load grocery list items. Please try again.');
     }
-    
-    console.log(`Retrieved ${items?.length || 0} items for the grocery list`);
-    
+
     // Debug: Print the first item's structure if available
     if (items && items.length > 0) {
-      console.log('Sample item structure:', JSON.stringify(items[0]));
+
     }
 
     // Get the owner's user information to display who shared the list
@@ -834,7 +774,7 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
           ownerName = userData.user.email || "Unknown";
         }
       }
-      console.log('Owner name:', ownerName);
+
     } catch (e) {
       console.error('Error getting owner name:', e);
     }
@@ -866,8 +806,7 @@ export const getSharedGroceryListById = async (userId: string, listId: string): 
         }
       })),
     };
-    
-    console.log(`Successfully returning shared list with ${result.items.length} items`);
+
     return result;
   } catch (error) {
     console.error('Error getting shared grocery list:', error);
@@ -907,7 +846,7 @@ export const addCollaborator = async (
 
     // Check if collaborator is already added
     if (currentCollaborators.includes(collaboratorEmail)) {
-      console.log('Collaborator already exists');
+
       return true;
     }
 
@@ -945,7 +884,7 @@ export const addCollaborator = async (
 // Helper function to handle collaborator updates in localStorage
 function handleCollaboratorWithLocalStorage(listId: string, email: string): boolean {
   try {
-    console.log('Using localStorage for collaborator update:', { listId, email });
+
     updateLocalStorageCollaborators(listId, email);
     return true;
   } catch (error) {
@@ -957,8 +896,7 @@ function handleCollaboratorWithLocalStorage(listId: string, email: string): bool
 // Helper function to update collaborators in localStorage
 function updateLocalStorageCollaborators(listId: string, email: string): boolean {
   try {
-    console.log('Using localStorage for collaborator update:', { listId, email });
-    
+
     // Normalize email
     const normalizedEmail = email.toLowerCase();
     
@@ -988,14 +926,11 @@ function updateLocalStorageCollaborators(listId: string, email: string): boolean
     
     // Check if email already exists (case insensitive)
     const emailExists = list.collaborators.includes(normalizedEmail);
-    
-    console.log('Current collaborators:', list.collaborators);
-    console.log('Email already exists:', emailExists);
-    
+
     if (!emailExists) {
       list.collaborators.push(normalizedEmail);
       localStorage.setItem('grocery_lists', JSON.stringify(lists));
-      console.log('Updated collaborators in localStorage:', list.collaborators);
+
     }
     
     return true;
@@ -1008,12 +943,10 @@ function updateLocalStorageCollaborators(listId: string, email: string): boolean
 // Remove a collaborator from a grocery list
 export const removeCollaborator = async (userId: string, listId: string, collaboratorEmail: string): Promise<boolean> => {
   try {
-    console.log(`===> Starting removeCollaborator: userId=${userId}, listId=${listId}, email=${collaboratorEmail}`);
-    
+
     // Normalize the email address
     const normalizedEmail = collaboratorEmail.trim().toLowerCase();
-    console.log(`===> Normalized email: ${normalizedEmail}`);
-    
+
     // Try database operation first
     let databaseSuccess = false;
     
@@ -1034,24 +967,20 @@ export const removeCollaborator = async (userId: string, listId: string, collabo
         console.error('===> List not found:', listId);
         return false;
       }
-      
-      console.log('===> List fetched successfully:', list);
-      
+
       // Check if the user is the owner
       const isOwner = list.user_id === userId;
-      console.log(`===> Is user the owner? ${isOwner}, list.user_id=${list.user_id}, userId=${userId}`);
-      
+
       if (!isOwner) {
         console.error('===> User does not have permission to remove collaborators');
         return false;
       }
       
       // Current collaborators
-      console.log('===> Current collaborators:', list.collaborators);
-      
+
       // Clean up the collaborators array 
       if (!Array.isArray(list.collaborators)) {
-        console.log('===> Collaborators is not an array, initializing empty array');
+
         list.collaborators = [];
       }
       
@@ -1064,7 +993,7 @@ export const removeCollaborator = async (userId: string, listId: string, collabo
       const emailExists = collaborators.includes(normalizedEmail);
       
       if (!emailExists) {
-        console.log(`===> Email ${normalizedEmail} not found in collaborators list`);
+
         return true; // Consider it "removed" since it's not there
       }
       
@@ -1072,9 +1001,7 @@ export const removeCollaborator = async (userId: string, listId: string, collabo
       const updatedCollaborators = collaborators.filter(email => 
         email !== normalizedEmail
       );
-      
-      console.log('===> New collaborators array after removal:', updatedCollaborators);
-      
+
       // Update the list with new collaborators
       const { error: updateError } = await supabase
         .from('grocery_lists')
@@ -1084,7 +1011,7 @@ export const removeCollaborator = async (userId: string, listId: string, collabo
       if (updateError) {
         console.error('===> Error updating collaborators in database:', updateError);
       } else {
-        console.log('===> Successfully removed collaborator in database');
+
         databaseSuccess = true;
       }
     } catch (dbError) {
@@ -1092,11 +1019,10 @@ export const removeCollaborator = async (userId: string, listId: string, collabo
     }
     
     // Always update localStorage for immediate UI updates and fallback
-    console.log('===> Attempting to update localStorage');
+
     try {
       removeCollaboratorFromLocalStorage(listId, normalizedEmail);
-      console.log('===> Successfully removed collaborator in localStorage');
-      
+
       return true; // Consider the operation successful if localStorage update worked
     } catch (localError) {
       console.error('===> Error updating localStorage:', localError);
@@ -1111,47 +1037,36 @@ export const removeCollaborator = async (userId: string, listId: string, collabo
 // Helper function to remove a collaborator from localStorage
 function removeCollaboratorFromLocalStorage(listId: string, email: string): boolean {
   try {
-    console.log(`===> removeCollaboratorFromLocalStorage: listId=${listId}, email=${email}`);
-    
+
     const normalizedEmail = email.toLowerCase();
-    console.log(`===> Normalized email for localStorage: ${normalizedEmail}`);
-    
+
     const lists = JSON.parse(localStorage.getItem('grocery_lists') || '[]');
-    console.log(`===> Found ${lists.length} lists in localStorage`);
-    
+
     const listIndex = lists.findIndex((list: any) => list.id === listId);
-    console.log(`===> List index in localStorage: ${listIndex}`);
-    
+
     if (listIndex === -1) {
-      console.log('===> List not found in localStorage');
+
       return false;
     }
     
     const list = lists[listIndex];
-    console.log(`===> Found list: ${list.name}`);
-    
+
     if (!list.collaborators) {
-      console.log('===> No collaborators array in list');
+
       list.collaborators = [];
       return true; // Nothing to remove
     }
-    
-    console.log(`===> Current collaborators: ${list.collaborators.join(', ')}`);
-    
+
     // Filter out the email to remove - case insensitive comparison
     const originalLength = list.collaborators.length;
     list.collaborators = list.collaborators.filter((e: string) => {
       if (typeof e !== 'string') return true;
       return e.toLowerCase() !== normalizedEmail;
     });
-    
-    console.log(`===> New collaborators: ${list.collaborators.join(', ')}`);
-    console.log(`===> Removed ${originalLength - list.collaborators.length} collaborator(s)`);
-    
+
     // Update localStorage
     localStorage.setItem('grocery_lists', JSON.stringify(lists));
-    console.log('===> Updated localStorage');
-    
+
     return true;
   } catch (error) {
     console.error('===> Error updating collaborators in localStorage:', error);
@@ -1168,12 +1083,10 @@ export const sendCollaboratorInvite = async (
 ): Promise<boolean> => {
   try {
     // Log the attempt
-    console.log(`Invitation would be sent to ${collaboratorEmail} for list ${listName} (${listId})`);
-    
+
     // Create a sharing link
     const shareUrl = `${window.location.origin}/shared-list/${listId}`;
-    console.log(`Share URL: ${shareUrl}`);
-    
+
     // For now, just return true since we don't have email functionality
     return true;
   } catch (error) {
@@ -1247,8 +1160,7 @@ const updateListInDatabase = async (list: GroceryList, userId: string) => {
  * @returns 
  */
 export const syncGroceryListToDatabase = async (list: GroceryList, userId: string): Promise<{ success: boolean; message?: string }> => {
-  console.log(`Syncing grocery list "${list.name}" to database for user ${userId}`);
-  
+
   try {
     // Update the list in the database
     const updateResult = await updateListInDatabase(list, userId);
@@ -1480,7 +1392,6 @@ export const updateListItem = async (
   userId: string,
   updates: Partial<GroceryListItem>
 ): Promise<{ success: boolean; item?: any; message?: string }> => {
-  console.log(`Updating item ${itemId} in list ${listId} for user ${userId}`, updates);
 
   try {
     // Convert from GroceryListItem format to database format
@@ -1490,8 +1401,6 @@ export const updateListItem = async (
     if (updates.checked !== undefined) dbUpdates.checked = updates.checked;
     if (updates.productData !== undefined) dbUpdates.product_data = updates.productData;
 
-    console.log('Database updates:', dbUpdates);
-    
     // Update the item in the database
     const { data, error } = await supabase
       .from('grocery_items')
@@ -1515,8 +1424,7 @@ export const updateListItem = async (
 // Add this new function at the end of the file
 export const verifyListExists = async (listId: string): Promise<boolean> => {
   try {
-    console.log('DIAGNOSTIC: Verifying list existence:', listId);
-    
+
     // First check Supabase connection
     const { data: testData, error: testError } = await supabase
       .from('grocery_lists')
@@ -1541,15 +1449,10 @@ export const verifyListExists = async (listId: string): Promise<boolean> => {
     }
     
     if (list) {
-      console.log('DIAGNOSTIC: List found:', {
-        id: list.id,
-        name: list.name,
-        userId: list.user_id,
-        createdAt: list.created_at
-      });
+
       return true;
     } else {
-      console.log('DIAGNOSTIC: List not found:', listId);
+
       return false;
     }
   } catch (error) {
@@ -1659,7 +1562,7 @@ export const addCollaboratorToList = async (
         }
       );
     } else {
-      console.log(`Could not find user with email ${collaboratorEmail} for notification`);
+
     }
 
     return { success: true, message: 'Collaborator added successfully' };

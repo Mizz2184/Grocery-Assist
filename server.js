@@ -24,13 +24,12 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
     // Simplify search query - take first word if multi-word query
     // MaxiPali API frequently fails with complex queries
     const simplifiedQuery = query.split(' ')[0];
-    console.log(`Using simplified query: "${simplifiedQuery}" (from original: "${query}")`);
-    
+
     let searchData = [];
     
     // Try path-based search first
     try {
-      console.log(`Attempting path-based search for: ${simplifiedQuery}`);
+
       const pathSearchResponse = await axios.get(`https://www.maxipali.co.cr/api/catalog_system/pub/products/search/${encodeURIComponent(simplifiedQuery)}`, {
         params: {
           '_from': (page - 1) * pageSize,
@@ -48,10 +47,10 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
       });
       
       if (pathSearchResponse.data && pathSearchResponse.data.length > 0) {
-        console.log(`Path-based search found ${pathSearchResponse.data.length} products`);
+
         searchData = pathSearchResponse.data;
       } else {
-        console.log('Path-based search returned no results, trying ft search');
+
       }
     } catch (pathError) {
       console.error('Path-based search error:', pathError.message);
@@ -61,7 +60,7 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
     // If path search returned no results, try ft parameter search
     if (searchData.length === 0) {
       try {
-        console.log(`Attempting ft parameter search for: ${simplifiedQuery}`);
+
         const ftSearchResponse = await axios.get(`https://www.maxipali.co.cr/api/catalog_system/pub/products/search`, {
           params: {
             'ft': simplifiedQuery,
@@ -80,10 +79,10 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
         });
         
         if (ftSearchResponse.data && ftSearchResponse.data.length > 0) {
-          console.log(`ft parameter search found ${ftSearchResponse.data.length} products`);
+
           searchData = ftSearchResponse.data;
         } else {
-          console.log('ft parameter search returned no results');
+
         }
       } catch (ftError) {
         console.error('ft parameter search error:', ftError.message);
@@ -94,7 +93,7 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
     // Final attempt - use intelligent search API
     if (searchData.length === 0) {
       try {
-        console.log(`Attempting intelligent search for: ${simplifiedQuery}`);
+
         const intelligentSearchResponse = await axios.get(`https://www.maxipali.co.cr/api/io/_v/api/intelligent-search/product_search/productSearch`, {
           params: {
             term: simplifiedQuery,
@@ -113,8 +112,7 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
         });
         
         if (intelligentSearchResponse.data?.products && intelligentSearchResponse.data.products.length > 0) {
-          console.log(`Intelligent search found ${intelligentSearchResponse.data.products.length} products`);
-          
+
           // Log price data for troubleshooting
           const priceSamples = intelligentSearchResponse.data.products.slice(0, 3).map(p => ({
             name: p.productName,
@@ -122,17 +120,14 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
             rawPriceType: typeof p.price,
             parsedPrice: parseFloat(p.price) || 0
           }));
-          console.log('Sample price data:', priceSamples);
-          
+
           // Convert intelligent search format to catalog search format
           const validProducts = intelligentSearchResponse.data.products.filter(p => {
             // Only include products with valid prices
             const hasPrice = p.price && parseFloat(p.price) > 0;
             return hasPrice;
           });
-          
-          console.log(`Filtered to ${validProducts.length} products with valid prices`);
-          
+
           // Map valid products to the expected format
           searchData = validProducts.map(p => ({
             productId: p.productId,
@@ -151,7 +146,7 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
             }]
           }));
         } else {
-          console.log('Intelligent search returned no results');
+
         }
       } catch (intelligentError) {
         console.error('Intelligent search error:', intelligentError.message);
@@ -163,9 +158,7 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
       products: (searchData || []).map(p => {
         const price = p.items?.[0]?.sellers?.[0]?.commertialOffer?.Price || 
                      p.items?.[0]?.sellers?.[0]?.commertialOffer?.ListPrice || 0;
-        
-        console.log(`Product ${p.productName} price:`, price);
-        
+
         return {
           id: p.productId,
           name: p.productName,
@@ -187,11 +180,10 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
 
     // Filter out products with zero price
     const filteredProducts = transformedData.products.filter(p => p.price > 0);
-    console.log(`Filtered from ${transformedData.products.length} to ${filteredProducts.length} products with price > 0`);
+
     transformedData.products = filteredProducts;
     transformedData.total = filteredProducts.length;
 
-    console.log(`Found ${transformedData.products.length} products from API`);
     return res.json(transformedData);
   } catch (error) {
     console.error('Error in MaxiPali search:', error.message, error.response?.status, error.response?.data);
@@ -205,7 +197,6 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
 app.get('/api/proxy/maxipali/barcode/:ean', async (req, res) => {
   try {
     const { ean } = req.params;
-    console.log('Received EAN lookup request:', ean);
 
     if (!ean || ean.trim() === '') {
       return res.status(400).json({
@@ -216,7 +207,7 @@ app.get('/api/proxy/maxipali/barcode/:ean', async (req, res) => {
 
     // Try direct product search first - using a more reliable endpoint
     try {
-      console.log(`Attempting direct search with EAN: ${ean}`);
+
       const directSearchResponse = await axios.get(`https://www.maxipali.co.cr/api/catalog_system/pub/products/search`, {
         params: {
           'fq': `alternateIds_RefId:${ean}`,
@@ -238,14 +229,7 @@ app.get('/api/proxy/maxipali/barcode/:ean', async (req, res) => {
         // Extract price and ensure it's a number
         const rawPrice = product.items?.[0]?.sellers?.[0]?.commertialOffer?.Price;
         const price = typeof rawPrice === 'string' ? parseFloat(rawPrice) : (rawPrice || 0);
-        
-        console.log('Direct search price data:', {
-          rawPrice,
-          rawPriceType: typeof rawPrice,
-          convertedPrice: price,
-          convertedPriceType: typeof price
-        });
-        
+
         const responseData = {
           id: product.productId,
           name: product.productName,
@@ -256,11 +240,10 @@ app.get('/api/proxy/maxipali/barcode/:ean', async (req, res) => {
           ean: ean,
           category: product.categories && product.categories[0] ? product.categories[0].split('/').pop() : 'Grocery'
         };
-        
-        console.log('Sending direct search product data:', responseData);
+
         return res.json(responseData);
       } else {
-        console.log('No results from direct search, proceeding to alternative search');
+
       }
     } catch (directSearchError) {
       console.error('Direct search failed:', {
@@ -273,7 +256,7 @@ app.get('/api/proxy/maxipali/barcode/:ean', async (req, res) => {
 
     // Try second search method - using free text search
     try {
-      console.log(`Attempting free text search with EAN: ${ean}`);
+
       const freeTextResponse = await axios.get(`https://www.maxipali.co.cr/api/catalog_system/pub/products/search`, {
         params: {
           'ft': ean
@@ -293,14 +276,7 @@ app.get('/api/proxy/maxipali/barcode/:ean', async (req, res) => {
         // Extract price and ensure it's a number
         const rawPrice = product.items?.[0]?.sellers?.[0]?.commertialOffer?.Price;
         const price = typeof rawPrice === 'string' ? parseFloat(rawPrice) : (rawPrice || 0);
-        
-        console.log('Free text search price data:', {
-          rawPrice,
-          rawPriceType: typeof rawPrice,
-          convertedPrice: price,
-          convertedPriceType: typeof price
-        });
-        
+
         const responseData = {
           id: product.productId,
           name: product.productName,
@@ -311,11 +287,10 @@ app.get('/api/proxy/maxipali/barcode/:ean', async (req, res) => {
           ean: ean,
           category: product.categories && product.categories[0] ? product.categories[0].split('/').pop() : 'Grocery'
         };
-        
-        console.log('Sending free text search product data:', responseData);
+
         return res.json(responseData);
       } else {
-        console.log('No results from free text search, proceeding to alternative search');
+
       }
     } catch (freeTextError) {
       console.error('Free text search failed:', {
@@ -328,7 +303,7 @@ app.get('/api/proxy/maxipali/barcode/:ean', async (req, res) => {
 
     // Try intelligent search API as final method
     try {
-      console.log(`Attempting intelligent search with EAN: ${ean}`);
+
       const altSearchResponse = await axios.get(`https://www.maxipali.co.cr/api/io/_v/api/intelligent-search/product_search/productSearch`, {
         params: {
           term: ean,
@@ -352,21 +327,19 @@ app.get('/api/proxy/maxipali/barcode/:ean', async (req, res) => {
       }
 
       // Look for exact matches of EAN in product properties
-      console.log(`Found ${altSearchResponse.data.products.length} possible matches`);
-      
+
       // Try to find a better match by looking at product specifications if available
       let bestMatch = null;
       let matchScore = 0;
       
       for (const product of altSearchResponse.data.products) {
-        console.log(`Checking product: ${product.productName}`);
-        
+
         let currentScore = 0;
         
         // Check if EAN appears in product name
         if (product.productName.includes(ean)) {
           currentScore += 5;
-          console.log(`  EAN found in name: +5 points`);
+
         }
         
         // Check if we have specifications that contain the EAN
@@ -375,7 +348,7 @@ app.get('/api/proxy/maxipali/barcode/:ean', async (req, res) => {
             for (const spec of group.specifications || []) {
               if (spec.value === ean) {
                 currentScore += 50;
-                console.log(`  Exact EAN match in specifications: +50 points`);
+
               }
             }
           }
@@ -384,7 +357,7 @@ app.get('/api/proxy/maxipali/barcode/:ean', async (req, res) => {
         if (currentScore > matchScore) {
           matchScore = currentScore;
           bestMatch = product;
-          console.log(`  New best match: ${product.productName} with score ${currentScore}`);
+
         }
       }
       
@@ -394,14 +367,7 @@ app.get('/api/proxy/maxipali/barcode/:ean', async (req, res) => {
       // Extract price and ensure it's a number
       const rawPrice = product.price;
       const price = typeof rawPrice === 'string' ? parseFloat(rawPrice) : (rawPrice || 0);
-      
-      console.log('Intelligent search price data:', {
-        rawPrice,
-        rawPriceType: typeof rawPrice,
-        convertedPrice: price,
-        convertedPriceType: typeof price
-      });
-      
+
       const transformedData = {
         id: product.productId,
         name: product.productName || 'Unknown Product',
@@ -414,7 +380,6 @@ app.get('/api/proxy/maxipali/barcode/:ean', async (req, res) => {
         matchConfidence: matchScore > 0 ? 'high' : 'low'
       };
 
-      console.log('Sending intelligent search transformed data:', transformedData);
       return res.json(transformedData);
     } catch (altSearchError) {
       console.error('Intelligent search failed:', {
@@ -456,9 +421,7 @@ app.get('/api/maxipali/search', async (req, res) => {
   if (!query) {
     return res.status(400).json({ error: 'Query parameter is required' });
   }
-  
-  console.log(`Searching MaxiPali for "${query}"`);
-  
+
   try {
     // Get data from the API
     const searchResponse = await axios.get(`https://www.maxipali.co.cr/api/catalog_system/pub/products/search/${encodeURIComponent(query)}`, {
@@ -495,7 +458,6 @@ app.get('/api/maxipali/search', async (req, res) => {
       hasMore: false
     };
 
-    console.log(`Found ${transformedData.products.length} products from API`);
     return res.json(transformedData);
   } catch (error) {
     console.error('Error with API:', error.message);
@@ -541,9 +503,7 @@ app.post('/api/proxy/masxmenos/search', async (req, res) => {
     const to = from + pageSize - 1;
     
     const searchQuery = query || '';
-    
-    console.log('Calling MasxMenos catalog API with query:', searchQuery);
-    
+
     // Call the MasxMenos catalog API
     const apiResponse = await axios.get('https://www.masxmenos.cr/api/catalog_system/pub/products/search', {
       params: {
@@ -561,9 +521,7 @@ app.post('/api/proxy/masxmenos/search', async (req, res) => {
     });
 
     // Log the raw response for debugging
-    console.log('MasxMenos API response status:', apiResponse.status);
-    console.log(`Found ${apiResponse.data?.length || 0} MasxMenos products`);
-    
+
     // Transform catalog API response to match GraphQL format expected by frontend
     const products = (apiResponse.data || []).map(product => ({
       cacheId: product.productId,
@@ -615,7 +573,6 @@ app.post('/api/proxy/masxmenos/search', async (req, res) => {
 app.get('/api/proxy/masxmenos/barcode/:ean', async (req, res) => {
   try {
     const { ean } = req.params;
-    console.log('Received MasxMenos EAN lookup request:', ean);
 
     if (!ean || ean.trim() === '') {
       return res.status(400).json({
@@ -625,8 +582,7 @@ app.get('/api/proxy/masxmenos/barcode/:ean', async (req, res) => {
     }
 
     // Use VTEX catalog API to search by EAN
-    console.log('Searching MasxMenos by EAN:', ean);
-    
+
     const apiResponse = await axios.get('https://www.masxmenos.cr/api/catalog_system/pub/products/search', {
       params: {
         ft: ean,
@@ -681,8 +637,7 @@ app.get('/api/proxy/masxmenos/barcode/:ean', async (req, res) => {
           ? product.categories[0].split('/').filter(Boolean).pop() || 'Grocery'
           : 'Grocery'
       };
-      
-      console.log('Sending MasxMenos product data:', responseData);
+
       return res.json(responseData);
     } else {
       return res.status(404).json({
@@ -708,8 +663,7 @@ app.get('/api/proxy/masxmenos/barcode/:ean', async (req, res) => {
 app.post('/api/proxy/automercado/search', async (req, res) => {
   try {
     const { query, page = 1, pageSize = 30 } = req.body;
-    console.log('Received Automercado search request:', { query, page, pageSize });
-    
+
     if (!query || typeof query !== 'string' || query.trim() === '') {
       return res.status(400).json({ error: 'Query parameter is required' });
     }
@@ -732,9 +686,7 @@ app.post('/api/proxy/automercado/search', async (req, res) => {
         // This ensures we get real-time data for ANY product search
       }]
     };
-    
-    console.log('Calling Automercado Algolia API with query:', query);
-    
+
     // Call the Algolia API
     const apiResponse = await axios.post(algoliaUrl, requestBody, {
       headers: {
@@ -747,9 +699,6 @@ app.post('/api/proxy/automercado/search', async (req, res) => {
       timeout: 15000
     });
 
-    console.log('Automercado API response status:', apiResponse.status);
-    console.log(`Found ${apiResponse.data?.results?.[0]?.hits?.length || 0} Automercado products`);
-    
     // Extract hits from Algolia response
     const hits = apiResponse.data?.results?.[0]?.hits || [];
     
@@ -780,8 +729,7 @@ app.post('/api/proxy/automercado/search', async (req, res) => {
 app.get('/api/proxy/automercado/scrape-all', async (req, res) => {
   try {
     const { page = 0, hitsPerPage = 1000 } = req.query;
-    console.log('Received Automercado bulk scrape request:', { page, hitsPerPage });
-    
+
     // Algolia API configuration for Automercado
     const algoliaUrl = 'https://fu5xfx7knl-dsn.algolia.net/1/indexes/*/queries';
     const algoliaAppId = 'FU5XFX7KNL';
@@ -839,9 +787,7 @@ app.get('/api/proxy/automercado/scrape-all', async (req, res) => {
         ]
       }]
     };
-    
-    console.log(`Calling Automercado Algolia API for bulk scrape - page ${page}, hitsPerPage ${hitsPerPage}`);
-    
+
     // Call the Algolia API
     const apiResponse = await axios.post(algoliaUrl, requestBody, {
       headers: {
@@ -858,14 +804,7 @@ app.get('/api/proxy/automercado/scrape-all', async (req, res) => {
     const hits = result.hits || [];
     const nbHits = result.nbHits || 0;
     const nbPages = result.nbPages || 0;
-    
-    console.log(`Automercado bulk scrape response:`, {
-      currentPage: page,
-      hitsInPage: hits.length,
-      totalHits: nbHits,
-      totalPages: nbPages
-    });
-    
+
     // Return comprehensive data including pagination info
     return res.json({
       hits: hits,
@@ -899,14 +838,13 @@ app.get('/api/proxy/automercado/scrape-all', async (req, res) => {
 app.post('/api/proxy/walmart/search', async (req, res) => {
   try {
     const { query, page = 1, pageSize = 49 } = req.body;
-    console.log('Received Walmart search request:', { query, page, pageSize });
-    
+
     // Initialize searchData variable at the top level
     let searchData = [];
     
     // Try path-based search first
     try {
-      console.log(`Attempting path-based search for: ${query}`);
+
       const pathSearchResponse = await axios.get(`https://www.walmart.co.cr/api/catalog_system/pub/products/search/${encodeURIComponent(query)}`, {
         params: {
           '_from': (page - 1) * pageSize,
@@ -922,14 +860,12 @@ app.post('/api/proxy/walmart/search', async (req, res) => {
         },
         timeout: 15000
       });
-      
-      console.log(`Path-based Walmart search response status: ${pathSearchResponse.status}`);
-      
+
       if (pathSearchResponse.data && pathSearchResponse.data.length > 0) {
-        console.log(`Path-based search found ${pathSearchResponse.data.length} Walmart products`);
+
         searchData = pathSearchResponse.data;
       } else {
-        console.log('Path-based Walmart search returned no results, trying ft search');
+
       }
     } catch (pathError) {
       console.error('Walmart path-based search error:', pathError.message);
@@ -941,7 +877,7 @@ app.post('/api/proxy/walmart/search', async (req, res) => {
     // If path search returned no results, try ft parameter search
     if (searchData.length === 0) {
       try {
-        console.log(`Attempting Walmart ft parameter search for: ${query}`);
+
         const ftSearchResponse = await axios.get('https://www.walmart.co.cr/api/catalog_system/pub/products/search', {
           params: {
             'ft': query,
@@ -958,14 +894,12 @@ app.post('/api/proxy/walmart/search', async (req, res) => {
           },
           timeout: 15000
         });
-        
-        console.log(`ft-based Walmart search response status: ${ftSearchResponse.status}`);
-        
+
         if (ftSearchResponse.data && ftSearchResponse.data.length > 0) {
-          console.log(`ft parameter search found ${ftSearchResponse.data.length} Walmart products`);
+
           searchData = ftSearchResponse.data;
         } else {
-          console.log('ft parameter Walmart search returned no results');
+
         }
       } catch (ftError) {
         console.error('Walmart ft parameter search error:', ftError.message);
@@ -977,7 +911,7 @@ app.post('/api/proxy/walmart/search', async (req, res) => {
     // If both path and ft search failed, try an alternative approach with intelligent search
     if (searchData.length === 0) {
       try {
-        console.log(`Attempting intelligent search for Walmart with query: ${query}`);
+
         const intelligentSearchResponse = await axios.get(`https://www.walmart.co.cr/api/io/_v/api/intelligent-search/product_search/productSearch`, {
           params: {
             term: query,
@@ -996,17 +930,14 @@ app.post('/api/proxy/walmart/search', async (req, res) => {
         });
         
         if (intelligentSearchResponse.data?.products && intelligentSearchResponse.data.products.length > 0) {
-          console.log(`Intelligent search found ${intelligentSearchResponse.data.products.length} Walmart products`);
-          
+
           // Convert intelligent search format to catalog search format
           const validProducts = intelligentSearchResponse.data.products.filter(p => {
             // Only include products with valid prices
             const hasPrice = p.price && parseFloat(p.price) > 0;
             return hasPrice;
           });
-          
-          console.log(`Filtered to ${validProducts.length} Walmart products with valid prices`);
-          
+
           // Map valid products to the expected format
           searchData = validProducts.map(p => ({
             productId: p.productId,
@@ -1025,7 +956,7 @@ app.post('/api/proxy/walmart/search', async (req, res) => {
             }]
           }));
         } else {
-          console.log('Intelligent search for Walmart returned no results');
+
         }
       } catch (intelligentError) {
         console.error('Walmart intelligent search error:', intelligentError.message);
@@ -1061,15 +992,14 @@ app.post('/api/proxy/walmart/search', async (req, res) => {
 
     // Filter out products with zero price
     const filteredProducts = transformedData.products.filter(p => p.price > 0);
-    console.log(`Filtered from ${transformedData.products.length} to ${filteredProducts.length} Walmart products with price > 0`);
+
     transformedData.products = filteredProducts;
     transformedData.total = filteredProducts.length;
 
-    console.log(`Found ${transformedData.products.length} Walmart products from API`);
     if (transformedData.products.length > 0) {
-      console.log('First Walmart product:', transformedData.products[0]);
+
     } else {
-      console.log('WARNING: No Walmart products were returned after all search attempts');
+
     }
     
     return res.json(transformedData);
@@ -1097,13 +1027,11 @@ app.post('/api/proxy/walmart/search', async (req, res) => {
 app.get('/api/proxy/walmart/barcode/:ean', async (req, res) => {
   try {
     const { ean } = req.params;
-    console.log(`Received Walmart barcode lookup request for EAN: ${ean}`);
-    
+
     // Walmart API URL for barcode search
     const url = 'https://www.walmart.co.cr/api/catalog_system/pub/products/search';
     const fullUrl = `${url}?fq=ean:${encodeURIComponent(ean)}`;
-    console.log(`Sending request to Walmart API for barcode: ${fullUrl}`);
-    
+
     const response = await axios.get(fullUrl, {
       headers: {
         'Accept': 'application/json',
@@ -1115,14 +1043,10 @@ app.get('/api/proxy/walmart/barcode/:ean', async (req, res) => {
       },
       timeout: 15000
     });
-    
-    console.log(`Walmart barcode API returned status: ${response.status}`);
-    console.log(`Walmart barcode API returned ${response.data ? response.data.length : 0} results`);
-    
+
     if (Array.isArray(response.data) && response.data.length > 0) {
       const product = response.data[0];
-      console.log(`Found product by barcode: ${product.productName}`);
-      
+
       const price = product.items?.[0]?.sellers?.[0]?.commertialOffer?.Price || 
                    product.items?.[0]?.sellers?.[0]?.commertialOffer?.ListPrice || 0;
       
@@ -1138,11 +1062,10 @@ app.get('/api/proxy/walmart/barcode/:ean', async (req, res) => {
         barcode: product.items?.[0]?.ean || ean,
         inStock: true
       };
-      
-      console.log('Transformed product from barcode:', transformedProduct);
+
       return res.json({ success: true, product: transformedProduct });
     } else {
-      console.log(`No products found for barcode ${ean} in Walmart`);
+
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
   } catch (error) {
@@ -1169,7 +1092,7 @@ app.get('/api/health', (req, res) => {
 if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 8080;
   app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+
   });
 }
 
@@ -1187,9 +1110,7 @@ app.post('/api/create-payment-intent', async (req, res) => {
     if (!amount) {
       return res.status(400).json({ error: 'Amount is required' });
     }
-    
-    console.log(`Creating payment intent for amount: ${amount} ${currency}`);
-    
+
     // Create a PaymentIntent with the order amount and currency
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount * 100), // Convert to cents
@@ -1200,8 +1121,6 @@ app.post('/api/create-payment-intent', async (req, res) => {
       },
     });
 
-    console.log(`Payment intent created with id: ${paymentIntent.id}`);
-    
     res.json({
       clientSecret: paymentIntent.client_secret,
       id: paymentIntent.id

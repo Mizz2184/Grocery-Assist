@@ -59,16 +59,15 @@ export const NotificationBell = () => {
   // Subscribe to real-time notifications
   useEffect(() => {
     if (!user?.id) {
-      console.log('🔕 NotificationBell: No user ID, skipping subscription');
+
       return;
     }
 
-    console.log('🔔 NotificationBell: Subscribing for user:', user.id);
     loadNotifications();
 
     // Subscribe to real-time updates
     const notificationChannel = subscribeToNotifications(user.id, (notification) => {
-      console.log('🔔 NotificationBell: Received real-time notification:', notification);
+
       setNotifications((prev) => [notification, ...prev]);
       setUnreadCount((prev) => prev + 1);
 

@@ -19,18 +19,10 @@ const SearchContext = createContext<SearchContextType | undefined>(undefined);
 
 export const SearchProvider = ({ children }: { children: React.ReactNode }) => {
   // Add initialization logging
-  console.log('SearchProvider initializing, checking sessionStorage for saved state');
-  
+
   const savedQueryFromSession = sessionStorage.getItem('search_query');
   const savedResultsFromSession = sessionStorage.getItem('search_results');
   const savedPositionFromSession = sessionStorage.getItem('search_scroll_position');
-  
-  console.log('SessionStorage state found:', { 
-    hasQuery: !!savedQueryFromSession,
-    hasResults: !!savedResultsFromSession,
-    resultsCount: savedResultsFromSession ? JSON.parse(savedResultsFromSession).length : 0,
-    position: savedPositionFromSession ? parseInt(savedPositionFromSession, 10) : 0
-  });
 
   const [query, setQuery] = useState<string>(() => {
     return savedQueryFromSession || '';
@@ -41,7 +33,7 @@ export const SearchProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         const parsed = JSON.parse(savedResultsFromSession);
         if (Array.isArray(parsed)) {
-          console.log(`Initialized searchResults state with ${parsed.length} items from sessionStorage`);
+
           return parsed;
         }
       } catch (error) {
@@ -84,17 +76,17 @@ export const SearchProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const clearSearch = useCallback(() => {
-    console.log('SearchContext: Clearing search state...');
+
     setQuery('');
     setSearchResults([]);
     setScrollPosition(0);
     setIsSearching(false);
     // Explicitly clear sessionStorage items
-    console.log('SearchContext/clearSearch: Clearing sessionStorage...');
+
     sessionStorage.removeItem('search_query');
     sessionStorage.removeItem('search_results');
     sessionStorage.removeItem('search_scroll_position');
-    console.log('SearchContext: SessionStorage cleared.');
+
   }, []);
 
   // Removed the debounced search effect to prevent automatic search when typing
@@ -102,30 +94,29 @@ export const SearchProvider = ({ children }: { children: React.ReactNode }) => {
   // Session storage sync - save when state changes
   useEffect(() => {
     // Log when this effect is triggered
-    console.log(`SearchContext: Saving state effect triggered. query:"${query}", results:${searchResults.length}, scroll:${scrollPosition}`);
 
     // Only save if we have meaningful data to prevent clearing valid state with empty state
     if (query.trim() || searchResults.length > 0 || scrollPosition > 0) {
-      console.log(`SearchContext: Saving state to sessionStorage...`);
+
       sessionStorage.setItem('search_query', query);
       sessionStorage.setItem('search_results', JSON.stringify(searchResults));
       sessionStorage.setItem('search_scroll_position', scrollPosition.toString());
-      console.log('SearchContext: State saved.');
+
     } else {
-      console.log('SearchContext: Skipping save, state is empty.');
+
     }
   }, [query, searchResults, scrollPosition]);
 
   // Create separate effect for page visibility changes to ensure state is saved when tab/window is closed
   useEffect(() => {
     const handleVisibilityChange = () => {
-      console.log(`SearchContext: Visibility changed to ${document.visibilityState}`);
+
       if (document.visibilityState === 'hidden' && (query || searchResults.length > 0)) {
-        console.log('SearchContext: Page hidden, saving search state to sessionStorage...');
+
         sessionStorage.setItem('search_query', query);
         sessionStorage.setItem('search_results', JSON.stringify(searchResults));
         sessionStorage.setItem('search_scroll_position', scrollPosition.toString());
-        console.log('SearchContext: State saved due to page hide.');
+
       }
     };
 
@@ -134,7 +125,7 @@ export const SearchProvider = ({ children }: { children: React.ReactNode }) => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      console.log('SearchContext: Cleaning up visibility change listeners.');
+
       window.removeEventListener('beforeunload', handleVisibilityChange);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
@@ -143,7 +134,7 @@ export const SearchProvider = ({ children }: { children: React.ReactNode }) => {
   // Debug logging - only in development
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      console.log('Search results updated:', searchResults.length);
+
     }
   }, [searchResults.length]); // Only depend on the length, not the full array
 
@@ -176,8 +167,7 @@ export function useSearch() {
   // Add debug effect to monitor search results
   useEffect(() => {
     if (context.searchResults && context.searchResults.length > 0) {
-      console.log(`useSearch: Currently has ${context.searchResults.length} search results`);
-      
+
       // Log store distribution
       const storeCount = {
         MaxiPali: context.searchResults.filter(p => p.store === 'MaxiPali').length,
@@ -185,10 +175,9 @@ export function useSearch() {
         Walmart: context.searchResults.filter(p => p.store === 'Walmart').length,
         Unknown: context.searchResults.filter(p => !p.store || p.store === 'Unknown').length
       };
-      console.log('Current search results by store:', storeCount);
-      
+
       if (context.searchResults.length > 0) {
-        console.log('First result example:', context.searchResults[0]);
+
       }
     }
   }, [context.searchResults]);

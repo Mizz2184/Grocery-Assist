@@ -44,8 +44,7 @@ const PaymentRequired = ({ children }: PaymentRequiredProps) => {
       try {
         // Check if the user has already paid
         const paymentStatus = await checkUserPaymentStatus(user.id);
-        console.log("Payment status check result:", paymentStatus);
-        
+
         // If paid, they're not a new user anymore
         if (paymentStatus) {
           setIsNewUser(false);

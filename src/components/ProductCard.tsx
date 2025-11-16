@@ -55,7 +55,7 @@ export const ProductCard = ({
     
     if (issues.length > 0) {
       console.warn(`ProductCard found issues with product ${product.id}:`, issues);
-      console.log('Problematic product data:', JSON.stringify(product));
+
     }
     
     return issues.length === 0;
@@ -72,7 +72,7 @@ export const ProductCard = ({
       const addedProducts = JSON.parse(localStorage.getItem('added_products') || '[]');
       if (addedProducts.includes(product.id) && !isInListLocal) {
         setIsInListLocal(true);
-        console.log(`Product ${product.id} found in localStorage added_products, updating UI`);
+
       }
     } catch (error) {
       console.warn('Error checking localStorage for added products:', error);
@@ -84,8 +84,7 @@ export const ProductCard = ({
     
     // Already in list or already adding, prevent duplicate calls
     if (isInListLocal || isAdding) return;
-    
-    console.log(`handleAddToList: Adding product ${product.id} to list`);
+
     setIsAdding(true);
     
     try {
@@ -94,9 +93,7 @@ export const ProductCard = ({
       
       // Call the parent handler
       await onAddToList(product.id);
-      
-      console.log(`handleAddToList: Successfully added product ${product.id} to list`);
-      
+
       // Ensure state persists even after reloads by adding to localStorage
       try {
         // Store this product as added in localStorage for UI persistence
@@ -104,7 +101,7 @@ export const ProductCard = ({
         if (!addedProducts.includes(product.id)) {
           addedProducts.push(product.id);
           localStorage.setItem('added_products', JSON.stringify(addedProducts));
-          console.log(`Product ${product.id} added to localStorage added_products`);
+
         }
       } catch (localStorageError) {
         console.warn('Could not update localStorage added_products:', localStorageError);

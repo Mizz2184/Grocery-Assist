@@ -65,15 +65,13 @@ export const searchProductByBarcode = async (ean: string): Promise<{
   message?: string 
 }> => {
   try {
-    console.log('Searching store APIs for EAN:', ean);
-    
+
     // Try MaxiPali first
     try {
-      console.log('Trying MaxiPali for EAN:', ean);
-      
+
       // STEP 1: Try MaxiPali direct catalog search API first
       try {
-        console.log('Trying direct catalog search API with EAN:', ean);
+
         const response = await axios.get(
           `https://www.maxipali.co.cr/api/catalog_system/pub/products/search`,
           {
@@ -94,21 +92,13 @@ export const searchProductByBarcode = async (ean: string): Promise<{
         
         // Check if we got any products
         if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-          console.log('Found products in catalog search:', response.data.length);
-          
+
           const product = response.data[0];
-          console.log('Selected product:', product.productName);
-          
+
           // Extract price and ensure it's a number
           const rawPrice = product.items?.[0]?.sellers?.[0]?.commertialOffer?.Price;
           const price = safeParsePrice(rawPrice);
-          
-          console.log('Price information:', {
-            rawPrice,
-            processedPrice: price,
-            type: typeof price
-          });
-          
+
           const finalProduct: Product = {
             id: product.productId || `maxipali-${ean}`,
             name: product.productName,
@@ -121,11 +111,10 @@ export const searchProductByBarcode = async (ean: string): Promise<{
             ean: ean,
             sku: product.items?.[0]?.itemId || ean
           };
-          
-          console.log('Final product object:', finalProduct);
+
           return { success: true, product: finalProduct };
         } else {
-          console.log('No products found in catalog search, trying next method');
+
         }
       } catch (catalogError) {
         console.error('Catalog search API error:', catalogError);
@@ -133,7 +122,7 @@ export const searchProductByBarcode = async (ean: string): Promise<{
       
       // STEP 2: Try the general search term API
       try {
-        console.log('Trying product search API with EAN:', ean);
+
         const response = await axios.get(
           `https://www.maxipali.co.cr/api/catalog/products/search?term=${ean}`,
           {
@@ -146,13 +135,10 @@ export const searchProductByBarcode = async (ean: string): Promise<{
             timeout: 15000 // 15 second timeout
           }
         );
-        
-        console.log('MaxiPali API response status:', response.status);
-        
+
         // Check if we got any products
         if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-          console.log('Found products in search:', response.data.length);
-          
+
           // Find exact match by EAN if possible
           const productsData = response.data as MaxiPaliProductData[];
           const exactMatch = productsData.find(item => 
@@ -160,17 +146,10 @@ export const searchProductByBarcode = async (ean: string): Promise<{
           );
           
           const productData = exactMatch || productsData[0];
-          console.log('Using product:', productData.name);
-          
+
           // Ensure price is a number
           const productPrice = safeParsePrice(productData.price);
-          
-          console.log('Price information:', {
-            rawPrice: productData.price,
-            processedPrice: productPrice,
-            type: typeof productPrice
-          });
-          
+
           const product: Product = {
             id: productData.id || `maxipali-${ean}`,
             name: productData.name,
@@ -183,11 +162,10 @@ export const searchProductByBarcode = async (ean: string): Promise<{
             ean: ean,
             sku: productData.sku || ean
           };
-          
-          console.log('Final product object:', product);
+
           return { success: true, product };
         } else {
-          console.log('No products found in search API, trying proxy API');
+
         }
       } catch (searchApiError) {
         console.error('Search API error:', searchApiError);
@@ -195,7 +173,7 @@ export const searchProductByBarcode = async (ean: string): Promise<{
       
       // STEP 3: Try our proxy API
       try {
-        console.log('Trying proxy API for EAN:', ean);
+
         const proxyResponse = await axios.get(`/api/proxy/maxipali/barcode/${ean}`, {
           headers: {
             'Accept': 'application/json',
@@ -203,9 +181,7 @@ export const searchProductByBarcode = async (ean: string): Promise<{
           },
           timeout: 15000
         });
-        
-        console.log('Proxy API response status:', proxyResponse.status);
-        
+
         // Check if the response contains data
         if (proxyResponse.data) {
           const productData = proxyResponse.data as MaxiPaliProductData;
@@ -225,13 +201,7 @@ export const searchProductByBarcode = async (ean: string): Promise<{
           
           // Ensure price is a number
           const productPrice = safeParsePrice(productData.price);
-          
-          console.log('Price information:', {
-            rawPrice: productData.price,
-            processedPrice: productPrice,
-            type: typeof productPrice
-          });
-          
+
           const product: Product = {
             id: productData.id || `proxy-${ean}`,
             name: productData.name,
@@ -244,8 +214,7 @@ export const searchProductByBarcode = async (ean: string): Promise<{
             ean: ean,
             sku: productData.sku || ''
           };
-          
-          console.log('Final product object from proxy:', product);
+
           return { success: true, product };
         }
       } catch (proxyError) {
@@ -254,29 +223,21 @@ export const searchProductByBarcode = async (ean: string): Promise<{
       
       // STEP 4: Try the general search as a final fallback
       try {
-        console.log('Trying general MaxiPali search with EAN as query:', ean);
+
         const maxiPaliResults = await searchMaxiPaliProducts({ query: ean });
         
         if (maxiPaliResults && maxiPaliResults.products && maxiPaliResults.products.length > 0) {
-          console.log('Found products in general search:', maxiPaliResults.products.length);
-          
+
           // Find exact match by EAN if available
           const exactMatch = maxiPaliResults.products.find(p => 
             p.sku === ean || p.id === ean || (p.ean && p.ean === ean) || p.barcode === ean
           );
           
           const productToUse = exactMatch || maxiPaliResults.products[0];
-          console.log('Using product from general search:', productToUse.name);
-          
+
           // Ensure price is a number
           const price = safeParsePrice(productToUse.price);
-          
-          console.log('Price information:', {
-            rawPrice: productToUse.price,
-            processedPrice: price,
-            type: typeof price
-          });
-          
+
           // Create a product with the parsed price
           const product = {
             ...productToUse,
@@ -284,11 +245,10 @@ export const searchProductByBarcode = async (ean: string): Promise<{
             barcode: ean,
             ean: ean
           };
-          
-          console.log('Final product object from general search:', product);
+
           return { success: true, product };
         } else {
-          console.log('No products found in general search');
+
         }
       } catch (searchError) {
         console.error('MaxiPali API search error:', searchError);
@@ -299,7 +259,7 @@ export const searchProductByBarcode = async (ean: string): Promise<{
     
     // Try Walmart if MaxiPali failed
     try {
-      console.log('Trying Walmart for EAN:', ean);
+
       const walmartResponse = await axios.get<WalmartApiResponse>(`/api/proxy/walmart/barcode/${ean}`, {
         headers: {
           'Accept': 'application/json',
@@ -307,12 +267,9 @@ export const searchProductByBarcode = async (ean: string): Promise<{
         },
         timeout: 15000
       });
-      
-      console.log('Walmart API response status:', walmartResponse.status);
-      
+
       if (walmartResponse.data && walmartResponse.data.success && walmartResponse.data.product) {
-        console.log('Found product in Walmart API:', walmartResponse.data.product.name);
-        
+
         // Ensure we have a valid product
         const product = walmartResponse.data.product;
         
@@ -335,11 +292,10 @@ export const searchProductByBarcode = async (ean: string): Promise<{
           ean: ean,
           sku: product.sku || ''
         };
-        
-        console.log('Final product object from Walmart API:', finalProduct);
+
         return { success: true, product: finalProduct };
       } else {
-        console.log('No product found in Walmart API or invalid response');
+
       }
     } catch (walmartError) {
       console.error('Walmart API error:', walmartError);
@@ -362,10 +318,8 @@ export const searchProductByBarcode = async (ean: string): Promise<{
 // Legacy function - Using proxy API
 export async function findByBarcode(barcode: string): Promise<Product | null> {
   try {
-    console.log(`Searching for product with EAN: ${barcode}`);
+
     const response = await axios.get(`/api/proxy/maxipali/barcode/${barcode}`);
-    
-    console.log("API response:", response.data);
 
     if (response.data) {
       // Type assertion to MaxiPaliProductData
@@ -373,8 +327,7 @@ export async function findByBarcode(barcode: string): Promise<Product | null> {
       
       // Ensure price is a number for display
       const price = safeParsePrice(productData.price);
-      console.log(`Parsed price: ${price}`);
-      
+
       return {
         id: productData.id || `default-${barcode}`,
         name: productData.name,
@@ -394,14 +347,13 @@ export async function findByBarcode(barcode: string): Promise<Product | null> {
     
     // If primary API failed, try the alternative API
     try {
-      console.log('Trying fallback API...');
+
       const altResponse = await axios.get('/api/fallback/product', {
         params: { ean: barcode }
       });
       
       if (altResponse.data) {
-        console.log('Fallback API response:', altResponse.data);
-        
+
         // Type assertion to MaxiPaliProductData
         const productData = altResponse.data as MaxiPaliProductData;
         
