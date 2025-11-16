@@ -656,11 +656,6 @@ export const deleteGroceryListItem = async (
 // Get grocery list by ID with permission check
 export const getSharedGroceryListById = async (userId: string, listId: string): Promise<GroceryList | undefined> => {
   try {
-
-    // Log Supabase client status
-
-    });
-    
     // Validate listId format
     if (!listId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
       console.error('Invalid list ID format:', listId);
