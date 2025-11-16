@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ShoppingCart, Search as SearchIcon, Scan, Filter, ArrowLeft, Minus, Plus, Store, X, Check } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { searchMaxiPaliProducts, searchMasxMenosProducts, searchWalmartProducts, searchAutomercadoProducts, connectToGeminiVoiceAgent } from "@/lib/services";
+import { searchMaxiPaliProducts, searchMasxMenosProducts, searchWalmartProducts, searchAutomercadoProducts } from "@/lib/services";
 import { 
   getOrCreateDefaultList, 
   addProductToGroceryList,
@@ -438,9 +438,6 @@ const Index = () => {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [storeFilter, setStoreFilter] = useState<'all' | 'MaxiPali' | 'MasxMenos' | 'Walmart' | 'Automercado'>('all');
   const [showBanner, setShowBanner] = useState(true);
-  const [isVoiceAgentActive, setIsVoiceAgentActive] = useState(false);
-  const [voiceConnection, setVoiceConnection] = useState<any>(null);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -825,209 +822,6 @@ const Index = () => {
     }
   };
   
-  const handleVoiceAgentToggle = async (shouldActivate: boolean) => {
-    if (shouldActivate) {
-      // Start voice agent
-      if (!user) {
-        toast({
-          title: translateUI("Se requiere iniciar sesión"),
-          description: translateUI("Por favor inicie sesión para usar el asistente de voz."),
-          variant: "destructive",
-        });
-        return;
-      }
-
-      try {
-        setIsVoiceAgentActive(true);
-        toast({
-          title: translateUI("Asistente de voz activado"),
-          description: translateUI("Hable ahora para buscar productos."),
-        });
-
-        // Set up microphone first
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          audio: {
-            channelCount: 1,
-            sampleRate: 16000,
-            echoCancellation: true,
-            noiseSuppression: true,
-          } 
-        });
-        
-        // Create media recorder with appropriate MIME type
-        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-          ? 'audio/webm;codecs=opus' 
-          : 'audio/webm';
-        
-        const recorder = new MediaRecorder(stream, { mimeType });
-        let connectionReady = false;
-        let pendingConnection: any = null;
-        
-        // Set up recorder event handlers before connecting
-        recorder.ondataavailable = async (event) => {
-          if (event.data.size > 0 && connectionReady && pendingConnection) {
-            // Convert blob to array buffer and send immediately
-            const arrayBuffer = await event.data.arrayBuffer();
-            pendingConnection.sendAudio(arrayBuffer);
-          }
-        };
-
-        recorder.onstop = () => {
-
-          stream.getTracks().forEach(track => track.stop());
-        };
-        
-        // Connect to Gemini Live
-        const connection = await connectToGeminiVoiceAgent(
-          async (message) => {
-
-            // Handle different message types
-            if (message.text) {
-              // Check if it's a JSON command
-              try {
-                const command = JSON.parse(message.text);
-                
-                if (command.action === 'search') {
-                  // Search for products
-                  const results = await searchProductsForVoiceAgent(command.query);
-                  // Send results back to Gemini
-                  connection.session.send({ text: results });
-                } else if (command.action === 'add_to_list') {
-                  // Trigger product addition
-                  window.dispatchEvent(new CustomEvent('voice-agent-add-product', {
-                    detail: command.product
-                  }));
-                }
-              } catch (e) {
-                // Not a JSON command, just a regular response
-
-              }
-            }
-            
-            // Play audio response if available
-            if (message.audio) {
-              const audioContext = new AudioContext();
-              const audioBuffer = await audioContext.decodeAudioData(message.audio);
-              const source = audioContext.createBufferSource();
-              source.buffer = audioBuffer;
-              source.connect(audioContext.destination);
-              source.start();
-            }
-          },
-          (error) => {
-            console.error('Gemini error:', error);
-            toast({
-              title: translateUI("Error"),
-              description: error.message,
-              variant: "destructive",
-            });
-          },
-          // onReady callback - start recording when connection is ready
-          () => {
-
-            connectionReady = true;
-            pendingConnection = connection;
-            
-            // Start recording - send audio chunks every 250ms for more responsive streaming
-            recorder.start(250);
-          }
-        );
-
-        setVoiceConnection(connection);
-        setMediaRecorder(recorder);
-
-      } catch (error) {
-        console.error('Error starting voice agent:', error);
-        setIsVoiceAgentActive(false);
-        toast({
-          title: translateUI("Error"),
-          description: translateUI("No se pudo iniciar el asistente de voz. Por favor intente de nuevo."),
-          variant: "destructive",
-        });
-      }
-    } else {
-      // Stop voice agent
-      try {
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-          mediaRecorder.stop();
-          mediaRecorder.stream.getTracks().forEach(track => track.stop());
-        }
-        
-        if (voiceConnection) {
-          voiceConnection.disconnect();
-          setVoiceConnection(null);
-        }
-        
-        setMediaRecorder(null);
-        setIsVoiceAgentActive(false);
-        
-        toast({
-          title: translateUI("Asistente de voz desactivado"),
-          description: translateUI("El asistente de voz se ha desconectado."),
-        });
-      } catch (error) {
-        console.error('Error stopping voice agent:', error);
-        setIsVoiceAgentActive(false);
-        setVoiceConnection(null);
-        setMediaRecorder(null);
-      }
-    }
-  };
-
-  // Listen for voice agent product additions
-  useEffect(() => {
-    const handleVoiceProductAdd = async (event: CustomEvent) => {
-      const { name, store, price } = event.detail;
-      
-      // Search for the product to get full details
-      try {
-        let searchFunction;
-        switch (store) {
-          case 'MaxiPali':
-            searchFunction = searchMaxiPaliProducts;
-            break;
-          case 'MasxMenos':
-            searchFunction = searchMasxMenosProducts;
-            break;
-          case 'Walmart':
-            searchFunction = searchWalmartProducts;
-            break;
-          case 'Automercado':
-            searchFunction = searchAutomercadoProducts;
-            break;
-          default:
-            return;
-        }
-
-        const results = await searchFunction({ query: name, page: 1, pageSize: 1 });
-        if (results.products && results.products.length > 0) {
-          const product = results.products[0];
-          await handleAddToList(product);
-        }
-      } catch (error) {
-        console.error('Error adding product from voice agent:', error);
-      }
-    };
-
-    window.addEventListener('voice-agent-add-product', handleVoiceProductAdd as EventListener);
-    return () => {
-      window.removeEventListener('voice-agent-add-product', handleVoiceProductAdd as EventListener);
-    };
-  }, [user]);
-
-  // Cleanup voice connection on unmount
-  useEffect(() => {
-    return () => {
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        mediaRecorder.stop();
-        mediaRecorder.stream.getTracks().forEach(track => track.stop());
-      }
-      if (voiceConnection) {
-        voiceConnection.disconnect();
-      }
-    };
-  }, [voiceConnection, mediaRecorder]);
-
   const handleAddScannedProduct = async (product: ProductType) => {
     if (!user) {
       toast({
@@ -1177,8 +971,6 @@ const Index = () => {
               expanded 
               onQueryChange={setQuery}
               isSearching={isSearching}
-              onVoiceAgentToggle={handleVoiceAgentToggle}
-              isVoiceAgentActive={isVoiceAgentActive}
               className="search-bar transition-all duration-300"
             />
           </div>

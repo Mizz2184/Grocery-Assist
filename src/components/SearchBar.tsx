@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, X, ArrowRight, Mic, MicOff } from "lucide-react";
+import { Search, X, ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -15,8 +15,6 @@ interface SearchBarProps {
   query?: string;
   onQueryChange?: (query: string) => void;
   isSearching?: boolean;
-  onVoiceAgentToggle?: (isActive: boolean) => void;
-  isVoiceAgentActive?: boolean;
 }
 
 export const SearchBar = ({
@@ -28,8 +26,6 @@ export const SearchBar = ({
   query: controlledQuery,
   onQueryChange,
   isSearching = false,
-  onVoiceAgentToggle,
-  isVoiceAgentActive = false,
 }: SearchBarProps) => {
   const [localQuery, setLocalQuery] = useState(initialQuery);
   const query = controlledQuery !== undefined ? controlledQuery : localQuery;
@@ -90,11 +86,6 @@ export const SearchBar = ({
     }
   };
 
-  const handleVoiceToggle = () => {
-    if (onVoiceAgentToggle) {
-      onVoiceAgentToggle(!isVoiceAgentActive);
-    }
-  };
 
   return (
     <form 
@@ -124,11 +115,11 @@ export const SearchBar = ({
             "pl-10 pr-28 h-12 rounded-full transition-all duration-300 focus:ring-2 focus:ring-primary/20",
             isExpanded ? "bg-background shadow-lg" : "bg-secondary/80"
           )}
-          disabled={isSearching || isVoiceAgentActive}
+          disabled={isSearching}
         />
         
         <div className="absolute right-2 flex items-center gap-1">
-          {query && !isVoiceAgentActive && (
+          {query && (
             <Button
               type="button"
               variant="ghost"
@@ -141,26 +132,6 @@ export const SearchBar = ({
             </Button>
           )}
           
-          {onVoiceAgentToggle && (
-            <Button
-              type="button"
-              variant={isVoiceAgentActive ? "default" : "ghost"}
-              size="icon"
-              onClick={handleVoiceToggle}
-              className={cn(
-                "rounded-full h-8 w-8 transition-all duration-300",
-                isVoiceAgentActive && "bg-red-500 hover:bg-red-600 text-white animate-pulse"
-              )}
-              aria-label={isVoiceAgentActive ? "Stop voice agent" : "Start voice agent"}
-            >
-              {isVoiceAgentActive ? (
-                <MicOff className="w-4 h-4" />
-              ) : (
-                <Mic className="w-4 h-4" />
-              )}
-            </Button>
-          )}
-          
           <Button
             type="submit"
             size="icon"
@@ -169,7 +140,7 @@ export const SearchBar = ({
               "bg-black dark:bg-white text-white dark:text-black",
               !query && "opacity-30"
             )}
-            disabled={!query.trim() || isSearching || isVoiceAgentActive}
+            disabled={!query.trim() || isSearching}
             aria-label="Search"
           >
             {isSearching ? (
