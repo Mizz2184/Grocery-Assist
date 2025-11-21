@@ -159,6 +159,9 @@ export const searchMasxMenosProducts = async ({
             : 'Uncategorized',
           store: 'MasxMenos',
           barcode: item?.ean || '',
+          regularPrice: product.regularPrice,
+          salePrice: product.salePrice,
+          isOnSale: product.isOnSale || false,
         };
       });
 
@@ -254,6 +257,7 @@ export const searchWalmartProducts = async ({ query, page = 1, pageSize = 30 }: 
         ...(product.barcode && { barcode: product.barcode }),
         ...(product.regularPrice && { regularPrice: product.regularPrice }),
         ...(product.salePrice && { salePrice: product.salePrice }),
+        ...(product.isOnSale !== undefined && { isOnSale: product.isOnSale }),
         ...(product.image && { image: product.image }),
         ...(product.largeImage && { largeImage: product.largeImage }),
         ...(product.thumbnailImage && { thumbnailImage: product.thumbnailImage }),

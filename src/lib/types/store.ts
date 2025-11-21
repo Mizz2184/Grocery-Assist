@@ -18,6 +18,9 @@ export interface Product {
   };
   unit?: string;
   quantity?: number;
+  regularPrice?: number;  // Original price before discount
+  salePrice?: number;     // Discounted price (same as price when on sale)
+  isOnSale?: boolean;     // Whether the product is currently on sale
 }
 
 export type ProductPrice = {

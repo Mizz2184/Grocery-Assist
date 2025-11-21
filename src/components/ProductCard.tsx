@@ -131,10 +131,29 @@ export const ProductCard = ({
     }
 
     const usdPrice = convertCRCtoUSD(product.price);
+    const isOnSale = product.isOnSale && product.regularPrice && product.regularPrice > product.price;
+    
+    // Calculate discount percentage
+    const discountPercentage = isOnSale 
+      ? Math.round(((product.regularPrice! - product.price) / product.regularPrice!) * 100)
+      : 0;
     
     return (
-      <div className="flex flex-col">
-        <span className="flex items-center font-semibold">
+      <div className="flex flex-col gap-1">
+        {isOnSale && product.regularPrice && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground line-through">
+              {formatCurrency(product.regularPrice, "CRC")}
+            </span>
+            <Badge variant="destructive" className="text-xs px-1.5 py-0">
+              -{discountPercentage}%
+            </Badge>
+          </div>
+        )}
+        <span className={cn(
+          "flex items-center font-semibold",
+          isOnSale && "text-red-600 dark:text-red-400"
+        )}>
           {formatCurrency(product.price, "CRC")}
           <span className="ml-2 text-sm text-muted-foreground">
             ({formatCurrency(usdPrice, "USD")})
@@ -183,18 +202,22 @@ export const ProductCard = ({
         )}
       </div>
 
-      <div className="p-4 space-y-3 flex-1 flex flex-col">
-        <div className="flex justify-between items-start gap-2 flex-1">
-          <div>
-            <h3 className="font-medium text-lg leading-tight line-clamp-2">{isTranslated ? translateText(product.name) : product.name}</h3>
-            <div className="flex items-center gap-2">
-              <p className="text-sm text-muted-foreground">
-                {product.brand 
-                  ? (isTranslated ? translateText(product.brand) : product.brand) 
-                  : (isTranslated ? "Unknown brand" : translateText("Marca desconocida"))}
-              </p>
-              {/* Barcode/EAN would go here if the Product type had that property */}
-            </div>
+      <div className="p-4 pb-4 space-y-2 flex-1 flex flex-col">
+        <div className="flex-1">
+          <h3 className="font-medium text-base leading-tight line-clamp-2">{isTranslated ? translateText(product.name) : product.name}</h3>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-xs text-muted-foreground truncate">
+              {product.brand 
+                ? (isTranslated ? translateText(product.brand) : product.brand) 
+                : (isTranslated ? "Unknown brand" : translateText("Marca desconocida"))}
+            </p>
+            {/* Barcode/EAN would go here if the Product type had that property */}
+          </div>
+        </div>
+        
+        <div className="flex items-end justify-between gap-3 pb-1">
+          <div className="flex-1">
+            {renderPrice()}
           </div>
           
           {onAddToList && (
@@ -202,7 +225,7 @@ export const ProductCard = ({
               size="icon"
               variant={isInListLocal ? "secondary" : "default"}
               className={cn(
-                "rounded-full flex-shrink-0",
+                "rounded-full flex-shrink-0 h-10 w-10 mb-0.5",
                 isInListLocal && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
               )}
               onClick={handleAddToList}
@@ -219,10 +242,6 @@ export const ProductCard = ({
               )}
             </Button>
           )}
-        </div>
-        
-        <div className="mt-auto">
-          {renderPrice()}
         </div>
       </div>
     </Card>

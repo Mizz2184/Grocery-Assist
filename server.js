@@ -158,6 +158,10 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
       products: (searchData || []).map(p => {
         const price = p.items?.[0]?.sellers?.[0]?.commertialOffer?.Price || 
                      p.items?.[0]?.sellers?.[0]?.commertialOffer?.ListPrice || 0;
+        const listPrice = p.items?.[0]?.sellers?.[0]?.commertialOffer?.ListPrice || 0;
+        
+        // Detect if product is on sale (ListPrice > Price)
+        const isOnSale = listPrice > 0 && price > 0 && listPrice > price;
 
         return {
           id: p.productId,
@@ -169,7 +173,10 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
           category: p.categories && p.categories[0] ? p.categories[0].split('/').pop() : 'Grocery',
           sku: p.items?.[0]?.itemId || '',
           barcode: p.items?.[0]?.ean || '',
-          inStock: true
+          inStock: true,
+          regularPrice: isOnSale ? listPrice : undefined,
+          salePrice: isOnSale ? price : undefined,
+          isOnSale: isOnSale
         };
       }),
       total: searchData?.length || 0,
@@ -177,6 +184,17 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
       pageSize: parseInt(pageSize),
       hasMore: (searchData?.length || 0) === pageSize
     };
+    
+    // Log sale products for debugging
+    const saleProducts = transformedData.products.filter(p => p.isOnSale);
+    if (saleProducts.length > 0) {
+      console.log(`MaxiPali: Found ${saleProducts.length} products on sale`);
+      console.log('Sample:', saleProducts.slice(0, 2).map(p => ({
+        name: p.name,
+        price: p.price,
+        regularPrice: p.regularPrice
+      })));
+    }
 
     // Filter out products with zero price
     const filteredProducts = transformedData.products.filter(p => p.price > 0);
@@ -543,6 +561,17 @@ app.post('/api/proxy/masxmenos/search', async (req, res) => {
         isTranslated: false
       }
     }));
+    
+    // Log sale products for debugging
+    const saleProducts = products.filter(p => p.isOnSale);
+    if (saleProducts.length > 0) {
+      console.log(`MasxMenos: Found ${saleProducts.length} products on sale`);
+      console.log('Sample:', saleProducts.slice(0, 2).map(p => ({
+        name: p.productName,
+        price: p.items?.[0]?.sellers?.[0]?.commertialOffer?.Price,
+        regularPrice: p.regularPrice
+      })));
+    }
     
     // Return in GraphQL-like format for compatibility with frontend
     return res.json({
@@ -995,6 +1024,17 @@ app.post('/api/proxy/walmart/search', async (req, res) => {
 
     transformedData.products = filteredProducts;
     transformedData.total = filteredProducts.length;
+    
+    // Log sale products for debugging
+    const saleProducts = filteredProducts.filter(p => p.isOnSale);
+    if (saleProducts.length > 0) {
+      console.log(`Walmart: Found ${saleProducts.length} products on sale`);
+      console.log('Sample:', saleProducts.slice(0, 2).map(p => ({
+        name: p.name,
+        price: p.price,
+        regularPrice: p.regularPrice
+      })));
+    }
 
     if (transformedData.products.length > 0) {
 

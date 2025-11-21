@@ -232,7 +232,7 @@ const ProductCardComponent = ({ product, onAddToList, isInList }: ProductCardPro
         
         {/* Show quantity selector or add button based on state */}
         {showQuantityInput && !isInList ? (
-          <div className="absolute -bottom-2 -right-2 flex items-center gap-0.5 bg-background border-2 border-primary rounded-full shadow-lg p-0.5 animate-in zoom-in-95 duration-200">
+          <div className="absolute bottom-2 right-2 flex items-center gap-0.5 bg-background border-2 border-primary rounded-full shadow-lg p-0.5 animate-in zoom-in-95 duration-200">
             <Button
               variant="ghost"
               size="icon"
@@ -283,7 +283,7 @@ const ProductCardComponent = ({ product, onAddToList, isInList }: ProductCardPro
             variant={isInList ? "secondary" : "default"}
             size="icon"
             className={cn(
-              "absolute -bottom-2 -right-2 h-10 w-10 rounded-full shadow-lg transition-all duration-200",
+              "absolute bottom-2 right-2 h-10 w-10 rounded-full shadow-lg transition-all duration-200",
               isInList ? "bg-secondary" : "bg-primary hover:scale-110"
             )}
             onClick={handleAddClick}
@@ -711,8 +711,27 @@ const Index = () => {
           return true;
         });
         
-        // Sort by price: lowest to highest
-        combinedResults.sort((a, b) => a.price - b.price);
+        // Debug: Log products with sale information
+        const productsOnSale = combinedResults.filter(p => p.isOnSale);
+        console.log(`Found ${productsOnSale.length} products on sale out of ${combinedResults.length} total products`);
+        if (productsOnSale.length > 0) {
+          console.log('Sample sale products:', productsOnSale.slice(0, 3).map(p => ({
+            name: p.name,
+            store: p.store,
+            price: p.price,
+            regularPrice: p.regularPrice,
+            isOnSale: p.isOnSale
+          })));
+        }
+        
+        // Sort by sale status first (on sale products first), then by price (lowest to highest)
+        combinedResults.sort((a, b) => {
+          // Prioritize products on sale
+          if (a.isOnSale && !b.isOnSale) return -1;
+          if (!a.isOnSale && b.isOnSale) return 1;
+          // If both are on sale or both are not, sort by price
+          return a.price - b.price;
+        });
 
         const storeTypes = combinedResults.map(p => p.store);
         const uniqueStores = [...new Set(storeTypes)];
