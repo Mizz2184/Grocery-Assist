@@ -284,7 +284,7 @@ const Payment = () => {
             🔒 Secure payment processing by Stripe. Your payment information is never stored on our servers.
           </p>
           <p className="text-xs text-muted-foreground">
-            Questions? Contact us at support@grocery-assist.com
+            Questions? Contact us at support@shop-assist.com
           </p>
         </div>
       </div>
