@@ -3,9 +3,22 @@ import cors from 'cors';
 import axios from 'axios';
 import Stripe from 'stripe';
 import dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
 
 // Load environment variables from .env file
 dotenv.config();
+
+// Initialize Supabase client with service role for admin operations
+const supabase = createClient(
+  process.env.VITE_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+);
 
 const app = express();
 
@@ -21,16 +34,18 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
       return res.status(400).json({ error: 'Query parameter is required' });
     }
     
-    // Simplify search query - take first word if multi-word query
-    // MaxiPali API frequently fails with complex queries
-    const simplifiedQuery = query.split(' ')[0];
+    // Use full query for better relevance
+    const searchQuery = query.trim();
+    
+    // Extract keywords for relevance filtering
+    const keywords = searchQuery.toLowerCase().split(' ').filter(word => word.length > 2);
 
     let searchData = [];
     
     // Try path-based search first
     try {
 
-      const pathSearchResponse = await axios.get(`https://www.maxipali.co.cr/api/catalog_system/pub/products/search/${encodeURIComponent(simplifiedQuery)}`, {
+      const pathSearchResponse = await axios.get(`https://www.maxipali.co.cr/api/catalog_system/pub/products/search/${encodeURIComponent(searchQuery)}`, {
         params: {
           '_from': (page - 1) * pageSize,
           '_to': (page * pageSize) - 1
@@ -63,7 +78,7 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
 
         const ftSearchResponse = await axios.get(`https://www.maxipali.co.cr/api/catalog_system/pub/products/search`, {
           params: {
-            'ft': simplifiedQuery,
+            'ft': searchQuery,
             '_from': (page - 1) * pageSize,
             '_to': (page * pageSize) - 1
           },
@@ -96,7 +111,7 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
 
         const intelligentSearchResponse = await axios.get(`https://www.maxipali.co.cr/api/io/_v/api/intelligent-search/product_search/productSearch`, {
           params: {
-            term: simplifiedQuery,
+            term: searchQuery,
             count: pageSize,
             page: page
           },
@@ -197,7 +212,16 @@ app.post('/api/proxy/maxipali/search', async (req, res) => {
     }
 
     // Filter out products with zero price
-    const filteredProducts = transformedData.products.filter(p => p.price > 0);
+    let filteredProducts = transformedData.products.filter(p => p.price > 0);
+    
+    // Apply relevance filtering - check if product name/brand/category contains search keywords
+    if (keywords.length > 0) {
+      filteredProducts = filteredProducts.filter(product => {
+        const searchableText = `${product.name} ${product.brand || ''} ${product.category || ''}`.toLowerCase();
+        // Product must contain at least one keyword to be relevant
+        return keywords.some(keyword => searchableText.includes(keyword));
+      });
+    }
 
     transformedData.products = filteredProducts;
     transformedData.total = filteredProducts.length;
@@ -516,6 +540,9 @@ app.post('/api/proxy/masxmenos/search', async (req, res) => {
       });
     }
     
+    // Extract keywords for relevance filtering
+    const keywords = query.toLowerCase().trim().split(' ').filter(word => word.length > 2);
+    
     // Use VTEX catalog API (simpler and more reliable than GraphQL)
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
@@ -562,8 +589,18 @@ app.post('/api/proxy/masxmenos/search', async (req, res) => {
       }
     }));
     
+    // Apply relevance filtering - check if product name/brand contains search keywords
+    let filteredProducts = products;
+    if (keywords.length > 0) {
+      filteredProducts = products.filter(product => {
+        const searchableText = `${product.productName || ''} ${product.brand || ''}`.toLowerCase();
+        // Product must contain at least one keyword to be relevant
+        return keywords.some(keyword => searchableText.includes(keyword));
+      });
+    }
+    
     // Log sale products for debugging
-    const saleProducts = products.filter(p => p.isOnSale);
+    const saleProducts = filteredProducts.filter(p => p.isOnSale);
     if (saleProducts.length > 0) {
       console.log(`MasxMenos: Found ${saleProducts.length} products on sale`);
       console.log('Sample:', saleProducts.slice(0, 2).map(p => ({
@@ -577,8 +614,8 @@ app.post('/api/proxy/masxmenos/search', async (req, res) => {
     return res.json({
       data: {
         productSearch: {
-          products: products,
-          recordsFiltered: products.length
+          products: filteredProducts,
+          recordsFiltered: filteredProducts.length
         }
       }
     });
@@ -867,6 +904,9 @@ app.get('/api/proxy/automercado/scrape-all', async (req, res) => {
 app.post('/api/proxy/walmart/search', async (req, res) => {
   try {
     const { query, page = 1, pageSize = 49 } = req.body;
+    
+    // Extract keywords for relevance filtering
+    const keywords = query.toLowerCase().trim().split(' ').filter(word => word.length > 2);
 
     // Initialize searchData variable at the top level
     let searchData = [];
@@ -1020,7 +1060,16 @@ app.post('/api/proxy/walmart/search', async (req, res) => {
     };
 
     // Filter out products with zero price
-    const filteredProducts = transformedData.products.filter(p => p.price > 0);
+    let filteredProducts = transformedData.products.filter(p => p.price > 0);
+    
+    // Apply relevance filtering - check if product name/brand/category contains search keywords
+    if (keywords.length > 0) {
+      filteredProducts = filteredProducts.filter(product => {
+        const searchableText = `${product.name} ${product.brand || ''} ${product.category || ''}`.toLowerCase();
+        // Product must contain at least one keyword to be relevant
+        return keywords.some(keyword => searchableText.includes(keyword));
+      });
+    }
 
     transformedData.products = filteredProducts;
     transformedData.total = filteredProducts.length;
@@ -1167,6 +1216,227 @@ app.post('/api/create-payment-intent', async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating payment intent:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Stripe webhook handler for payment events
+app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    console.error('Stripe webhook secret not configured');
+    return res.status(500).send('Webhook secret not configured');
+  }
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle the event
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        console.log('Checkout session completed:', session.id);
+        
+        // Get customer email and metadata
+        const customerEmail = session.customer_email || session.customer_details?.email;
+        const customerId = session.customer;
+        const subscriptionId = session.subscription;
+        const paymentType = subscriptionId ? 'SUBSCRIPTION' : 'ONE_TIME';
+        
+        if (!customerEmail) {
+          console.error('No customer email found in session');
+          break;
+        }
+
+        // Check if user exists in Supabase auth
+        const { data: existingUsers, error: listError } = await supabase.auth.admin.listUsers();
+        
+        if (listError) {
+          console.error('Error listing users:', listError);
+          break;
+        }
+
+        let userId;
+        const existingUser = existingUsers.users.find(u => u.email === customerEmail);
+
+        if (existingUser) {
+          // User already exists
+          userId = existingUser.id;
+          console.log('User already exists:', userId);
+        } else {
+          // Create new user in Supabase Auth
+          const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+            email: customerEmail,
+            email_confirm: true, // Auto-confirm email
+            user_metadata: {
+              full_name: session.customer_details?.name || '',
+              created_via: 'stripe_payment'
+            }
+          });
+
+          if (createError) {
+            console.error('Error creating user:', createError);
+            break;
+          }
+
+          userId = newUser.user.id;
+          console.log('New user created:', userId);
+        }
+
+        // Get subscription details if it's a subscription
+        let currentPeriodEnd = null;
+        if (subscriptionId) {
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          currentPeriodEnd = new Date(subscription.current_period_end * 1000).toISOString();
+        }
+
+        // Create or update payment record
+        const { error: upsertError } = await supabase
+          .from('user_payments')
+          .upsert({
+            user_id: userId,
+            status: 'PAID',
+            payment_type: paymentType,
+            stripe_customer_id: customerId,
+            stripe_subscription_id: subscriptionId,
+            stripe_session_id: session.id,
+            current_period_end: currentPeriodEnd,
+            cancel_at_period_end: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id'
+          });
+
+        if (upsertError) {
+          console.error('Error upserting payment record:', upsertError);
+        } else {
+          console.log('Payment record created/updated for user:', userId);
+        }
+
+        break;
+      }
+
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object;
+        console.log('Subscription updated:', subscription.id);
+
+        // Update subscription details in database
+        const { error: updateError } = await supabase
+          .from('user_payments')
+          .update({
+            cancel_at_period_end: subscription.cancel_at_period_end,
+            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('stripe_subscription_id', subscription.id);
+
+        if (updateError) {
+          console.error('Error updating subscription:', updateError);
+        }
+
+        break;
+      }
+
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object;
+        console.log('Subscription deleted:', subscription.id);
+
+        // Mark subscription as cancelled in database
+        const { error: deleteError } = await supabase
+          .from('user_payments')
+          .update({
+            status: 'CANCELLED',
+            updated_at: new Date().toISOString()
+          })
+          .eq('stripe_subscription_id', subscription.id);
+
+        if (deleteError) {
+          console.error('Error marking subscription as cancelled:', deleteError);
+        }
+
+        break;
+      }
+
+      default:
+        console.log(`Unhandled event type: ${event.type}`);
+    }
+
+    res.json({ received: true });
+  } catch (error) {
+    console.error('Error processing webhook:', error);
+    res.status(500).json({ error: 'Webhook processing failed' });
+  }
+});
+
+// Cancel subscription endpoint
+app.post('/api/cancel-subscription', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    // Get user's subscription info from database
+    const { data: payment, error: fetchError } = await supabase
+      .from('user_payments')
+      .select('stripe_subscription_id, stripe_customer_id')
+      .eq('user_id', userId)
+      .eq('payment_type', 'SUBSCRIPTION')
+      .single();
+
+    if (fetchError || !payment) {
+      console.error('Error fetching subscription:', fetchError);
+      return res.status(404).json({ error: 'Subscription not found' });
+    }
+
+    if (!payment.stripe_subscription_id) {
+      return res.status(400).json({ error: 'No active Stripe subscription found' });
+    }
+
+    // Cancel the subscription at period end in Stripe
+    const subscription = await stripe.subscriptions.update(
+      payment.stripe_subscription_id,
+      {
+        cancel_at_period_end: true
+      }
+    );
+
+    // Update database to reflect cancellation
+    const { error: updateError } = await supabase
+      .from('user_payments')
+      .update({
+        cancel_at_period_end: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', userId);
+
+    if (updateError) {
+      console.error('Error updating database:', updateError);
+      return res.status(500).json({ error: 'Failed to update subscription status' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Subscription will be cancelled at the end of the billing period',
+      subscription: {
+        id: subscription.id,
+        cancel_at_period_end: subscription.cancel_at_period_end,
+        current_period_end: subscription.current_period_end
+      }
+    });
+  } catch (error) {
+    console.error('Error cancelling subscription:', error);
     res.status(500).json({ error: error.message });
   }
 });

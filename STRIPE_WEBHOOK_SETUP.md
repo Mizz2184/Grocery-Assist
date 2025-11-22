@@ -45,14 +45,23 @@ Add these new variables:
 |--------------|-------|-------------|
 | `STRIPE_SECRET_KEY` | `sk_live_51SRyO7...` | Production |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_...` (from Step 2) | Production |
-| `SUPABASE_SERVICE_ROLE_KEY` | Get from Supabase Dashboard | Production |
+| `VITE_SUPABASE_URL` | Your Supabase project URL | Production |
+| `SUPABASE_SERVICE_ROLE_KEY` | Your Supabase service role key | Production |
 
-#### How to Get Supabase Service Role Key:
+**⚠️ CRITICAL:** The `SUPABASE_SERVICE_ROLE_KEY` is required for the webhook to automatically create new users. This key has admin privileges and should be kept secret.
+
+#### How to Get Supabase Keys:
 
 1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
 2. Select your project
 3. Go to **Settings** → **API**
-4. Copy the **service_role** key (⚠️ Keep this secret!)
+4. Copy the **Project URL** → Use for `VITE_SUPABASE_URL`
+5. Copy the **service_role** key (⚠️ NOT the anon key!) → Use for `SUPABASE_SERVICE_ROLE_KEY`
+
+**Important:** 
+- The service role key allows creating users via `supabase.auth.admin.createUser()`
+- Never expose this key in client-side code
+- Only use it in server-side code (webhooks, API endpoints)
 
 ### Step 4: Update Database Schema (If Needed)
 
@@ -105,11 +114,14 @@ After adding the environment variables:
 3. **Stripe sends webhook** → `POST /api/stripe-webhook`
 4. **Webhook handler**:
    - Verifies webhook signature
-   - Extracts customer email
-   - Finds user in database
-   - Updates `user_payments` table with `status = 'PAID'`
+   - Extracts customer email from Stripe session
+   - **Checks if user exists in Supabase Auth**
+   - **If user doesn't exist**: Creates new user with email auto-confirmed
+   - **If user exists**: Uses existing user ID
+   - Creates/updates `user_payments` table with `status = 'PAID'`
+   - Stores subscription details (for monthly plans)
 5. **User redirected** → `/payment-success` page
-6. **Next login** → Payment check passes, no paywall!
+6. **User can now log in** → Email is already in the system, ready to use!
 
 ### Webhook Events Handled:
 

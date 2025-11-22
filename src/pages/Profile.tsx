@@ -176,7 +176,7 @@ const Profile = () => {
                     <div className="space-y-1">
                       <Label className="text-muted-foreground">Plan Type</Label>
                       <div className="font-medium">
-                        {subscription.payment_type === 'SUBSCRIPTION' ? 'Monthly Subscription' : 'Lifetime Access'}
+                        {subscription.payment_type === 'SUBSCRIPTION' ? 'Monthly Access' : 'Lifetime Access'}
                       </div>
                     </div>
                     
