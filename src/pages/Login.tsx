@@ -29,6 +29,9 @@ const Login = () => {
   const [redirectPath, setRedirectPath] = useState("/");
   const [showPaymentCard, setShowPaymentCard] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState("");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
   
   // Hook calls
   const { user } = useAuth();
@@ -205,6 +208,46 @@ const Login = () => {
     }
   };
 
+  // Handle password reset
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail) {
+      toast({
+        title: "Error",
+        description: "Please enter your email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsResettingPassword(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Password reset email sent",
+        description: "Please check your email for a password reset link. The link will expire in 1 hour.",
+      });
+
+      // Reset form and go back to login
+      setShowForgotPassword(false);
+      setResetEmail("");
+    } catch (error) {
+      console.error("Error sending password reset email:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to send password reset email",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
   // Handle Google sign-in
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
@@ -268,6 +311,48 @@ const Login = () => {
             </TabsList>
             
             <TabsContent value="login" className="space-y-4">
+              {showForgotPassword ? (
+                <form onSubmit={handlePasswordReset} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="resetEmail">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        id="resetEmail" 
+                        type="email" 
+                        placeholder="you@example.com"
+                        className="pl-8"
+                        value={resetEmail}
+                        onChange={(e) => setResetEmail(e.target.value)}
+                        disabled={isResettingPassword}
+                      />
+                    </div>
+                  </div>
+                  <Button 
+                    type="submit" 
+                    className="w-full h-10" 
+                    disabled={isResettingPassword}
+                  >
+                    {isResettingPassword ? (
+                      <>
+                        <span className="mr-2 h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                        Sending...
+                      </>
+                    ) : "Send Reset Link"}
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    className="w-full" 
+                    onClick={() => {
+                      setShowForgotPassword(false);
+                      setResetEmail("");
+                    }}
+                  >
+                    Back to Login
+                  </Button>
+                </form>
+              ) : (
               <form onSubmit={handleEmailLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
@@ -299,6 +384,16 @@ const Login = () => {
                     />
                   </div>
                 </div>
+                <div className="flex items-center justify-between">
+                  <Button 
+                    type="button" 
+                    variant="link" 
+                    className="p-0 h-auto text-sm text-primary hover:underline"
+                    onClick={() => setShowForgotPassword(true)}
+                  >
+                    Forgot password?
+                  </Button>
+                </div>
                 <Button 
                   type="submit" 
                   className="w-full h-10" 
@@ -312,6 +407,7 @@ const Login = () => {
                   ) : "Sign In"}
                 </Button>
               </form>
+              )}
               
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">

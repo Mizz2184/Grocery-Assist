@@ -1244,7 +1244,8 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object;
-        console.log('Checkout session completed:', session.id);
+        console.log('🎉 Checkout session completed:', session.id);
+        console.log('Session details:', JSON.stringify(session, null, 2));
         
         // Get customer email and metadata
         const customerEmail = session.customer_email || session.customer_details?.email;
@@ -1252,8 +1253,13 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
         const subscriptionId = session.subscription;
         const paymentType = subscriptionId ? 'SUBSCRIPTION' : 'ONE_TIME';
         
+        console.log('📧 Customer email:', customerEmail);
+        console.log('💳 Customer ID:', customerId);
+        console.log('📅 Subscription ID:', subscriptionId);
+        console.log('💰 Payment type:', paymentType);
+        
         if (!customerEmail) {
-          console.error('No customer email found in session');
+          console.error('❌ No customer email found in session');
           break;
         }
 
@@ -1271,9 +1277,10 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
         if (existingUser) {
           // User already exists
           userId = existingUser.id;
-          console.log('User already exists:', userId);
+          console.log('✅ User already exists:', userId);
         } else {
           // Create new user in Supabase Auth
+          console.log('👤 Creating new user for email:', customerEmail);
           const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
             email: customerEmail,
             email_confirm: true, // Auto-confirm email
@@ -1284,12 +1291,12 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
           });
 
           if (createError) {
-            console.error('Error creating user:', createError);
+            console.error('❌ Error creating user:', createError);
             break;
           }
 
           userId = newUser.user.id;
-          console.log('New user created:', userId);
+          console.log('✅ New user created:', userId);
         }
 
         // Get subscription details if it's a subscription
@@ -1300,27 +1307,33 @@ app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (
         }
 
         // Create or update payment record
+        console.log('💾 Creating/updating payment record for user:', userId);
+        const paymentData = {
+          user_id: userId,
+          status: 'PAID',
+          payment_type: paymentType,
+          stripe_customer_id: customerId,
+          stripe_subscription_id: subscriptionId,
+          stripe_session_id: session.id,
+          current_period_end: currentPeriodEnd,
+          cancel_at_period_end: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        console.log('Payment data:', JSON.stringify(paymentData, null, 2));
+        
         const { error: upsertError } = await supabase
           .from('user_payments')
-          .upsert({
-            user_id: userId,
-            status: 'PAID',
-            payment_type: paymentType,
-            stripe_customer_id: customerId,
-            stripe_subscription_id: subscriptionId,
-            stripe_session_id: session.id,
-            current_period_end: currentPeriodEnd,
-            cancel_at_period_end: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }, {
+          .upsert(paymentData, {
             onConflict: 'user_id'
           });
 
         if (upsertError) {
-          console.error('Error upserting payment record:', upsertError);
+          console.error('❌ Error upserting payment record:', upsertError);
         } else {
-          console.log('Payment record created/updated for user:', userId);
+          console.log('✅ Payment record created/updated for user:', userId);
+          console.log('🎊 User can now log in and access the app!');
         }
 
         break;
