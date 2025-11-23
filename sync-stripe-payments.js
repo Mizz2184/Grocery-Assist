@@ -104,11 +104,16 @@ async function processCustomer(customer, existingUserEmails, existingUsers) {
   );
 
   // Check if customer has any successful payments
-  const charges = await stripe.charges.list({
-    customer: customer.id,
-    limit: 1
-  });
-  const hasSuccessfulPayment = charges.data.some(charge => charge.paid);
+  let hasSuccessfulPayment = false;
+  try {
+    const charges = await stripe.charges.list({
+      customer: customer.id,
+      limit: 1
+    });
+    hasSuccessfulPayment = charges.data.some(charge => charge.paid);
+  } catch (error) {
+    console.log(`   ⚠️  Could not fetch charges: ${error.message}`);
+  }
 
   // Determine if this customer should have access
   const shouldHaveAccess = activeSubscription || hasSuccessfulPayment;
@@ -126,10 +131,15 @@ async function processCustomer(customer, existingUserEmails, existingUsers) {
   if (activeSubscription) {
     paymentType = 'SUBSCRIPTION';
     subscriptionId = activeSubscription.id;
-    currentPeriodEnd = new Date(activeSubscription.current_period_end * 1000).toISOString();
+    try {
+      currentPeriodEnd = new Date(activeSubscription.current_period_end * 1000).toISOString();
+    } catch (error) {
+      console.log(`   ⚠️  Invalid period end date, using null`);
+      currentPeriodEnd = null;
+    }
     stats.activeSubscriptions++;
     console.log(`   💳 Active subscription: ${subscriptionId}`);
-    console.log(`   📅 Period ends: ${currentPeriodEnd}`);
+    console.log(`   📅 Period ends: ${currentPeriodEnd || 'N/A'}`);
   } else {
     stats.oneTimePayments++;
     console.log(`   💰 One-time payment`);
@@ -187,7 +197,12 @@ async function processCustomer(customer, existingUserEmails, existingUsers) {
   };
 
   if (!existingPayment) {
-    paymentData.created_at = new Date().toISOString();
+    try {
+      paymentData.created_at = new Date().toISOString();
+    } catch (error) {
+      console.log(`   ⚠️  Error creating timestamp, using current time`);
+      paymentData.created_at = new Date().toISOString();
+    }
   }
 
   const { error: upsertError } = await supabase
