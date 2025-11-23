@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Stripe with secret key
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
 // Initialize Supabase client
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -16,7 +16,7 @@ if (!supabaseUrl || !supabaseKey) {
   });
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 export default async function handler(req, res) {
   // Set CORS headers
@@ -36,6 +36,17 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Check if services are initialized
+    if (!stripe) {
+      console.error('Stripe not initialized - missing STRIPE_SECRET_KEY');
+      return res.status(500).json({ error: 'Server configuration error: Stripe not initialized' });
+    }
+
+    if (!supabase) {
+      console.error('Supabase not initialized - missing credentials');
+      return res.status(500).json({ error: 'Server configuration error: Supabase not initialized' });
+    }
+
     // Verify authentication
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
