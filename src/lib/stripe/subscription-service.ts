@@ -56,10 +56,28 @@ export async function cancelSubscription(userId: string): Promise<{ success: boo
       body: JSON.stringify({ userId })
     });
 
-    const result = await response.json();
+    let result;
+    try {
+      result = await response.json();
+    } catch (parseError) {
+      console.error('Failed to parse response:', parseError);
+      return { 
+        success: false, 
+        message: `Server error: ${response.status} ${response.statusText}` 
+      };
+    }
 
     if (!response.ok) {
+      console.error('Cancel subscription failed:', result);
       return { success: false, message: result.error || 'Failed to cancel subscription' };
+    }
+
+    // Check if the result indicates success
+    if (result.success) {
+      return { 
+        success: true, 
+        message: result.message || 'Subscription cancelled successfully' 
+      };
     }
 
     return { success: true, message: 'Subscription cancelled successfully' };

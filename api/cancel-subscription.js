@@ -97,20 +97,46 @@ export default async function handler(req, res) {
       }
     );
 
+    console.log('Stripe cancellation successful:', {
+      subscriptionId: subscription.id,
+      cancel_at_period_end: subscription.cancel_at_period_end,
+      current_period_end: subscription.current_period_end
+    });
+
     // Update database to reflect cancellation
-    const { error: updateError } = await supabase
+    const updateData = {
+      cancel_at_period_end: true,
+      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    console.log('Attempting database update with data:', updateData);
+
+    const { data: updateResult, error: updateError } = await supabase
       .from('user_payments')
-      .update({
-        cancel_at_period_end: true,
-        current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', userId);
+      .update(updateData)
+      .eq('user_id', userId)
+      .select();
 
     if (updateError) {
-      console.error('Error updating database:', updateError);
-      return res.status(500).json({ error: 'Failed to update database' });
+      console.error('Error updating database:', {
+        error: updateError,
+        code: updateError.code,
+        message: updateError.message,
+        details: updateError.details,
+        hint: updateError.hint
+      });
+      // Still return success since Stripe cancellation worked
+      // The webhook will sync the data later
+      return res.status(200).json({
+        success: true,
+        message: 'Subscription cancelled in Stripe. Database sync pending.',
+        current_period_end: subscription.current_period_end,
+        warning: 'Database update failed but cancellation is active'
+      });
     }
+
+    console.log('Database update successful:', updateResult);
 
     return res.status(200).json({
       success: true,
