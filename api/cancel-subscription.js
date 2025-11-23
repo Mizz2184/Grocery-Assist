@@ -106,9 +106,13 @@ export default async function handler(req, res) {
     // Update database to reflect cancellation
     const updateData = {
       cancel_at_period_end: true,
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
       updated_at: new Date().toISOString()
     };
+
+    // Only add current_period_end if it exists and is valid
+    if (subscription.current_period_end && typeof subscription.current_period_end === 'number') {
+      updateData.current_period_end = new Date(subscription.current_period_end * 1000).toISOString();
+    }
 
     console.log('Attempting database update with data:', updateData);
 
