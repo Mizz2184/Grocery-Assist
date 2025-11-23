@@ -2,6 +2,18 @@
   "version": 2,
   "builds": [
     { 
+      "src": "api/cancel-subscription.js", 
+      "use": "@vercel/node" 
+    },
+    { 
+      "src": "api/stripe-webhook.js", 
+      "use": "@vercel/node" 
+    },
+    { 
+      "src": "api/sync-subscription.js", 
+      "use": "@vercel/node" 
+    },
+    { 
       "src": "server.js", 
       "use": "@vercel/node" 
     },
@@ -15,17 +27,17 @@
     { 
       "src": "/api/stripe-webhook", 
       "dest": "/api/stripe-webhook.js",
-      "methods": ["POST"]
+      "methods": ["POST", "OPTIONS"]
     },
     { 
       "src": "/api/cancel-subscription", 
       "dest": "/api/cancel-subscription.js",
-      "methods": ["POST"]
+      "methods": ["POST", "OPTIONS"]
     },
     { 
       "src": "/api/sync-subscription", 
       "dest": "/api/sync-subscription.js",
-      "methods": ["POST"]
+      "methods": ["POST", "OPTIONS"]
     },
     { 
       "src": "/api/(.*)", 
