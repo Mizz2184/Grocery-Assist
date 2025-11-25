@@ -129,7 +129,58 @@ export const commonTranslations: Record<string, string> = {
   "Precio: menor a mayor": "Price: low to high",
   "Precio: mayor a menor": "Price: high to low",
   "Nombre: A-Z": "Name: A-Z",
-  "Nombre: Z-A": "Name: Z-A"
+  "Nombre: Z-A": "Name: Z-A",
+  
+  // Meal Plan translations
+  "Plan de Comidas": "Meal Plan",
+  "Mis Planes": "My Plans",
+  "Compartidos Conmigo": "Shared with Me",
+  "Compartido": "Shared",
+  "Plan compartido": "Shared plan",
+  "Recetas": "Recipes",
+  "Anterior": "Previous",
+  "Siguiente": "Next",
+  "Hoy": "Today",
+  "No hay plan de comidas para esta semana": "No meal plan for this week",
+  "Crea un nuevo plan para esta semana": "Create a new plan for this week",
+  "Crear Plan": "Create Plan",
+  "Plan Creado": "Plan Created",
+  "Tu plan de comidas ha sido creado exitosamente": "Your meal plan has been created successfully",
+  "Agregar Comida": "Add Meal",
+  "Agrega una nueva comida a tu plan semanal": "Add a new meal to your weekly plan",
+  "Nombre de la Comida": "Meal Name",
+  "Ej: Pasta con Pollo": "Ex: Chicken Pasta",
+  "Tipo de Comida": "Meal Type",
+  "Notas (Opcional)": "Notes (Optional)",
+  "Comida Agregada": "Meal Added",
+  "La comida se agregó exitosamente": "The meal was added successfully",
+  "No se pudo agregar la comida": "Could not add the meal",
+  "Comida Eliminada": "Meal Deleted",
+  "La comida se eliminó exitosamente": "The meal was deleted successfully",
+  "No se pudo eliminar la comida": "Could not delete the meal",
+  "No se pudo cargar el plan de comidas": "Could not load the meal plan",
+  
+  // Days of the week
+  "Monday": "Monday",
+  "Tuesday": "Tuesday",
+  "Wednesday": "Wednesday",
+  "Thursday": "Thursday",
+  "Friday": "Friday",
+  "Saturday": "Saturday",
+  "Sunday": "Sunday",
+  "Lunes": "Monday",
+  "Martes": "Tuesday",
+  "Miércoles": "Wednesday",
+  "Jueves": "Thursday",
+  "Viernes": "Friday",
+  "Sábado": "Saturday",
+  "Domingo": "Sunday",
+  
+  // Meal types
+  "Desayuno": "Breakfast",
+  "Almuerzo": "Lunch",
+  "Cena": "Dinner",
+  "Merienda": "Snack"
 };
 
 /**

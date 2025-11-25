@@ -64,7 +64,7 @@ export default function MealPlan() {
     }
     loadMealPlan();
     loadAvailableWeeks();
-  }, [user, currentWeekStart]);
+  }, [user, currentWeekStart, planType]);
 
   const loadAvailableWeeks = async () => {
     if (!user) return;
@@ -169,7 +169,16 @@ export default function MealPlan() {
         // No meal plan exists for this week yet
         setMealPlan(null);
       } else {
-        setMealPlan(plan);
+        // Check if the plan matches the current filter
+        const isOwnedPlan = plan.user_id === user.id;
+        const isSharedPlan = plan.user_id !== user.id;
+        
+        // Only show the plan if it matches the selected filter
+        if ((planType === 'owned' && isOwnedPlan) || (planType === 'shared' && isSharedPlan)) {
+          setMealPlan(plan);
+        } else {
+          setMealPlan(null);
+        }
       }
     } catch (error) {
       console.error('Error loading meal plan:', error);
@@ -269,7 +278,15 @@ export default function MealPlan() {
           <div className="flex gap-2 mb-4 justify-center md:justify-start">
             <Button
               variant={planType === 'owned' ? 'default' : 'outline'}
-              onClick={() => setPlanType('owned')}
+              onClick={() => {
+                setPlanType('owned');
+                // Switch to first owned meal plan if available
+                if (ownedMealPlans.length > 0) {
+                  const firstWeek = ownedMealPlans[0].week_start_date;
+                  const [year, month, day] = firstWeek.split('-').map(Number);
+                  setCurrentWeekStart(new Date(year, month - 1, day));
+                }
+              }}
               size="sm"
               className="flex items-center gap-2"
             >
@@ -278,7 +295,15 @@ export default function MealPlan() {
             </Button>
             <Button
               variant={planType === 'shared' ? 'default' : 'outline'}
-              onClick={() => setPlanType('shared')}
+              onClick={() => {
+                setPlanType('shared');
+                // Switch to first shared meal plan if available
+                if (sharedMealPlans.length > 0) {
+                  const firstWeek = sharedMealPlans[0].week_start_date;
+                  const [year, month, day] = firstWeek.split('-').map(Number);
+                  setCurrentWeekStart(new Date(year, month - 1, day));
+                }
+              }}
               size="sm"
               className="flex items-center gap-2"
             >
