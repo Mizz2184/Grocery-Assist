@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { createNotification } from '@/lib/services/notificationService';
 import type {
   MealPlan,
   Meal,
@@ -722,7 +723,45 @@ export async function addMealPlanCollaborator(
       return false;
     }
 
-    // TODO: Send notification to collaborator (similar to grocery lists)
+    // Send notification to collaborator
+    try {
+      // Get current user info
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const userName = currentUser?.user_metadata?.full_name || currentUser?.email || 'Someone';
+
+      // Find the collaborator's user ID by email
+      const { data: collaboratorUsers, error: userError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', collaboratorEmail)
+        .limit(1);
+
+      if (!userError && collaboratorUsers && collaboratorUsers.length > 0) {
+        const collaboratorUserId = collaboratorUsers[0].id;
+
+        // Create notification
+        await createNotification(
+          collaboratorUserId,
+          'meal_plan_shared',
+          'Meal Plan Shared',
+          `${userName} shared the meal plan "${mealPlan.name}" with you`,
+          {
+            meal_plan_id: mealPlanId,
+            meal_plan_name: mealPlan.name,
+            shared_by: userName,
+            shared_by_id: userId
+          }
+        );
+
+        console.log(`✅ Notification sent to ${collaboratorEmail}`);
+      } else {
+        console.log(`⚠️ User with email ${collaboratorEmail} not found in profiles table`);
+      }
+    } catch (notificationError) {
+      console.error('Error sending notification:', notificationError);
+      // Continue even if notification fails - the user has been added as a collaborator
+    }
+
     console.log(`Collaborator ${collaboratorEmail} added to meal plan ${mealPlanId}`);
     
     return true;

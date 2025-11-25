@@ -12,7 +12,9 @@ import {
   Calendar,
   Trash2,
   BookOpen,
-  Loader2
+  Loader2,
+  Share2,
+  CalendarDays
 } from 'lucide-react';
 import {
   getMealPlanForWeek,
@@ -34,6 +36,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { ShareMealPlan } from '@/components/ShareMealPlan';
 
 export default function MealPlan() {
@@ -51,6 +54,8 @@ export default function MealPlan() {
   const [newMealName, setNewMealName] = useState('');
   const [newMealNotes, setNewMealNotes] = useState('');
   const [availableWeeks, setAvailableWeeks] = useState<string[]>([]);
+  const [allMealPlans, setAllMealPlans] = useState<MealPlan[]>([]);
+  const [planType, setPlanType] = useState<'owned' | 'shared'>('owned');
 
   useEffect(() => {
     if (!user) {
@@ -66,12 +71,23 @@ export default function MealPlan() {
     
     try {
       const plans = await getUserMealPlans(user.id);
+      setAllMealPlans(plans);
       const weeks = plans.map(plan => plan.week_start_date);
       setAvailableWeeks(weeks);
     } catch (error) {
       console.error('Error loading available weeks:', error);
     }
   };
+
+  // Separate meal plans into owned and shared
+  const ownedMealPlans = allMealPlans.filter(plan => plan.user_id === user?.id);
+  const sharedMealPlans = allMealPlans.filter(plan => {
+    // A meal plan is shared if user is not the creator but is in collaborators
+    return plan.user_id !== user?.id && 
+           plan.collaborators && 
+           Array.isArray(plan.collaborators) &&
+           plan.collaborators.length > 0;
+  });
 
   const goToPreviousWeek = () => {
     const previousWeek = new Date(currentWeekStart);
@@ -114,12 +130,16 @@ export default function MealPlan() {
     const diff = currentDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
     currentDate.setDate(diff);
     
+    // Get weeks from filtered meal plans (owned or shared)
+    const filteredPlans = planType === 'owned' ? ownedMealPlans : sharedMealPlans;
+    const filteredWeeks = filteredPlans.map(plan => plan.week_start_date);
+    
     while (currentDate <= endDate) {
       const weekStartISO = formatDateISO(currentDate);
       const weekEnd = new Date(currentDate);
       weekEnd.setDate(weekEnd.getDate() + 6);
       
-      const hasData = availableWeeks.includes(weekStartISO);
+      const hasData = filteredWeeks.includes(weekStartISO);
       const label = `${currentDate.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('es-ES', { month: 'short', day: 'numeric', year: 'numeric' })}${hasData ? ' ✓' : ''}`;
       
       options.push({
@@ -244,6 +264,28 @@ export default function MealPlan() {
             <span className="text-4xl md:text-5xl">📅</span>
             <span>{translateUI('Plan de Comidas')}</span>
           </h1>
+
+          {/* Owned vs Shared Toggle */}
+          <div className="flex gap-2 mb-4 justify-center md:justify-start">
+            <Button
+              variant={planType === 'owned' ? 'default' : 'outline'}
+              onClick={() => setPlanType('owned')}
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <CalendarDays className="h-4 w-4" />
+              {translateUI('Mis Planes')} ({ownedMealPlans.length})
+            </Button>
+            <Button
+              variant={planType === 'shared' ? 'default' : 'outline'}
+              onClick={() => setPlanType('shared')}
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <Share2 className="h-4 w-4" />
+              {translateUI('Compartidos Conmigo')} ({sharedMealPlans.length})
+            </Button>
+          </div>
           
           {/* Week Navigation */}
           <div className="flex flex-col gap-2 mb-2">
@@ -309,10 +351,12 @@ export default function MealPlan() {
           </div>
           
           {mealPlan && user && mealPlan.user_id !== user.id && (
-            <p className="text-sm text-primary mt-2 flex items-center justify-center md:justify-start gap-2">
-              <span>👥</span>
-              <span>{translateUI('Plan compartido')}</span>
-            </p>
+            <div className="flex items-center justify-center md:justify-start gap-2 mt-2">
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <Share2 className="h-3 w-3" />
+                {translateUI('Compartido')}
+              </Badge>
+            </div>
           )}
         </div>
         

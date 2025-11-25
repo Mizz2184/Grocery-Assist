@@ -6,7 +6,10 @@ export type NotificationType =
   | 'item_added' 
   | 'item_checked' 
   | 'list_updated' 
-  | 'collaborator_added';
+  | 'collaborator_added'
+  | 'meal_plan_shared'
+  | 'meal_added'
+  | 'meal_plan_updated';
 
 export interface Notification {
   id: string;
@@ -29,6 +32,9 @@ export interface NotificationPreferences {
   item_added: boolean;
   item_checked: boolean;
   list_updated: boolean;
+  meal_plan_shared: boolean;
+  meal_added: boolean;
+  meal_plan_updated: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -266,7 +272,10 @@ export const createDefaultNotificationPreferences = async (
         list_shared: true,
         item_added: true,
         item_checked: false,
-        list_updated: true
+        list_updated: true,
+        meal_plan_shared: true,
+        meal_added: true,
+        meal_plan_updated: true
       })
       .select()
       .single();
