@@ -15,14 +15,35 @@ import type {
 // ============================================
 
 /**
- * Get all meal plans for a user
+ * Get all meal plans for a user (including shared meal plans)
  */
 export async function getUserMealPlans(userId: string): Promise<MealPlan[]> {
+  // Get user email for collaborator check
+  const { data: { user } } = await supabase.auth.getUser();
+  const userEmail = user?.email;
+
+  if (!userEmail) {
+    // If no email, just get owned meal plans
+    const { data, error } = await supabase
+      .from('meal_plans')
+      .select('*')
+      .eq('user_id', userId)
+      .order('week_start_date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching meal plans:', error);
+      throw error;
+    }
+
+    return data || [];
+  }
+
+  // Get meal plans owned by user OR where user is a collaborator
   const { data, error } = await supabase
     .from('meal_plans')
     .select('*')
-    .eq('user_id', userId)
-    .order('week_start_date', { ascending: false });
+    .or(`user_id.eq.${userId},collaborators.cs.{${userEmail}}`)
+    .order('week_start_date', { ascending: false});
 
   if (error) {
     console.error('Error fetching meal plans:', error);
@@ -639,4 +660,203 @@ export async function getMealPlanIngredients(mealPlanId: string): Promise<Recipe
   }
 
   return ingredients || [];
+}
+
+// ============================================
+// MEAL PLAN SHARING / COLLABORATORS
+// ============================================
+
+/**
+ * Add a collaborator to a meal plan
+ */
+export async function addMealPlanCollaborator(
+  mealPlanId: string,
+  userId: string,
+  collaboratorEmail: string
+): Promise<boolean> {
+  try {
+    // First, verify the user has permission to add collaborators (must be owner)
+    const { data: mealPlan, error: fetchError } = await supabase
+      .from('meal_plans')
+      .select('*')
+      .eq('id', mealPlanId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching meal plan:', fetchError);
+      return false;
+    }
+
+    if (mealPlan.user_id !== userId) {
+      console.error('User does not have permission to add collaborators');
+      return false;
+    }
+
+    // Normalize email to lowercase
+    collaboratorEmail = collaboratorEmail.toLowerCase().trim();
+
+    // Get current collaborators array or initialize it
+    const currentCollaborators = Array.isArray(mealPlan.collaborators) 
+      ? mealPlan.collaborators 
+      : [];
+
+    // Check if collaborator is already added
+    if (currentCollaborators.includes(collaboratorEmail)) {
+      console.log('Collaborator already exists');
+      return true;
+    }
+
+    // Add the new collaborator
+    const updatedCollaborators = [...currentCollaborators, collaboratorEmail];
+
+    // Update the meal plan
+    const { error: updateError } = await supabase
+      .from('meal_plans')
+      .update({ 
+        collaborators: updatedCollaborators
+      })
+      .eq('id', mealPlanId);
+
+    if (updateError) {
+      console.error('Error updating collaborators:', updateError);
+      return false;
+    }
+
+    // TODO: Send notification to collaborator (similar to grocery lists)
+    console.log(`Collaborator ${collaboratorEmail} added to meal plan ${mealPlanId}`);
+    
+    return true;
+  } catch (error) {
+    console.error('Error adding collaborator:', error);
+    return false;
+  }
+}
+
+/**
+ * Remove a collaborator from a meal plan
+ */
+export async function removeMealPlanCollaborator(
+  mealPlanId: string,
+  userId: string,
+  collaboratorEmail: string
+): Promise<boolean> {
+  try {
+    // Normalize email
+    const normalizedEmail = collaboratorEmail.toLowerCase().trim();
+
+    // Check if user has permission to remove collaborators (must be the owner)
+    const { data: mealPlan, error: fetchError } = await supabase
+      .from('meal_plans')
+      .select('id, user_id, collaborators')
+      .eq('id', mealPlanId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching meal plan:', fetchError);
+      return false;
+    }
+
+    const isOwner = mealPlan.user_id === userId;
+
+    if (!isOwner) {
+      console.error('User does not have permission to remove collaborators');
+      return false;
+    }
+
+    // Clean up the collaborators array
+    if (!Array.isArray(mealPlan.collaborators)) {
+      mealPlan.collaborators = [];
+    }
+
+    // Clean and normalize all existing collaborators
+    const collaborators = mealPlan.collaborators
+      .filter(item => item !== null && item !== undefined && item !== '')
+      .map(item => String(item).toLowerCase().trim());
+
+    // Check if the email exists in the collaborators list
+    const emailExists = collaborators.includes(normalizedEmail);
+
+    if (!emailExists) {
+      console.log('Collaborator not found in list');
+      return true;
+    }
+
+    // Remove the email
+    const updatedCollaborators = collaborators.filter(email => 
+      email !== normalizedEmail
+    );
+
+    // Update the meal plan with new collaborators
+    const { error: updateError } = await supabase
+      .from('meal_plans')
+      .update({ collaborators: updatedCollaborators })
+      .eq('id', mealPlanId);
+
+    if (updateError) {
+      console.error('Error removing collaborator:', updateError);
+      return false;
+    }
+
+    console.log(`Collaborator ${collaboratorEmail} removed from meal plan ${mealPlanId}`);
+    return true;
+  } catch (error) {
+    console.error('Error removing collaborator:', error);
+    return false;
+  }
+}
+
+/**
+ * Get a shared meal plan by ID (accessible to owner and collaborators)
+ */
+export async function getSharedMealPlan(mealPlanId: string): Promise<MealPlan | null> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id;
+    const userEmail = user?.email;
+
+    // Get the meal plan
+    const { data: mealPlan, error: planError } = await supabase
+      .from('meal_plans')
+      .select('*')
+      .eq('id', mealPlanId)
+      .single();
+
+    if (planError) {
+      console.error('Error fetching shared meal plan:', planError);
+      return null;
+    }
+
+    // Check if user has access (owner or collaborator)
+    const isOwner = userId && mealPlan.user_id === userId;
+    const isCollaborator = userEmail && 
+                          mealPlan.collaborators && 
+                          Array.isArray(mealPlan.collaborators) && 
+                          mealPlan.collaborators.some(email => 
+                            email.toLowerCase() === userEmail.toLowerCase()
+                          );
+
+    if (!isOwner && !isCollaborator) {
+      console.error('User does not have access to this meal plan');
+      return null;
+    }
+
+    // Get meals for this meal plan
+    const { data: meals, error: mealsError } = await supabase
+      .from('meals')
+      .select('*')
+      .eq('meal_plan_id', mealPlanId)
+      .order('day_of_week', { ascending: true });
+
+    if (mealsError) {
+      console.error('Error fetching meals:', mealsError);
+    }
+
+    return {
+      ...mealPlan,
+      meals: meals || []
+    };
+  } catch (error) {
+    console.error('Error getting shared meal plan:', error);
+    return null;
+  }
 }
