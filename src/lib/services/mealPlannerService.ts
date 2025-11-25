@@ -157,13 +157,12 @@ export async function getMealPlanForWeek(userId: string, weekStartDate: string, 
   }
 
   // If no own plan, check for shared plans with this user as collaborator
-  // RLS policies will automatically filter to only show plans where user is a collaborator
   if (userEmail) {
     const { data: sharedPlans, error: sharedError } = await supabase
       .from('meal_plans')
       .select('*')
       .eq('week_start_date', weekStartDate)
-      .neq('user_id', userId) // Exclude own plans (already checked above)
+      .contains('collaborators', [userEmail]) // Check if user email is in collaborators array
       .order('created_at', { ascending: false })
       .limit(1);
 
@@ -729,18 +728,27 @@ export async function addMealPlanCollaborator(
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       const userName = currentUser?.user_metadata?.full_name || currentUser?.email || 'Someone';
 
+      console.log(`🔍 Looking up user with email: ${collaboratorEmail}`);
+
       // Find the collaborator's user ID by email
       const { data: collaboratorUsers, error: userError } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, email')
         .eq('email', collaboratorEmail)
         .limit(1);
 
-      if (!userError && collaboratorUsers && collaboratorUsers.length > 0) {
+      if (userError) {
+        console.error('❌ Error querying profiles table:', userError);
+        console.log('⚠️ Make sure you have run create-profiles-table.sql');
+      } else if (!collaboratorUsers || collaboratorUsers.length === 0) {
+        console.log(`⚠️ User with email ${collaboratorEmail} not found in profiles table`);
+        console.log('💡 The user may need to log in at least once to create their profile');
+      } else {
         const collaboratorUserId = collaboratorUsers[0].id;
+        console.log(`✅ Found user ID: ${collaboratorUserId}`);
 
         // Create notification
-        await createNotification(
+        const notificationResult = await createNotification(
           collaboratorUserId,
           'meal_plan_shared',
           'Meal Plan Shared',
@@ -753,12 +761,14 @@ export async function addMealPlanCollaborator(
           }
         );
 
-        console.log(`✅ Notification sent to ${collaboratorEmail}`);
-      } else {
-        console.log(`⚠️ User with email ${collaboratorEmail} not found in profiles table`);
+        if (notificationResult) {
+          console.log(`✅ Notification sent successfully to ${collaboratorEmail}`);
+        } else {
+          console.log(`⚠️ Notification may not have been created`);
+        }
       }
     } catch (notificationError) {
-      console.error('Error sending notification:', notificationError);
+      console.error('❌ Error sending notification:', notificationError);
       // Continue even if notification fails - the user has been added as a collaborator
     }
 
