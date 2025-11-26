@@ -180,7 +180,35 @@ export const commonTranslations: Record<string, string> = {
   "Desayuno": "Breakfast",
   "Almuerzo": "Lunch",
   "Cena": "Dinner",
-  "Merienda": "Snack"
+  "Merienda": "Snack",
+  
+  // Month names (full)
+  "enero": "January",
+  "febrero": "February",
+  "marzo": "March",
+  "abril": "April",
+  "mayo": "May",
+  "junio": "June",
+  "julio": "July",
+  "agosto": "August",
+  "septiembre": "September",
+  "octubre": "October",
+  "noviembre": "November",
+  "diciembre": "December",
+  
+  // Month names (abbreviated)
+  "ene": "Jan",
+  "feb": "Feb",
+  "mar": "Mar",
+  "abr": "Apr",
+  "may": "May",
+  "jun": "Jun",
+  "jul": "Jul",
+  "ago": "Aug",
+  "sep": "Sep",
+  "oct": "Oct",
+  "nov": "Nov",
+  "dic": "Dec"
 };
 
 /**

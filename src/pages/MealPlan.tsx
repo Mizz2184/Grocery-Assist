@@ -43,7 +43,10 @@ export default function MealPlan() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { translateUI } = useTranslation();
+  const { translateUI, isTranslated } = useTranslation();
+  
+  // Get locale based on translation state
+  const locale = isTranslated ? 'en-US' : 'es-ES';
 
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
   const [loading, setLoading] = useState(true);
@@ -140,7 +143,7 @@ export default function MealPlan() {
       weekEnd.setDate(weekEnd.getDate() + 6);
       
       const hasData = filteredWeeks.includes(weekStartISO);
-      const label = `${currentDate.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('es-ES', { month: 'short', day: 'numeric', year: 'numeric' })}${hasData ? ' ✓' : ''}`;
+      const label = `${currentDate.toLocaleDateString(locale, { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}${hasData ? ' ✓' : ''}`;
       
       options.push({
         value: weekStartISO,
@@ -318,7 +321,10 @@ export default function MealPlan() {
               >
                 <SelectTrigger className="w-[280px] h-9">
                   <SelectValue>
-                    {weekStart.toLocaleDateString('es-ES', { day: 'numeric' })} de {weekStart.toLocaleDateString('es-ES', { month: 'long' })} - {weekEnd.toLocaleDateString('es-ES', { day: 'numeric' })} de {weekEnd.toLocaleDateString('es-ES', { month: 'long' })} de {weekEnd.toLocaleDateString('es-ES', { year: 'numeric' })}
+                    {isTranslated 
+                      ? `${weekStart.toLocaleDateString(locale, { month: 'long', day: 'numeric' })} - ${weekEnd.toLocaleDateString(locale, { month: 'long', day: 'numeric', year: 'numeric' })}`
+                      : `${weekStart.toLocaleDateString(locale, { day: 'numeric' })} de ${weekStart.toLocaleDateString(locale, { month: 'long' })} - ${weekEnd.toLocaleDateString(locale, { day: 'numeric' })} de ${weekEnd.toLocaleDateString(locale, { month: 'long' })} de ${weekEnd.toLocaleDateString(locale, { year: 'numeric' })}`
+                    }
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="max-h-[300px]">
@@ -445,7 +451,7 @@ export default function MealPlan() {
                 {translateUI(day)}
               </CardTitle>
               <CardDescription className="text-xs">
-                {new Date(currentWeekStart.getTime() + dayIndex * 24 * 60 * 60 * 1000).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}
+                {new Date(currentWeekStart.getTime() + dayIndex * 24 * 60 * 60 * 1000).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex-grow space-y-2">
