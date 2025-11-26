@@ -803,21 +803,17 @@ export async function addMealPlanCollaborator(
 
       console.log(`🔍 Looking up user with email: ${collaboratorEmail}`);
 
-      // Find the collaborator's user ID by email
-      const { data: collaboratorUsers, error: userError } = await supabase
-        .from('profiles')
-        .select('id, email')
-        .eq('email', collaboratorEmail)
-        .limit(1);
+      // Find the collaborator's user ID using the database function
+      const { data: collaboratorUserId, error: userError } = await supabase
+        .rpc('get_user_id_by_email', { user_email: collaboratorEmail });
 
       if (userError) {
-        console.error('❌ Error querying profiles table:', userError);
-        console.log('⚠️ Make sure you have run create-profiles-table.sql');
-      } else if (!collaboratorUsers || collaboratorUsers.length === 0) {
-        console.log(`⚠️ User with email ${collaboratorEmail} not found in profiles table`);
-        console.log('💡 The user may need to log in at least once to create their profile');
+        console.error('❌ Error looking up user:', userError);
+        console.log('⚠️ Make sure you have run create-get-user-id-function.sql');
+      } else if (!collaboratorUserId) {
+        console.log(`⚠️ User with email ${collaboratorEmail} not found`);
+        console.log('💡 The user may need to sign up first');
       } else {
-        const collaboratorUserId = collaboratorUsers[0].id;
         console.log(`✅ Found user ID: ${collaboratorUserId}`);
 
         // Create notification
