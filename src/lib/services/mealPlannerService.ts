@@ -93,9 +93,82 @@ export async function getMealPlanWithMeals(mealPlanId: string): Promise<MealPlan
 /**
  * Get meal plan for a specific week
  */
-export async function getMealPlanForWeek(userId: string, weekStartDate: string, userEmail?: string): Promise<MealPlan | null> {
+export async function getMealPlanForWeek(
+  userId: string, 
+  weekStartDate: string, 
+  userEmail?: string,
+  planType: 'owned' | 'shared' | 'any' = 'any'
+): Promise<MealPlan | null> {
 
-  // First, try to get the user's own meal plan
+  // If specifically looking for shared plans only, skip owned plans
+  if (planType === 'shared') {
+    // Only get shared plans
+    if (userEmail) {
+      console.log(`🔍 Searching for shared meal plans for week ${weekStartDate} where ${userEmail} is a collaborator`);
+      
+      const { data: sharedPlans, error: sharedError } = await supabase
+        .from('meal_plans')
+        .select('*')
+        .eq('week_start_date', weekStartDate)
+        .contains('collaborators', [userEmail])
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (sharedError) {
+        console.error('❌ Error fetching shared meal plans:', sharedError);
+        throw sharedError;
+      }
+
+      console.log(`📊 Found ${sharedPlans?.length || 0} shared meal plan(s)`);
+      
+      if (sharedPlans && sharedPlans.length > 0) {
+        const mealPlan = sharedPlans[0];
+        const { data: meals, error: mealsError } = await supabase
+          .from('meals')
+          .select(`
+            id,
+            meal_plan_id,
+            day_of_week,
+            meal_type,
+            name,
+            notes,
+            recipe_id,
+            created_at,
+            updated_at,
+            recipes (
+              id,
+              user_id,
+              name,
+              description,
+              instructions,
+              prep_time,
+              cook_time,
+              servings,
+              image_url,
+              is_favorite,
+              created_at,
+              updated_at
+            )
+          `)
+          .eq('meal_plan_id', mealPlan.id)
+          .order('day_of_week')
+          .order('meal_type');
+
+        if (mealsError) {
+          console.error('Error fetching meals:', mealsError);
+          throw mealsError;
+        }
+
+        return {
+          ...mealPlan,
+          meals: meals || []
+        };
+      }
+    }
+    return null;
+  }
+
+  // For 'owned' or 'any', try to get the user's own meal plan first
   const { data: ownMealPlans, error: ownPlanError } = await supabase
     .from('meal_plans')
     .select('*')
@@ -109,7 +182,7 @@ export async function getMealPlanForWeek(userId: string, weekStartDate: string, 
     throw ownPlanError;
   }
 
-  // If user has their own plan, use it
+  // If user has their own plan and we're looking for owned or any, use it
   if (ownMealPlans && ownMealPlans.length > 0) {
     const mealPlan = ownMealPlans[0];
     

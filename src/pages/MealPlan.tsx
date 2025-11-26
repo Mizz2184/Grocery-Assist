@@ -163,25 +163,21 @@ export default function MealPlan() {
     try {
       setLoading(true);
       const weekStartDate = formatDateISO(currentWeekStart);
-      const plan = await getMealPlanForWeek(user.id, weekStartDate, user.email);
+      
+      console.log(`🔍 Loading meal plan for week ${weekStartDate}, type: ${planType}`);
+      
+      // Pass the planType to the service to get the correct meal plan
+      const plan = await getMealPlanForWeek(user.id, weekStartDate, user.email, planType);
       
       if (!plan) {
-        // No meal plan exists for this week yet
+        console.log(`⚠️ No ${planType} meal plan found for this week`);
         setMealPlan(null);
       } else {
-        // Check if the plan matches the current filter
-        const isOwnedPlan = plan.user_id === user.id;
-        const isSharedPlan = plan.user_id !== user.id;
-        
-        // Only show the plan if it matches the selected filter
-        if ((planType === 'owned' && isOwnedPlan) || (planType === 'shared' && isSharedPlan)) {
-          setMealPlan(plan);
-        } else {
-          setMealPlan(null);
-        }
+        console.log(`✅ Found ${planType} meal plan:`, plan.name);
+        setMealPlan(plan);
       }
     } catch (error) {
-      console.error('Error loading meal plan:', error);
+      console.error('❌ Error loading meal plan:', error);
       toast({
         title: translateUI('Error'),
         description: translateUI('No se pudo cargar el plan de comidas'),
