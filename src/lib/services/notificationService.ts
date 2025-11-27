@@ -50,14 +50,18 @@ export const createNotification = async (
   data?: Record<string, any>
 ): Promise<Notification | null> => {
   try {
+    console.log(`📬 Creating notification for user ${userId}, type: ${type}`);
 
     // Check if user has this notification type enabled
     const preferences = await getNotificationPreferences(userId);
+    console.log(`⚙️ User preferences:`, preferences);
 
-    if (preferences && !preferences[type]) {
-
+    if (preferences && preferences[type] === false) {
+      console.log(`🚫 Notification type ${type} is disabled for user`);
       return null;
     }
+
+    console.log(`✅ Notification type ${type} is enabled, creating notification...`);
 
     const { data: notification, error } = await supabase
       .from('notifications')
@@ -74,9 +78,11 @@ export const createNotification = async (
 
     if (error) {
       console.error('❌ Error creating notification:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
       return null;
     }
 
+    console.log(`✅ Notification created successfully:`, notification.id);
     return notification;
   } catch (error) {
     console.error('💥 Error in createNotification:', error);
