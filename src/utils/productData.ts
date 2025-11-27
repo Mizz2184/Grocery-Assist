@@ -151,6 +151,8 @@ export interface GroceryList {
   id: string;
   name: string;
   createdBy: string;
+  createdByEmail?: string; // Email of the user who created the list
+  createdByName?: string; // Name of the user who created the list
   createdAt: string;
   items: GroceryListItem[];
   collaborators: string[];

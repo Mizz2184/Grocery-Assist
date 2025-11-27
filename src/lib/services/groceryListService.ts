@@ -54,6 +54,26 @@ export const getUserGroceryLists = async (userId: string): Promise<GroceryList[]
       return [];
     }
 
+    // Fetch creator info separately for all unique user IDs
+    const uniqueUserIds = [...new Set(allLists.map(list => list.user_id))];
+    const { data: creators, error: creatorsError } = await supabase
+      .from('profiles')
+      .select('id, email, full_name')
+      .in('id', uniqueUserIds);
+
+    if (creatorsError) {
+      console.error('Error fetching creator profiles:', creatorsError);
+      // Continue without creator info
+    }
+
+    // Create a map of user IDs to creator info
+    const creatorMap = new Map();
+    if (creators) {
+      creators.forEach(creator => {
+        creatorMap.set(creator.id, creator);
+      });
+    }
+
     // Fetch items for all lists
     const { data: items, error: itemsError } = await supabase
       .from('grocery_items')
@@ -85,10 +105,17 @@ export const getUserGroceryLists = async (userId: string): Promise<GroceryList[]
         (Array.isArray(list.collaborators) && 
          list.collaborators.includes(userEmail));
 
+      // Get creator info from the creator map
+      const creator = creatorMap.get(list.user_id);
+      const creatorEmail = creator?.email || list.user_id;
+      const creatorName = creator?.full_name;
+
       return {
         id: list.id,
         name: list.name,
         createdBy: list.user_id,
+        createdByEmail: creatorEmail,
+        createdByName: creatorName,
         createdAt: list.created_at,
         collaborators: list.collaborators || [],
         hasEditPermission,

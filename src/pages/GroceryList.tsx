@@ -71,6 +71,7 @@ import { ShareGroceryList } from "@/components/ShareGroceryList";
 import { Product } from "@/lib/types/store";
 import type { GroceryList, GroceryListItem } from "@/types/groceryList";
 import { useGroceryList } from "@/hooks/useGroceryList";
+import { useTranslation } from "@/context/TranslationContext";
 
 // Helper function to get price from any product structure
 const getProductPrice = (product: any): number => {
@@ -95,6 +96,7 @@ const GroceryList = () => {
   const { toast } = useToast();
   const { query, searchResults } = useSearch();
   const navigate = useNavigate();
+  const { translateUI } = useTranslation();
   const [lists, setLists] = useState<GroceryListType[]>([]);
   const { activeList, setActiveList } = useGroceryList();
   const [loading, setLoading] = useState(true);
@@ -967,7 +969,7 @@ const GroceryList = () => {
                     )}
                     {activeList.createdBy !== user?.id && (
                       <CardDescription className="text-xs">
-                        Shared by {activeList.createdBy}
+                        {translateUI("Compartido por")} {activeList.createdByName || activeList.createdByEmail || activeList.createdBy}
                       </CardDescription>
                     )}
                   </div>

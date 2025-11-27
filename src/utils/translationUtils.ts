@@ -182,6 +182,9 @@ export const commonTranslations: Record<string, string> = {
   "Cena": "Dinner",
   "Merienda": "Snack",
   
+  // Sharing
+  "Compartido por": "Shared by",
+  
   // Month names (full)
   "enero": "January",
   "febrero": "February",
