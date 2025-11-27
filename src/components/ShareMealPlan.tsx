@@ -15,6 +15,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { useTranslation } from "@/context/TranslationContext";
+import { addMealPlanCollaborator, removeMealPlanCollaborator } from "@/lib/services/mealPlannerService";
 
 export function ShareMealPlan({ 
   mealPlanId, 
@@ -71,37 +72,18 @@ export function ShareMealPlan({
     setSharing(true);
     
     try {
-      // Get current meal plan
-      const { data: mealPlan, error: fetchError } = await supabase
-        .from('meal_plans')
-        .select('collaborators')
-        .eq('id', mealPlanId)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      const currentCollabs = mealPlan?.collaborators || [];
+      console.log(`📤 Sharing meal plan ${mealPlanId} with ${email.trim()}`);
       
-      // Check if email is already a collaborator
-      if (currentCollabs.includes(email.trim())) {
-        toast({
-          title: translateUI("Ya es colaborador"),
-          description: translateUI(`${email} ya tiene acceso a este plan de comidas.`),
-          variant: "destructive",
-        });
-        setSharing(false);
-        return;
+      // Use the service function which handles notifications
+      const success = await addMealPlanCollaborator(
+        mealPlanId,
+        userId,
+        email.trim()
+      );
+
+      if (!success) {
+        throw new Error('Failed to add collaborator');
       }
-
-      // Add collaborator
-      const { error: updateError } = await supabase
-        .from('meal_plans')
-        .update({ 
-          collaborators: [...currentCollabs, email.trim()] 
-        })
-        .eq('id', mealPlanId);
-
-      if (updateError) throw updateError;
 
       toast({
         title: translateUI("Compartido exitosamente"),
@@ -125,25 +107,18 @@ export function ShareMealPlan({
   const handleRemoveCollaborator = async (collaboratorEmail: string) => {
     setRemoving(collaboratorEmail);
     try {
-      // Get current meal plan
-      const { data: mealPlan, error: fetchError } = await supabase
-        .from('meal_plans')
-        .select('collaborators')
-        .eq('id', mealPlanId)
-        .single();
+      console.log(`🗑️ Removing collaborator ${collaboratorEmail} from meal plan ${mealPlanId}`);
+      
+      // Use the service function
+      const success = await removeMealPlanCollaborator(
+        mealPlanId,
+        userId,
+        collaboratorEmail
+      );
 
-      if (fetchError) throw fetchError;
-
-      const currentCollabs = mealPlan?.collaborators || [];
-      const updatedCollabs = currentCollabs.filter((email: string) => email !== collaboratorEmail);
-
-      // Update meal plan
-      const { error: updateError } = await supabase
-        .from('meal_plans')
-        .update({ collaborators: updatedCollabs })
-        .eq('id', mealPlanId);
-
-      if (updateError) throw updateError;
+      if (!success) {
+        throw new Error('Failed to remove collaborator');
+      }
 
       toast({
         title: translateUI("Colaborador eliminado"),
