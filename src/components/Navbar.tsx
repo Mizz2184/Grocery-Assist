@@ -385,6 +385,7 @@ export const Navbar = () => {
         
         {/* Mobile Navigation */}
         <div className="flex md:hidden items-center gap-2">
+          <TranslationToggle />
           {user && <NotificationBell />}
           <Button 
             variant="ghost" 
