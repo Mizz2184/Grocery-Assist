@@ -85,11 +85,12 @@ export default function MealPlan() {
   // Separate meal plans into owned and shared
   const ownedMealPlans = allMealPlans.filter(plan => plan.user_id === user?.id);
   const sharedMealPlans = allMealPlans.filter(plan => {
-    // A meal plan is shared if user is not the creator but is in collaborators
+    // A meal plan is shared if user is not the creator AND user's email is in collaborators
     return plan.user_id !== user?.id && 
            plan.collaborators && 
            Array.isArray(plan.collaborators) &&
-           plan.collaborators.length > 0;
+           user?.email &&
+           plan.collaborators.includes(user.email.toLowerCase());
   });
 
   const goToPreviousWeek = () => {
@@ -414,29 +415,37 @@ export default function MealPlan() {
           <CardContent className="py-8 text-center">
             <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-lg font-semibold mb-2">
-              {translateUI('No hay plan de comidas para esta semana')}
+              {planType === 'owned' 
+                ? translateUI('No hay plan de comidas para esta semana')
+                : translateUI('No hay planes compartidos para esta semana')
+              }
             </h3>
             <p className="text-muted-foreground mb-4">
-              {translateUI('Crea un nuevo plan para esta semana')}
+              {planType === 'owned'
+                ? translateUI('Crea un nuevo plan para esta semana')
+                : translateUI('Los planes compartidos contigo aparecerán aquí')
+              }
             </p>
-            <Button onClick={async () => {
-              if (!user) return;
-              const weekStartDate = formatDateISO(currentWeekStart);
-              const newPlan = await createMealPlan(user.id, {
-                name: `${translateUI('Plan de Comidas')} - ${weekStartDate}`,
-                week_start_date: weekStartDate,
-                notes: ''
-              });
-              setMealPlan(newPlan);
-              await loadAvailableWeeks();
-              toast({
-                title: translateUI('Plan Creado'),
-                description: translateUI('Tu plan de comidas ha sido creado exitosamente')
-              });
-            }}>
-              <Plus className="h-4 w-4 mr-2" />
-              {translateUI('Crear Plan')}
-            </Button>
+            {planType === 'owned' && (
+              <Button onClick={async () => {
+                if (!user) return;
+                const weekStartDate = formatDateISO(currentWeekStart);
+                const newPlan = await createMealPlan(user.id, {
+                  name: `${translateUI('Plan de Comidas')} - ${weekStartDate}`,
+                  week_start_date: weekStartDate,
+                  notes: ''
+                });
+                setMealPlan(newPlan);
+                await loadAvailableWeeks();
+                toast({
+                  title: translateUI('Plan Creado'),
+                  description: translateUI('Tu plan de comidas ha sido creado exitosamente')
+                });
+              }}>
+                <Plus className="h-4 w-4 mr-2" />
+                {translateUI('Crear Plan')}
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
@@ -466,6 +475,7 @@ export default function MealPlan() {
                 }}
                 onDelete={handleDeleteMeal}
                 translateUI={translateUI}
+                isOwner={user?.id === mealPlan.user_id}
               />
 
               {/* Lunch */}
@@ -479,6 +489,7 @@ export default function MealPlan() {
                 }}
                 onDelete={handleDeleteMeal}
                 translateUI={translateUI}
+                isOwner={user?.id === mealPlan.user_id}
               />
 
               {/* Dinner */}
@@ -492,6 +503,7 @@ export default function MealPlan() {
                 }}
                 onDelete={handleDeleteMeal}
                 translateUI={translateUI}
+                isOwner={user?.id === mealPlan.user_id}
               />
             </CardContent>
           </Card>
@@ -564,10 +576,23 @@ interface MealSlotProps {
   onAdd: () => void;
   onDelete: (mealId: string) => void;
   translateUI: (text: string) => string;
+  isOwner: boolean;
 }
 
-function MealSlot({ meal, mealType, onAdd, onDelete, translateUI }: MealSlotProps) {
+function MealSlot({ meal, mealType, onAdd, onDelete, translateUI, isOwner }: MealSlotProps) {
   if (!meal) {
+    // Only show add button if user owns the plan
+    if (!isOwner) {
+      return (
+        <div className="w-full p-2 border-2 border-dashed border-muted/50 rounded-lg text-left opacity-50">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>{MEAL_TYPE_ICONS[mealType]}</span>
+            <span className="text-xs">{translateUI(MEAL_TYPE_LABELS[mealType])}</span>
+          </div>
+        </div>
+      );
+    }
+    
     return (
       <button
         onClick={onAdd}
@@ -595,14 +620,16 @@ function MealSlot({ meal, mealType, onAdd, onDelete, translateUI }: MealSlotProp
             <p className="text-xs text-primary truncate">📖 {meal.recipe.name}</p>
           )}
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={() => onDelete(meal.id)}
-        >
-          <Trash2 className="h-3 w-3" />
-        </Button>
+        {isOwner && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={() => onDelete(meal.id)}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        )}
       </div>
     </div>
   );

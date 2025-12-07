@@ -159,7 +159,7 @@ export const productTranslations: TranslationMap = {
   'oatmeal': ['avena'],
   'granola': ['granola'],
   'crackers': ['galletas saladas'],
-  'chips': ['papas fritas', 'chips'],
+  'chips': ['chips', 'papas fritas'],
   'popcorn': ['palomitas de maíz'],
   'nuts': ['nueces', 'frutos secos'],
   'almonds': ['almendras'],

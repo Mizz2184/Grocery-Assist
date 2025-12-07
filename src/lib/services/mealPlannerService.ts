@@ -229,7 +229,13 @@ export async function getMealPlanForWeek(
     };
   }
 
-  // If no own plan, check for shared plans with this user as collaborator
+  // If planType is 'owned' and no owned plan found, return null (don't check shared)
+  if (planType === 'owned') {
+    console.log(`⚠️ No owned meal plan found for week ${weekStartDate}`);
+    return null;
+  }
+
+  // If no own plan and planType is 'any', check for shared plans with this user as collaborator
   if (userEmail) {
     const { data: sharedPlans, error: sharedError } = await supabase
       .from('meal_plans')
