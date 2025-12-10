@@ -1,12 +1,11 @@
-// Payment page with monthly subscription and lifetime deal options
+// Payment page with lifetime deal option
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShoppingCart, Check, CreditCard, ArrowRight, Zap, Crown, Sparkles } from "lucide-react";
+import { ShoppingCart, Check, ArrowRight, Crown, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/badge";
 import { 
   PRICING, 
   checkUserPaymentStatus, 
@@ -152,28 +151,33 @@ const Payment = () => {
             <ShoppingCart className="h-10 w-10 text-primary-foreground" />
           </div>
           <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-            Choose Your Plan
+            Get Lifetime Access
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Get full access to price comparisons, meal planning, and smart grocery shopping
           </p>
         </div>
 
-        {/* Pricing Cards */}
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
-          {/* Monthly Plan */}
-          <Card className="relative overflow-hidden border-2 hover:border-primary/50 transition-all duration-300 hover:shadow-xl">
-            <CardHeader className="text-center pb-8">
-              <div className="mx-auto p-3 h-16 w-16 bg-blue-100 dark:bg-blue-900/30 rounded-xl mb-4 flex items-center justify-center">
-                <Zap className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+        {/* Pricing Card */}
+        <div className="flex justify-center mb-8">
+          {/* Lifetime Deal */}
+          <Card className="relative overflow-hidden border-2 border-primary shadow-xl hover:shadow-2xl transition-all duration-300">
+            <div className="absolute top-0 right-0 bg-gradient-to-br from-yellow-400 to-orange-500 text-white px-4 py-1 text-sm font-bold rounded-bl-lg flex items-center gap-1">
+              <Crown className="h-4 w-4" />
+              BEST VALUE
+            </div>
+            
+            <CardHeader className="text-center pb-8 pt-12">
+              <div className="mx-auto p-3 h-16 w-16 bg-gradient-to-br from-yellow-100 to-orange-100 dark:from-yellow-900/30 dark:to-orange-900/30 rounded-xl mb-4 flex items-center justify-center">
+                <Sparkles className="h-8 w-8 text-orange-600 dark:text-orange-400" />
               </div>
-              <CardTitle className="text-2xl font-bold">Monthly</CardTitle>
+              <CardTitle className="text-2xl font-bold">Lifetime Deal</CardTitle>
               <div className="mt-4">
-                <span className="text-5xl font-bold">${PRICING.MONTHLY.price}</span>
-                <span className="text-muted-foreground">/month</span>
+                <span className="text-5xl font-bold">${PRICING.LIFETIME.price}</span>
+                <span className="text-muted-foreground">/once</span>
               </div>
               <CardDescription className="mt-2">
-                Cancel anytime, no commitment
+                Pay once, use forever
               </CardDescription>
             </CardHeader>
             
@@ -197,56 +201,6 @@ const Payment = () => {
                 </div>
                 <div className="flex items-start gap-3">
                   <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                  <p className="text-sm">Priority customer support</p>
-                </div>
-              </div>
-            </CardContent>
-            
-            <CardFooter>
-              <Button 
-                className="w-full h-12 text-base gap-2" 
-                variant="outline"
-                onClick={() => handlePayment('MONTHLY')}
-                disabled={isProcessing}
-              >
-                <CreditCard className="h-5 w-5" />
-                Start Monthly Plan
-              </Button>
-            </CardFooter>
-          </Card>
-
-          {/* Lifetime Deal */}
-          <Card className="relative overflow-hidden border-2 border-primary shadow-xl hover:shadow-2xl transition-all duration-300">
-            <div className="absolute top-0 right-0 bg-gradient-to-br from-yellow-400 to-orange-500 text-white px-4 py-1 text-sm font-bold rounded-bl-lg flex items-center gap-1">
-              <Crown className="h-4 w-4" />
-              BEST VALUE
-            </div>
-            
-            <CardHeader className="text-center pb-8 pt-12">
-              <div className="mx-auto p-3 h-16 w-16 bg-gradient-to-br from-yellow-100 to-orange-100 dark:from-yellow-900/30 dark:to-orange-900/30 rounded-xl mb-4 flex items-center justify-center">
-                <Sparkles className="h-8 w-8 text-orange-600 dark:text-orange-400" />
-              </div>
-              <CardTitle className="text-2xl font-bold">Lifetime Deal</CardTitle>
-              <div className="mt-4">
-                <span className="text-5xl font-bold">${PRICING.LIFETIME.price}</span>
-                <span className="text-muted-foreground">/once</span>
-              </div>
-              <CardDescription className="mt-2">
-                Pay once, use forever
-              </CardDescription>
-              <Badge variant="secondary" className="mt-3 mx-auto">
-                Save ${((PRICING.MONTHLY.price * 12) - PRICING.LIFETIME.price).toFixed(2)} vs yearly
-              </Badge>
-            </CardHeader>
-            
-            <CardContent className="space-y-4 pb-6">
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                  <p className="text-sm font-medium">Everything in Monthly, plus:</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
                   <p className="text-sm">Lifetime access - no recurring fees</p>
                 </div>
                 <div className="flex items-start gap-3">
@@ -255,11 +209,7 @@ const Payment = () => {
                 </div>
                 <div className="flex items-start gap-3">
                   <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                  <p className="text-sm">Priority feature requests</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Check className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                  <p className="text-sm">VIP support channel</p>
+                  <p className="text-sm">Priority customer support</p>
                 </div>
               </div>
             </CardContent>
@@ -284,7 +234,7 @@ const Payment = () => {
             🔒 Secure payment processing by Stripe. Your payment information is never stored on our servers.
           </p>
           <p className="text-xs text-muted-foreground">
-            Questions? Contact us at support@shop-assist.com
+            Questions? Contact us at https://www.shop-assist.app/contact
           </p>
         </div>
       </div>

@@ -23,12 +23,12 @@ export const PRICING = {
     description: '$2.99/month - Cancel anytime'
   },
   LIFETIME: {
-    price: 34.99,
+    price: 9.99,
     priceId: import.meta.env.VITE_STRIPE_LIFETIME_PRICE_ID || '',
     paymentLink: import.meta.env.VITE_STRIPE_LIFETIME_PAYMENT_LINK || '',
     interval: 'one_time' as const,
     label: 'Lifetime Deal',
-    description: '$34.99 one-time payment'
+    description: '$9.99 one-time payment'
   }
 };
 
