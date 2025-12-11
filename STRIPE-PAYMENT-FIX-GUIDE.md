@@ -47,16 +47,16 @@ Ensure your Stripe webhook is properly configured:
    - `invoice.payment_succeeded`
 
 3. **Webhook Secret**: Verify it matches your `.env` file
-   - Current value in `.env`: `whsec_u2wkrxBl9nftZ1UtLEYp0WE6INRvZ1fv`
+   - Check your local `.env` file for `STRIPE_WEBHOOK_SECRET`
 
 ### 4. Environment Variables Check
 
-Your `.env` file contains:
+Your `.env` file should contain:
 ```
-STRIPE_SECRET_KEY=sk_live_51SRyO7Ls15YjqKLY...
-STRIPE_WEBHOOK_SECRET=whsec_u2wkrxBl9nftZ1UtLEYp0WE6INRvZ1fv
-VITE_STRIPE_LIFETIME_PRICE_ID=plink_1ScCGbLs15YjqKLYoHdvHMjD
-VITE_STRIPE_LIFETIME_PAYMENT_LINK=https://buy.stripe.com/bJe28s5Vs2Mo5hi8rRgnK04
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+VITE_STRIPE_LIFETIME_PRICE_ID=plink_...
+VITE_STRIPE_LIFETIME_PAYMENT_LINK=https://buy.stripe.com/...
 ```
 
 **Note**: The `VITE_STRIPE_LIFETIME_PRICE_ID` uses a payment link ID (`plink_`) which is correct for this implementation since you're using Stripe Payment Links.
