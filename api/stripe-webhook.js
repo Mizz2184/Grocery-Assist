@@ -83,15 +83,12 @@ async function handleCheckoutSessionCompleted(session) {
     return;
   }
 
-  // Get user by email
-  const { data: user, error: userError } = await supabase
-    .from('auth.users')
-    .select('id')
-    .eq('email', customerEmail)
-    .single();
+  // Get user by email using RPC function
+  const { data: userId, error: userError } = await supabase
+    .rpc('get_user_id_by_email', { user_email: customerEmail });
 
-  if (userError || !user) {
-    console.error('User not found:', customerEmail);
+  if (userError || !userId) {
+    console.error('User not found:', customerEmail, userError);
     return;
   }
 
@@ -110,7 +107,7 @@ async function handleCheckoutSessionCompleted(session) {
   const { error: paymentError } = await supabase
     .from('user_payments')
     .upsert({
-      user_id: user.id,
+      user_id: userId,
       status: 'PAID',
       stripe_customer_id: session.customer,
       stripe_subscription_id: session.subscription || null,
@@ -140,19 +137,16 @@ async function handlePaymentIntentSucceeded(paymentIntent) {
     const customer = await stripe.customers.retrieve(paymentIntent.customer);
     
     if (customer.email) {
-      // Get user by email
-      const { data: user, error: userError } = await supabase
-        .from('auth.users')
-        .select('id')
-        .eq('email', customer.email)
-        .single();
+      // Get user by email using RPC function
+      const { data: userId, error: userError } = await supabase
+        .rpc('get_user_id_by_email', { user_email: customer.email });
 
-      if (!userError && user) {
+      if (!userError && userId) {
         // Update payment status
         await supabase
           .from('user_payments')
           .upsert({
-            user_id: user.id,
+            user_id: userId,
             status: 'PAID',
             stripe_customer_id: paymentIntent.customer,
             payment_type: 'LIFETIME',
@@ -176,17 +170,14 @@ async function handleSubscriptionUpdate(subscription) {
   const customer = await stripe.customers.retrieve(subscription.customer);
   
   if (customer.email) {
-    const { data: user } = await supabase
-      .from('auth.users')
-      .select('id')
-      .eq('email', customer.email)
-      .single();
+    const { data: userId } = await supabase
+      .rpc('get_user_id_by_email', { user_email: customer.email });
 
-    if (user) {
+    if (userId) {
       await supabase
         .from('user_payments')
         .upsert({
-          user_id: user.id,
+          user_id: userId,
           status: subscription.status === 'active' ? 'PAID' : 'PENDING',
           stripe_customer_id: subscription.customer,
           stripe_subscription_id: subscription.id,
@@ -210,20 +201,17 @@ async function handleSubscriptionDeleted(subscription) {
   const customer = await stripe.customers.retrieve(subscription.customer);
   
   if (customer.email) {
-    const { data: user } = await supabase
-      .from('auth.users')
-      .select('id')
-      .eq('email', customer.email)
-      .single();
+    const { data: userId } = await supabase
+      .rpc('get_user_id_by_email', { user_email: customer.email });
 
-    if (user) {
+    if (userId) {
       await supabase
         .from('user_payments')
         .update({
           status: 'CANCELLED',
           updated_at: new Date().toISOString()
         })
-        .eq('user_id', user.id);
+        .eq('user_id', userId);
       
       console.log(`Subscription cancelled for user: ${customer.email}`);
     }
