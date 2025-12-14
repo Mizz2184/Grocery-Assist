@@ -160,17 +160,6 @@ export const getGroceryListById = async (
       return undefined;
     }
     
-    // Fetch user's products from user_products table
-    const { data: userProducts, error: productsError } = await supabase
-      .from('user_products')
-      .select('*')
-      .eq('user_id', list.user_id);
-      
-    if (productsError) {
-      console.error('Error fetching user products:', productsError);
-      // Continue without user products, using the embedded product_data
-    }
-    
     // Create a map of product_id to user product for quick lookup
     const productMap = new Map();
     
@@ -344,6 +333,13 @@ export const addProductToGroceryList = async (
       },
       created_at: now
     };
+
+    console.log('📦 Storing product in database:', {
+      name: product.name,
+      price: product.price,
+      store: product.store,
+      quantity: actualQuantity
+    });
 
     // Insert the item into the database
     const { error: insertError } = await supabase

@@ -250,6 +250,7 @@ app.get('/api/proxy/maxipali/barcode/:ean', async (req, res) => {
     // Try direct product search first - using a more reliable endpoint
     try {
 
+      console.log(`🔍 MaxiPali: Searching for EAN ${ean} using alternateIds_RefId`);
       const directSearchResponse = await axios.get(`https://www.maxipali.co.cr/api/catalog_system/pub/products/search`, {
         params: {
           'fq': `alternateIds_RefId:${ean}`,
@@ -265,25 +266,45 @@ app.get('/api/proxy/maxipali/barcode/:ean', async (req, res) => {
         timeout: 10000 // 10 second timeout
       });
 
+      console.log(`📦 MaxiPali API returned ${directSearchResponse.data?.length || 0} results for ${ean}`);
+      
       if (directSearchResponse.data && directSearchResponse.data.length > 0) {
         const product = directSearchResponse.data[0];
+        const item = product.items?.[0];
         
-        // Extract price and ensure it's a number
-        const rawPrice = product.items?.[0]?.sellers?.[0]?.commertialOffer?.Price;
-        const price = typeof rawPrice === 'string' ? parseFloat(rawPrice) : (rawPrice || 0);
+        // CRITICAL: Validate that the returned product's EAN matches the requested EAN
+        const itemEAN = item?.ean;
+        console.log(`🔍 Validating EAN: requested=${ean}, returned=${itemEAN}`);
+        
+        if (!itemEAN || itemEAN !== ean) {
+          console.log(`❌ EAN mismatch! Requested ${ean} but got ${itemEAN}. Skipping this result.`);
+          // Don't return this product - it's not a match
+        } else {
+          // Extract price and ensure it's a number
+          const rawPrice = item?.sellers?.[0]?.commertialOffer?.Price;
+          const price = typeof rawPrice === 'string' ? parseFloat(rawPrice) : (rawPrice || 0);
 
-        const responseData = {
-          id: product.productId,
-          name: product.productName,
-          brand: product.brand || 'Unknown',
-          price: price,
-          imageUrl: product.items?.[0]?.images?.[0]?.imageUrl || '',
-          store: 'MaxiPali',
-          ean: ean,
-          category: product.categories && product.categories[0] ? product.categories[0].split('/').pop() : 'Grocery'
-        };
+          const responseData = {
+            id: product.productId,
+            name: product.productName,
+            brand: product.brand || 'Unknown',
+            price: price,
+            imageUrl: item?.images?.[0]?.imageUrl || '',
+            store: 'MaxiPali',
+            barcode: itemEAN,
+            ean: itemEAN,
+            category: product.categories && product.categories[0] ? product.categories[0].split('/').pop() : 'Grocery'
+          };
 
-        return res.json(responseData);
+          console.log(`✅ MaxiPali direct search for ${ean}:`, {
+            productId: product.productId,
+            name: responseData.name,
+            price: responseData.price,
+            validatedEAN: itemEAN
+          });
+
+          return res.json(responseData);
+        }
       } else {
 
       }
@@ -298,7 +319,7 @@ app.get('/api/proxy/maxipali/barcode/:ean', async (req, res) => {
 
     // Try second search method - using free text search
     try {
-
+      console.log(`🔍 MaxiPali: Trying free text search for ${ean}`);
       const freeTextResponse = await axios.get(`https://www.maxipali.co.cr/api/catalog_system/pub/products/search`, {
         params: {
           'ft': ean
@@ -312,25 +333,38 @@ app.get('/api/proxy/maxipali/barcode/:ean', async (req, res) => {
         timeout: 10000 // 10 second timeout
       });
 
+      console.log(`📦 MaxiPali free text search returned ${freeTextResponse.data?.length || 0} results for ${ean}`);
+      
       if (freeTextResponse.data && freeTextResponse.data.length > 0) {
         const product = freeTextResponse.data[0];
+        const item = product.items?.[0];
         
-        // Extract price and ensure it's a number
-        const rawPrice = product.items?.[0]?.sellers?.[0]?.commertialOffer?.Price;
-        const price = typeof rawPrice === 'string' ? parseFloat(rawPrice) : (rawPrice || 0);
+        // CRITICAL: Validate that the returned product's EAN matches the requested EAN
+        const itemEAN = item?.ean;
+        console.log(`🔍 Free text - Validating EAN: requested=${ean}, returned=${itemEAN}`);
+        
+        if (!itemEAN || itemEAN !== ean) {
+          console.log(`❌ Free text EAN mismatch! Requested ${ean} but got ${itemEAN}. Skipping.`);
+          // Don't return this product - it's not a match
+        } else {
+          // Extract price and ensure it's a number
+          const rawPrice = item?.sellers?.[0]?.commertialOffer?.Price;
+          const price = typeof rawPrice === 'string' ? parseFloat(rawPrice) : (rawPrice || 0);
 
-        const responseData = {
-          id: product.productId,
-          name: product.productName,
-          brand: product.brand || 'Unknown',
-          price: price,
-          imageUrl: product.items?.[0]?.images?.[0]?.imageUrl || '',
-          store: 'MaxiPali',
-          ean: ean,
-          category: product.categories && product.categories[0] ? product.categories[0].split('/').pop() : 'Grocery'
-        };
+          const responseData = {
+            id: product.productId,
+            name: product.productName,
+            brand: product.brand || 'Unknown',
+            price: price,
+            imageUrl: item?.images?.[0]?.imageUrl || '',
+            store: 'MaxiPali',
+            barcode: itemEAN,
+            ean: itemEAN,
+            category: product.categories && product.categories[0] ? product.categories[0].split('/').pop() : 'Grocery'
+          };
 
-        return res.json(responseData);
+          return res.json(responseData);
+        }
       } else {
 
       }
@@ -405,22 +439,42 @@ app.get('/api/proxy/maxipali/barcode/:ean', async (req, res) => {
       
       // If we don't have a good match, use the first product but with a note
       const product = bestMatch || altSearchResponse.data.products[0];
+      const item = product.items?.[0];
+      
+      // CRITICAL: Validate that the returned product's EAN matches the requested EAN
+      const itemEAN = item?.ean;
+      console.log(`🔍 Intelligent search - Validating EAN: requested=${ean}, returned=${itemEAN}, matchScore=${matchScore}`);
+      
+      if (!itemEAN || itemEAN !== ean) {
+        console.log(`❌ Intelligent search EAN mismatch! Requested ${ean} but got ${itemEAN}. Returning 404.`);
+        return res.status(404).json({
+          error: 'Product not found',
+          details: `No product found with matching EAN: ${ean}`
+        });
+      }
       
       // Extract price and ensure it's a number
       const rawPrice = product.price;
       const price = typeof rawPrice === 'string' ? parseFloat(rawPrice) : (rawPrice || 0);
-
+      
       const transformedData = {
         id: product.productId,
         name: product.productName || 'Unknown Product',
         brand: product.brand || 'Unknown',
         price: price,
-        imageUrl: product.items?.[0]?.images?.[0]?.imageUrl || '',
+        imageUrl: item?.images?.[0]?.imageUrl || '',
         store: 'MaxiPali',
-        ean: ean,
+        barcode: itemEAN,
+        ean: itemEAN,
         category: 'Grocery',
         matchConfidence: matchScore > 0 ? 'high' : 'low'
       };
+
+      console.log(`✅ MaxiPali barcode ${ean} found:`, {
+        name: transformedData.name,
+        price: transformedData.price,
+        validatedEAN: itemEAN
+      });
 
       return res.json(transformedData);
     } catch (altSearchError) {
@@ -698,7 +752,8 @@ app.get('/api/proxy/masxmenos/barcode/:ean', async (req, res) => {
         price: price,
         imageUrl: imageUrl,
         store: 'MasxMenos',
-        ean: ean,
+        barcode: matchedItem?.ean || ean,
+        ean: matchedItem?.ean || ean,
         category: product.categories && product.categories.length > 0 
           ? product.categories[0].split('/').filter(Boolean).pop() || 'Grocery'
           : 'Grocery'

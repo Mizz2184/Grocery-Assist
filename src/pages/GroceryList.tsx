@@ -68,6 +68,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { ShareGroceryList } from "@/components/ShareGroceryList";
+import { ReceiptScanner } from "@/components/ReceiptScanner";
 import { Product } from "@/lib/types/store";
 import type { GroceryList, GroceryListItem } from "@/types/groceryList";
 import { useGroceryList } from "@/hooks/useGroceryList";
@@ -974,13 +975,20 @@ const GroceryList = () => {
                     )}
                   </div>
                   
-                  <div className="flex items-center gap-2 w-full">
+                  <div className="flex items-center gap-2 w-full flex-wrap">
                     {activeList.createdBy === user?.id && (
                       <ShareGroceryList 
                         listId={activeList.id} 
                         userId={user?.id || ''} 
                         listName={activeList.name}
                         collaborators={activeList.collaborators || []}
+                      />
+                    )}
+                    {(activeList.createdBy === user?.id || activeList.hasEditPermission) && user && (
+                      <ReceiptScanner
+                        listId={activeList.id}
+                        userId={user.id}
+                        onProductsAdded={fetchLists}
                       />
                     )}
                     {(activeList.createdBy === user?.id || activeList.hasEditPermission) && (

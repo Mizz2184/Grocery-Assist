@@ -18,6 +18,7 @@ export interface Product {
   };
   unit?: string;
   quantity?: number;
+  barcode?: string;        // Product barcode for receipt scanning
   regularPrice?: number;  // Original price before discount
   salePrice?: number;     // Discounted price (same as price when on sale)
   isOnSale?: boolean;     // Whether the product is currently on sale
