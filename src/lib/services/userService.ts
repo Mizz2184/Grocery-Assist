@@ -231,8 +231,14 @@ export const markUserAsNew = async (userId: string): Promise<boolean> => {
 
 /**
  * Checks if a user is new (has no payment status)
+ * PAYWALL DISABLED: Always returns false (all users treated as having access)
+ * To re-enable, uncomment the code below and remove the return false statement
  */
 export const isNewUser = async (userId: string): Promise<boolean> => {
+  // FREE ACCESS MODE - All users are treated as existing users with access
+  return false;
+  
+  /* PAYWALL CODE - Uncomment to re-enable new user check
   try {
     // First, check if the user has a session (required for RLS policies)
     const { data: sessionData } = await supabase.auth.getSession();
@@ -257,12 +263,13 @@ export const isNewUser = async (userId: string): Promise<boolean> => {
       return false;
     }
     
-    // User is new if they have no payment record or status is NONE
-    return !data || data.status === PAYMENT_STATUS.NONE;
+    // If there's a record, user is not new
+    return false;
   } catch (error) {
     console.error('Error in isNewUser:', error);
     return false;
   }
+  */
 };
 
 export const manuallyConfirmEmail = async (userId: string, adminPassword: string): Promise<boolean> => {
