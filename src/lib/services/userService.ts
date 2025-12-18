@@ -150,8 +150,14 @@ export const setUserPaid = async (userId: string): Promise<boolean> => {
 
 /**
  * Checks if a user has paid
+ * PAYWALL DISABLED: Currently returns true for all users (free access)
+ * To re-enable paywall, uncomment the code below and remove the return true statement
  */
 export const checkUserPaymentStatus = async (userId: string): Promise<boolean> => {
+  // FREE ACCESS MODE - All users have access
+  return true;
+  
+  /* PAYWALL CODE - Uncomment to re-enable payment verification
   try {
     // Check for network connectivity first
     if (!navigator.onLine) {
@@ -185,6 +191,7 @@ export const checkUserPaymentStatus = async (userId: string): Promise<boolean> =
     }
     return false;
   }
+  */
 };
 
 /**
